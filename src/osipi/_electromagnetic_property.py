@@ -1,9 +1,9 @@
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 
 def R1_to_C_linear_relaxivity(
-    R1: NDArray[np.floating], R10: np.floating, r1: np.floating
+    R1: ArrayLike, R10: np.floating, r1: np.floating
 ) -> NDArray[np.floating]:
     """
     Electromagnetic property inverse model:
@@ -12,7 +12,7 @@ def R1_to_C_linear_relaxivity(
     Converts R1 to tissue concentration
 
     Args:
-        R1 (1D array of np.floating):
+        R1 (ArrayLike):
             Vector of longitudinal relaxation rate in units of /s. [OSIPI code Q.EL1.001]
         R10 (np.floating):
             Native longitudinal relaxation rate in units of /s. [OSIPI code Q.EL1.002]
@@ -32,9 +32,15 @@ def R1_to_C_linear_relaxivity(
             longitudinal relaxation rate, linear with relaxivity model [OSIPI code M.EL1.003]
         - Adapted from equation given in lexicon
     """
-    # Check R1 is a 1D array of floats
-    if not (isinstance(R1, np.ndarray) and R1.ndim == 1 and np.issubdtype(R1.dtype, np.floating)):
-        raise TypeError("R1 must be a 1D NumPy array of np.floating")
+    # Convert input to numpy array with appropriate dtype
+    R1_arr = np.asarray(R1)
+    # Ensure floating-point dtype
+    if not np.issubdtype(R1_arr.dtype, np.floating):
+        R1_arr = R1_arr.astype(np.float64)
+
+    # Check R1 is a 1D array
+    if not (R1_arr.ndim == 1):
+        raise TypeError("R1 must be a 1D array-like object of floating point values")
     elif not (r1 >= 0):
         raise ValueError("r1 must be positive")
-    return (R1 - R10) / r1  # C
+    return (R1_arr - R10) / r1  # C

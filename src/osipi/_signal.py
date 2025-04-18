@@ -1,12 +1,11 @@
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 
-# Use a more generic floating-point type annotation
-def signal_linear(R1: NDArray[np.floating], k: np.floating) -> NDArray[np.floating]:
+def signal_linear(R1: ArrayLike, k: np.floating) -> NDArray[np.floating]:
     """Linear model for relationship between R1 and magnitude signal
     Args:
-        R1 (NDArray[np.floating]): longitudinal relaxation rate in units of /s. [OSIPI code Q.EL1.001]
+        R1 (ArrayLike): longitudinal relaxation rate in units of /s. [OSIPI code Q.EL1.001]
         k (np.floating): proportionality constant in a.u. S [OSIPI code Q.GE1.009]
     Returns:
         NDArray[np.floating]: magnitude signal in a.u. [OSIPI code Q.MS1.001]
@@ -16,20 +15,26 @@ def signal_linear(R1: NDArray[np.floating], k: np.floating) -> NDArray[np.floati
         - OSIPI name: Linear model
         - Adapted from equation given in the Lexicon
     """
+    # Convert input to numpy array with appropriate dtype
+    R1_arr = np.asarray(R1)
+    # Ensure floating-point dtype
+    if not np.issubdtype(R1_arr.dtype, np.floating):
+        R1_arr = R1_arr.astype(np.float64)
+
     # calculate signal
-    return k * R1  # S
+    return k * R1_arr  # S
 
 
 def signal_SPGR(
-    R1: NDArray[np.floating],
-    S0: NDArray[np.floating],
+    R1: ArrayLike,
+    S0: ArrayLike,
     TR: np.floating,
     a: np.floating,
 ) -> NDArray[np.floating]:
     """Steady-state signal for SPGR sequence.
     Args:
-        R1 (NDArray[np.floating]): longitudinal relaxation rate in units of /s. [OSIPI code Q.EL1.001]
-        S0 (NDArray[np.floating]): fully T1-relaxed signal in a.u. [OSIPI code Q.MS1.010]
+        R1 (ArrayLike): longitudinal relaxation rate in units of /s. [OSIPI code Q.EL1.001]
+        S0 (ArrayLike): fully T1-relaxed signal in a.u. [OSIPI code Q.MS1.010]
         TR (np.floating): repetition time in units of s. [OSIPI code Q.MS1.006]
         a (np.floating): prescribed flip angle in units of deg. [OSIPI code Q.MS1.007]
     Returns:
@@ -40,7 +45,17 @@ def signal_SPGR(
         - OSIPI name: Spoiled gradient recalled echo model
         - Adapted from equation given in the Lexicon and contribution from MJT_UoEdinburgh_UK
     """
+    # Convert inputs to numpy arrays with appropriate dtype
+    R1_arr = np.asarray(R1)
+    S0_arr = np.asarray(S0)
+
+    # Ensure floating-point dtype
+    if not np.issubdtype(R1_arr.dtype, np.floating):
+        R1_arr = R1_arr.astype(np.float64)
+    if not np.issubdtype(S0_arr.dtype, np.floating):
+        S0_arr = S0_arr.astype(np.float64)
+
     # calculate signal
     a_rad = a * np.pi / 180
-    exp_TR_R1 = np.exp(-TR * R1)
-    return S0 * (((1.0 - exp_TR_R1) * np.sin(a_rad)) / (1.0 - exp_TR_R1 * np.cos(a_rad)))  # S
+    exp_TR_R1 = np.exp(-TR * R1_arr)
+    return S0_arr * (((1.0 - exp_TR_R1) * np.sin(a_rad)) / (1.0 - exp_TR_R1 * np.cos(a_rad)))  # S

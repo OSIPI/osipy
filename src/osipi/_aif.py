@@ -1,14 +1,14 @@
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 
 def aif_parker(
-    t: NDArray[np.floating], BAT: np.floating = 0.0, Hct: np.floating = 0.0
+    t: ArrayLike, BAT: np.floating = 0.0, Hct: np.floating = 0.0
 ) -> NDArray[np.floating]:
     """AIF model as defined by Parker et al (2005)
 
     Args:
-        t (NDArray[np.floating]): array of time points in units of sec. [OSIPI code Q.GE1.004]
+        t (ArrayLike): array of time points in units of sec. [OSIPI code Q.GE1.004]
         BAT (np.floating, optional):
             Time in seconds before the bolus arrives. Defaults to 0. [OSIPI code Q.BA1.001]
         Hct (np.floating, optional):
@@ -45,8 +45,14 @@ def aif_parker(
         >>> plt.show()
 
     """
+    # Convert input to numpy array with appropriate dtype
+    t_arr = np.asarray(t)
+    # Ensure floating-point dtype
+    if not np.issubdtype(t_arr.dtype, np.floating):
+        t_arr = t_arr.astype(np.float64)
+
     # Convert from OSIPI units (sec) to units used internally (mins)
-    t_min = t / 60
+    t_min = t_arr / 60
     bat_min = BAT / 60
 
     t_offset = t_min - bat_min
@@ -71,7 +77,7 @@ def aif_parker(
     return pop_aif
 
 
-def aif_georgiou(t: NDArray[np.floating], BAT: np.floating = 0.0) -> NDArray[np.floating]:
+def aif_georgiou(t: ArrayLike, BAT: np.floating = 0.0) -> NDArray[np.floating]:
     """AIF model as defined by Georgiou et al.
 
     Note:
@@ -80,7 +86,7 @@ def aif_georgiou(t: NDArray[np.floating], BAT: np.floating = 0.0) -> NDArray[np.
         so nobody ever has to write this function again!
 
     Args:
-        t (NDArray[np.floating]): array of time points in units of sec. [OSIPI code Q.GE1.004]
+        t (ArrayLike): array of time points in units of sec. [OSIPI code Q.GE1.004]
         BAT (np.floating, optional):
             Time in seconds before the bolus arrives. Defaults to 0sec. [OSIPI code Q.BA1.001]
 
@@ -125,7 +131,7 @@ def aif_georgiou(t: NDArray[np.floating], BAT: np.floating = 0.0) -> NDArray[np.
     raise NotImplementedError(msg)
 
 
-def aif_weinmann(t: NDArray[np.floating], BAT: np.floating = 0.0) -> NDArray[np.floating]:
+def aif_weinmann(t: ArrayLike, BAT: np.floating = 0.0) -> NDArray[np.floating]:
     """AIF model as defined by Weinmann et al.
 
     Note:
@@ -134,7 +140,7 @@ def aif_weinmann(t: NDArray[np.floating], BAT: np.floating = 0.0) -> NDArray[np.
         so nobody ever has to write this function again!
 
     Args:
-        t (NDArray[np.floating]): array of time points in units of sec. [OSIPI code Q.GE1.004]
+        t (ArrayLike): array of time points in units of sec. [OSIPI code Q.GE1.004]
         BAT (np.floating, optional):
             Time in seconds before the bolus arrives. Defaults to 0sec. [OSIPI code Q.BA1.001]
 
