@@ -125,8 +125,7 @@ def aif_georgiou(t: ArrayLike, BAT: np.floating = 0.0) -> NDArray[np.floating]:
 
     msg = "This function is not yet implemented \n"
     msg += (
-        "If you implement it yourself, please consider submitting it"
-        " as an OSIPI code contribution"
+        "If you implement it yourself, please consider submitting it as an OSIPI code contribution"
     )
     raise NotImplementedError(msg)
 
@@ -178,7 +177,6 @@ def aif_weinmann(t: ArrayLike, BAT: np.floating = 0.0) -> NDArray[np.floating]:
 
     msg = "This function is not yet implemented \n"
     msg += (
-        "If you implement it yourself, please consider submitting it"
-        " as an OSIPI code contribution"
+        "If you implement it yourself, please consider submitting it as an OSIPI code contribution"
     )
     raise NotImplementedError(msg)

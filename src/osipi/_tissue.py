@@ -86,7 +86,7 @@ def tofts(
 
     if not np.allclose(np.diff(t_arr), np.diff(t_arr)[0]):
         warnings.warn(
-            ("Non-uniform time spacing detected. Time array may be" " resampled."),
+            ("Non-uniform time spacing detected. Time array may be resampled."),
             stacklevel=2,
         )
 
@@ -253,7 +253,7 @@ def extended_tofts(
 
     if not np.allclose(np.diff(t_arr), np.diff(t_arr)[0]):
         warnings.warn(
-            ("Non-uniform time spacing detected. Time array may be" " resampled."),
+            ("Non-uniform time spacing detected. Time array may be resampled."),
             stacklevel=2,
         )
 
