@@ -1,15 +1,15 @@
 import warnings
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 from scipy.interpolate import interp1d
 
 from ._convolution import exp_conv
 
 
 def tofts(
-    t: NDArray[np.floating],
-    ca: NDArray[np.floating],
+    t: ArrayLike,
+    ca: ArrayLike,
     Ktrans: np.floating,
     ve: np.floating,
     Ta: np.floating = 30.0,
@@ -18,8 +18,8 @@ def tofts(
     """Tofts model as defined by Tofts and Kermode (1991)
 
     Args:
-        t (NDArray[np.floating]): array of time points in units of sec. [OSIPI code Q.GE1.004]
-        ca (NDArray[np.floating]):
+        t (ArrayLike): array of time points in units of sec. [OSIPI code Q.GE1.004]
+        ca (ArrayLike):
             Arterial concentrations in mM for each time point in t. [OSIPI code Q.IC1.001]
         Ktrans (np.floating):
             Volume transfer constant in units of 1/min. [OSIPI code Q.PH1.008]
@@ -74,14 +74,24 @@ def tofts(
         >>> plt.plot(t, ca, "r", t, ct, "b")
 
     """
-    if not np.allclose(np.diff(t), np.diff(t)[0]):
+    # Convert inputs to numpy arrays with appropriate dtype
+    t_arr = np.asarray(t)
+    ca_arr = np.asarray(ca)
+
+    # Ensure floating-point dtype
+    if not np.issubdtype(t_arr.dtype, np.floating):
+        t_arr = t_arr.astype(np.float64)
+    if not np.issubdtype(ca_arr.dtype, np.floating):
+        ca_arr = ca_arr.astype(np.float64)
+
+    if not np.allclose(np.diff(t_arr), np.diff(t_arr)[0]):
         warnings.warn(
-            ("Non-uniform time spacing detected. Time array may be" " resampled."),
+            ("Non-uniform time spacing detected. Time array may be resampled."),
             stacklevel=2,
         )
 
     if Ktrans <= 0 or ve <= 0:
-        ct = 0 * ca
+        ct = 0 * ca_arr
 
     else:
         # Convert units
@@ -91,54 +101,54 @@ def tofts(
             # Shift the AIF by the arterial delay time (if not zero)
             if Ta != 0:
                 f = interp1d(
-                    t,
-                    ca,
+                    t_arr,
+                    ca_arr,
                     kind="linear",
                     bounds_error=False,
                     fill_value=0,
                 )
-                ca = (t > Ta) * f(t - Ta)
+                ca_arr = (t_arr > Ta) * f(t_arr - Ta)
 
             Tc = ve / Ktrans
-            ct = ve * exp_conv(Tc, t, ca)
+            ct = ve * exp_conv(Tc, t_arr, ca_arr)
 
         else:  # Use convolution by default
             # Calculate the impulse response function
             kep = Ktrans / ve
-            imp = Ktrans * np.exp(-1 * kep * t)
+            imp = Ktrans * np.exp(-1 * kep * t_arr)
 
             # Shift the AIF by the arterial delay time (if not zero)
             if Ta != 0:
                 f = interp1d(
-                    t,
-                    ca,
+                    t_arr,
+                    ca_arr,
                     kind="linear",
                     bounds_error=False,
                     fill_value=0,
                 )
-                ca = (t > Ta) * f(t - Ta)
+                ca_arr = (t_arr > Ta) * f(t_arr - Ta)
 
             # Check if time data grid is uniformly spaced
-            if np.allclose(np.diff(t), np.diff(t)[0]):
+            if np.allclose(np.diff(t_arr), np.diff(t_arr)[0]):
                 # Convolve impulse response with AIF
-                convolution = np.convolve(ca, imp)
+                convolution = np.convolve(ca_arr, imp)
 
                 # Discard unwanted points and make sure time spacing
                 # is correct
-                ct = convolution[0 : len(t)] * t[1]
+                ct = convolution[0 : len(t_arr)] * t_arr[1]
             else:
                 # Resample at the smallest spacing
-                dt = np.min(np.diff(t))
-                t_resampled = np.linspace(t[0], t[-1], int((t[-1] - t[0]) / dt))
+                dt = np.min(np.diff(t_arr))
+                t_resampled = np.linspace(t_arr[0], t_arr[-1], int((t_arr[-1] - t_arr[0]) / dt))
                 ca_func = interp1d(
-                    t,
-                    ca,
+                    t_arr,
+                    ca_arr,
                     kind="quadratic",
                     bounds_error=False,
                     fill_value=0,
                 )
                 imp_func = interp1d(
-                    t,
+                    t_arr,
                     imp,
                     kind="quadratic",
                     bounds_error=False,
@@ -149,8 +159,7 @@ def tofts(
                 # Convolve impulse response with AIF
                 convolution = np.convolve(ca_resampled, imp_resampled)
 
-                # Discard unwanted points and make sure time spacing
-                # is correct
+                # Discard unwanted points and make sure time spacing is correct
                 ct_resampled = convolution[0 : len(t_resampled)] * t_resampled[1]
 
                 # Restore time grid spacing
@@ -161,14 +170,14 @@ def tofts(
                     bounds_error=False,
                     fill_value=0,
                 )
-                ct = ct_func(t)
+                ct = ct_func(t_arr)
 
     return ct
 
 
 def extended_tofts(
-    t: NDArray[np.floating],
-    ca: NDArray[np.floating],
+    t: ArrayLike,
+    ca: ArrayLike,
     Ktrans: np.floating,
     ve: np.floating,
     vp: np.floating,
@@ -178,15 +187,9 @@ def extended_tofts(
     """Extended tofts model as defined by Tofts (1997)
 
     Args:
-        t (NDArray[np.floating]):
+        t (ArrayLike):
             array of time points in units of sec. [OSIPI code Q.GE1.004]
-        ca (NDArray[np.floating]):
-            Arterial concentrations in mM for each time point in t. [OSIPI code Q.IC1.001]
-        Ktrans (np.floating):
-            Volume transfer constant in units of 1/min. [OSIPI code Q.PH1.008]
-        ve (np.floating):
-            Relative volume fraction of the extracellular
-            extravascular compartment (e). [OSIPI code Q.PH1.001.[e]]
+        ca (ArrayLike):
         vp (np.floating):
             Relative volyme fraction of the plasma compartment (p). [OSIPI code Q.PH1.001.[p]]
         Ta (np.floating, optional):
@@ -238,15 +241,24 @@ def extended_tofts(
         >>> plt.plot(t, ca, "r", t, ct, "b")
 
     """
+    # Convert inputs to numpy arrays with appropriate dtype
+    t_arr = np.asarray(t)
+    ca_arr = np.asarray(ca)
 
-    if not np.allclose(np.diff(t), np.diff(t)[0]):
+    # Ensure floating-point dtype
+    if not np.issubdtype(t_arr.dtype, np.floating):
+        t_arr = t_arr.astype(np.float64)
+    if not np.issubdtype(ca_arr.dtype, np.floating):
+        ca_arr = ca_arr.astype(np.float64)
+
+    if not np.allclose(np.diff(t_arr), np.diff(t_arr)[0]):
         warnings.warn(
-            ("Non-uniform time spacing detected. Time array may be" " resampled."),
+            ("Non-uniform time spacing detected. Time array may be resampled."),
             stacklevel=2,
         )
 
     if Ktrans <= 0 or ve <= 0:
-        ct = vp * ca
+        ct = vp * ca_arr
 
     else:
         # Convert units
@@ -256,56 +268,56 @@ def extended_tofts(
             # Shift the AIF by the arterial delay time (if not zero)
             if Ta != 0:
                 f = interp1d(
-                    t,
-                    ca,
+                    t_arr,
+                    ca_arr,
                     kind="linear",
                     bounds_error=False,
                     fill_value=0,
                 )
-                ca = (t > Ta) * f(t - Ta)
+                ca_arr = (t_arr > Ta) * f(t_arr - Ta)
 
             Tc = ve / Ktrans
             # expconv calculates convolution of ca and
             # (1/Tc)exp(-t/Tc), add vp*ca term for extended model
-            ct = (vp * ca) + ve * exp_conv(Tc, t, ca)
+            ct = (vp * ca_arr) + ve * exp_conv(Tc, t_arr, ca_arr)
 
         else:  # Use convolution by default
             # Calculate the impulse response function
             kep = Ktrans / ve
-            imp = Ktrans * np.exp(-1 * kep * t)
+            imp = Ktrans * np.exp(-1 * kep * t_arr)
 
             # Shift the AIF by the arterial delay time (if not zero)
             if Ta != 0:
                 f = interp1d(
-                    t,
-                    ca,
+                    t_arr,
+                    ca_arr,
                     kind="linear",
                     bounds_error=False,
                     fill_value=0,
                 )
-                ca = (t > Ta) * f(t - Ta)
+                ca_arr = (t_arr > Ta) * f(t_arr - Ta)
 
             # Check if time data grid is uniformly spaced
-            if np.allclose(np.diff(t), np.diff(t)[0]):
+            if np.allclose(np.diff(t_arr), np.diff(t_arr)[0]):
                 # Convolve impulse response with AIF
-                convolution = np.convolve(ca, imp)
+                convolution = np.convolve(ca_arr, imp)
 
                 # Discard unwanted points, make sure time spacing is
                 # correct and add vp*ca term for extended model
-                ct = convolution[0 : len(t)] * t[1] + (vp * ca)
+                ct = convolution[0 : len(t_arr)] * t_arr[1] + (vp * ca_arr)
             else:
                 # Resample at the smallest spacing
-                dt = np.min(np.diff(t))
-                t_resampled = np.linspace(t[0], t[-1], int((t[-1] - t[0]) / dt))
+                dt = np.min(np.diff(t_arr))
+                t_resampled = np.linspace(t_arr[0], t_arr[-1], int((t_arr[-1] - t_arr[0]) / dt))
                 ca_func = interp1d(
-                    t,
-                    ca,
+                    t_arr,
+                    ca_arr,
                     kind="quadratic",
                     bounds_error=False,
                     fill_value=0,
                 )
                 imp_func = interp1d(
-                    t,
+                    t_arr,
                     imp,
                     kind="quadratic",
                     bounds_error=False,
@@ -330,6 +342,6 @@ def extended_tofts(
                     bounds_error=False,
                     fill_value=0,
                 )
-                ct = ct_func(t)
+                ct = ct_func(t_arr)
 
     return ct
