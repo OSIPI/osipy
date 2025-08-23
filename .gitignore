@@ -14,3 +14,4 @@ docs/generated
 site
 src/osipi.egg-info
 venv
+.vscode

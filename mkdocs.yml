@@ -1,10 +1,10 @@
 site_name: ''
 repo_url: https://github.com/OSIPI/pypi
+
 theme:
   name: material
-  logo: img/osipi.png
-  icon:
-    repo: fontawesome/brands/github
+  logo: assets/osipiImgs/OSIPI_logo.png
+  favicon: assets/osipiImgs/OSIPI_logo_only_square.png
   features:
     - header.autohide
     - navigation.tabs
@@ -20,28 +20,47 @@ theme:
     - search.highlight
     - search.share
     - content.tabs.link
-    - content.code.annotation
+    - content.code.annotate
     - content.code.copy
     - content.code.select
+    - content.tooltips
     - tables
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - navigation.tracking
+    - toc.follow
 
   language: en
   palette:
-    - scheme: default
-      primary: teal
-      accent: purple
+    - media: "(prefers-color-scheme)"
       toggle:
-        icon: material/weather-sunny
-        name: Switch to dark mode
-    - scheme: slate
+        icon: material/link
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
       toggle:
-        icon: material/weather-night
+        icon: material/toggle-switch
         name: Switch to dark mode
-      primary: teal
-      accent: lime
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off
+        name: Switch to system preference
+  font:
+    text: Roboto
+    code: Roboto Mono
 
 plugins:
-  - search
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - minify:
+      minify_html: true
+  - open-in-new-tab
   - mkdocstrings:
       handlers:
         python:
@@ -50,8 +69,15 @@ plugins:
       examples_dirs: docs/examples
       gallery_dirs: docs/generated/gallery
 
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/OSIPI
+    - icon: fontawesome/brands/slack
+      link: https://app.slack.com/client/TFGVCE9HS
+
 extra_css:
-  - stylesheets/extra.css
+    - assets/stylesheets/extra.css
 
 nav:
   - Home: index.md
@@ -84,33 +110,53 @@ nav:
   - Examples: generated/gallery
 
 
+# Extensions
 markdown_extensions:
+  - abbr
   - admonition
+  - attr_list
   - codehilite
+  - def_list
   - footnotes
-  - meta
+  - md_in_html
   - toc:
       permalink: true
-  - tables
-  - pymdownx.arithmatex
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.betterem:
       smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
-  - pymdownx.caret
-  - pymdownx.critic
-  - pymdownx.details
   - pymdownx.inlinehilite
-  - pymdownx.magiclink
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: squidfunk
+      repo: mkdocs-material
   - pymdownx.mark
   - pymdownx.smartsymbols
-  - pymdownx.superfences
-  - pymdownx.details
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
-  - pymdownx.tabbed:
-        alternate_style: true
-  - attr_list
