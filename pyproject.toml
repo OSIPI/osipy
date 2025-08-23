@@ -1,7 +1,7 @@
 [project]
 name = "osipi"
 version = "0.1.2"
-dependencies = [ "numpy", "scipy"]
+dependencies = [ "numpy", "scipy",]
 description = "The authorative python package for perfusion MRI"
 readme = "README.md"
 classifiers = [ "Development Status :: 3 - Alpha", "Intended Audience :: Developers", "Intended Audience :: Science/Research", "Topic :: Scientific/Engineering", "Operating System :: OS Independent", "License :: OSI Approved :: Apache Software License", "Programming Language :: Python", "Programming Language :: Python :: 3",]
