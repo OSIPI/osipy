@@ -45,8 +45,8 @@ def test_tissue_tofts():
     ca = osipi.aif_parker(t)
     ct_conv = osipi.tofts(t, ca, Ktrans=0.6, ve=0.2)
     ct_exp = osipi.tofts(t, ca, Ktrans=0.6, ve=0.2, discretization_method="exp")
-    assert math.isclose(np.trapz(ct_conv, t) / np.trapz(ca, t), 0.2, abs_tol=1e-1)
-    assert math.isclose(np.trapz(ct_exp, t) / np.trapz(ca, t), 0.2, abs_tol=1e-1)
+    assert math.isclose(np.trapezoid(ct_conv, t) / np.trapezoid(ca, t), 0.2, abs_tol=1e-1)
+    assert math.isclose(np.trapezoid(ct_exp, t) / np.trapezoid(ca, t), 0.2, abs_tol=1e-1)
 
     # 6. Test specific use cases
     t = np.arange(0, 6 * 60, 1)
@@ -102,11 +102,11 @@ def test_tissue_extended_tofts():
     ct_conv = osipi.extended_tofts(t, ca, Ktrans=0.6, ve=0.2, vp=0.3)
     ct_exp = osipi.extended_tofts(t, ca, Ktrans=0.6, ve=0.2, vp=0.3, discretization_method="exp")
     assert math.isclose(
-        np.trapz(ct_conv, t) / np.trapz(ca, t),
+        np.trapezoid(ct_conv, t) / np.trapezoid(ca, t),
         0.2 + 0.3,
         abs_tol=1e-1,
     )
-    assert math.isclose(np.trapz(ct_exp, t) / np.trapz(ca, t), 0.2 + 0.3, abs_tol=1e-1)
+    assert math.isclose(np.trapezoid(ct_exp, t) / np.trapezoid(ca, t), 0.2 + 0.3, abs_tol=1e-1)
 
     # 6. Test specific use cases
     t = np.arange(0, 6 * 60, 1)
