@@ -49,7 +49,7 @@ jobs:
         run: poetry install
 
       - name: Test with pytest
-        run: poetry run pytest --junitxml=junit/test-results.xml --cov=dbdicom tests/
+        run: poetry run pytest --junitxml=junit/test-results.xml --cov=osipi tests/
 
       - name: Upload coverage to Codecov
         if: runner.os == 'Windows'
