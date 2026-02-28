@@ -9,3 +9,7 @@ def run_coverage():
         subprocess.run(["poetry", "run", "coverage", "report", "--fail-under=95"], check=True)
     except subprocess.CalledProcessError as e:
         print(f"Coverage check failed: {e}")
+
+
+if __name__ == "__main__":
+    run_coverage()
