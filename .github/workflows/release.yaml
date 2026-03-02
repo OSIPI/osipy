@@ -66,7 +66,7 @@ jobs:
           sed -i "s/__version__ = \".*\"/__version__ = \"${new_version}\"/" osipy/_version.py
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
-      - name: Create release PR and merge
+      - name: Create release PR, approve, and merge
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -86,6 +86,7 @@ jobs:
             --base main \
             --head "$branch"
 
+          gh pr review "$branch" --approve
           gh pr merge "$branch" --squash --delete-branch
 
       - name: Pull merged main and tag
