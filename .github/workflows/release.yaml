@@ -24,6 +24,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
   id-token: write
 
 jobs:
@@ -65,18 +66,35 @@ jobs:
           sed -i "s/__version__ = \".*\"/__version__ = \"${new_version}\"/" osipy/_version.py
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
 
-      - name: Commit version bump
+      - name: Create release PR and merge
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          version="${{ steps.version.outputs.version }}"
+          branch="release/v${version}"
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
           git add osipy/_version.py
-          git commit -m "release: v${{ steps.version.outputs.version }}"
-          git push
+          git commit -m "release: v${version}"
+          git push origin "$branch"
 
-      - name: Create tag
+          gh pr create \
+            --title "release: v${version}" \
+            --body "Automated version bump to v${version}" \
+            --base main \
+            --head "$branch"
+
+          gh pr merge "$branch" --squash --delete-branch
+
+      - name: Pull merged main and tag
         run: |
-          git tag "v${{ steps.version.outputs.version }}"
-          git push origin "v${{ steps.version.outputs.version }}"
+          version="${{ steps.version.outputs.version }}"
+          git checkout main
+          git pull origin main
+          git tag "v${version}"
+          git push origin "v${version}"
 
       - name: Build package
         run: uv build

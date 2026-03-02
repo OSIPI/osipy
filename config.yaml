@@ -1,0 +1,45 @@
+modality: dce
+pipeline:
+  model: extended_tofts            # tofts | extended_tofts | patlak | 2cxm | 2cum
+  t1_mapping_method: vfa           # vfa | look_locker
+  aif_source: population           # population | detect | manual
+  population_aif: parker           # parker | georgiou | fritz_hansen | weinmann | mcgrath
+  save_intermediate: false
+  acquisition:
+    baseline_frames: 5
+    relaxivity: 4.5                # mM^-1 s^-1, contrast agent r1 relaxivity
+    # --- overrides: auto-detected from DICOM when available ---
+    # tr: 5.0                      # ms, repetition time of the dynamic acquisition
+    # flip_angles: [2, 5, 10, 15]  # degrees, VFA flip angles for T1 mapping
+    # t1_assumed: 1400.0           # ms, assumed T1 when no T1 map data exists
+  roi:
+    enabled: false                 # set true to process only an ROI for faster iteration
+    # center: [128, 128, 8]        # voxel center [x, y, z] (default: volume center)
+    # radius: 10                   # radius in voxels
+  fitting:
+    fitter: lm                     # lm | bayesian (aliases: least_squares, vectorized)
+    max_iterations: 100
+    tolerance: 1.0e-6
+    r2_threshold: 0.5             # minimum R^2 for a voxel fit to be considered valid
+    # bounds:                      # override model defaults (omit to use model defaults)
+    #   Ktrans: [0.0, 5.0]        # [lower, upper], 1/min
+    #   ve: [0.001, 1.0]          # [lower, upper], mL/100mL
+    #   vp: [0.0, 0.2]            # [lower, upper], mL/100mL
+    # initial_guess:               # override data-driven initial estimates
+    #   Ktrans: 0.1               # 1/min
+    #   ve: 0.2                   # mL/100mL
+    #   vp: 0.02                  # mL/100mL
+data:
+  format: auto                     # auto | nifti | dicom | bids
+  # mask: brain_mask.nii.gz        # tissue mask, relative to data_path or absolute
+  # t1_map: t1_map.nii.gz          # pre-computed T1 map (skips T1 mapping step)
+  # aif_file: aif.txt              # custom AIF (requires aif_source: manual)
+  # subject: "01"                  # BIDS subject ID (required when format: bids)
+  # session: "01"                  # BIDS session ID
+output:
+  format: nifti                    # nifti
+backend:
+  force_cpu: false
+logging:
+  level: INFO                      # DEBUG | INFO | WARNING | ERROR
+
