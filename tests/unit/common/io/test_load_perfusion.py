@@ -259,7 +259,7 @@ class TestLoadPerfusionErrors:
         unknown_file = tmp_path / "test.xyz"
         unknown_file.write_text("unknown content")
 
-        with pytest.raises(Exception, match=""):  # IOError
+        with pytest.raises(OsipyIOError):
             load_perfusion(unknown_file)
 
 

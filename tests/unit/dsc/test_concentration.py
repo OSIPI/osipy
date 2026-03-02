@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from osipy.common.exceptions import DataValidationError
 from osipy.dsc.concentration import (
     DSCAcquisitionParams,
     delta_r2_to_concentration,
@@ -64,7 +65,7 @@ class TestSignalToDeltaR2:
         """Test that invalid TE raises error."""
         signal = np.random.rand(30)
 
-        with pytest.raises(Exception, match=""):
+        with pytest.raises(DataValidationError):
             signal_to_delta_r2(signal, te=-5.0)
 
 
