@@ -27,7 +27,11 @@ permissions:
   id-token: write
 
 jobs:
+  tests:
+    uses: ./.github/workflows/pytest-actions.yaml
+
   release:
+    needs: tests
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.target }}

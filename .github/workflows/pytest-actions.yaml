@@ -1,56 +1,40 @@
-name: Test osipi
+name: Tests
 
-on: [push]
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
 
 jobs:
-  build:
-
+  test:
     strategy:
       matrix:
-         os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.12", "3.13"]
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: ${{ matrix.python-version }}
 
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          java-version: '11'
-          distribution: 'adopt'
-          architecture: x64
-
-      - name: Install Poetry
-        uses: Gr1N/setup-poetry@v8
-        with:
-          poetry-version: '1.8.3'  # Specify the Poetry version you need
-
-      - name: Cache Poetry dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/pypoetry
-            ~/.virtualenvs
-          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
-
-      - name: Update lock file
-        run: poetry lock --no-update
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
       - name: Install dependencies
-        run: poetry install
+        run: uv sync
 
-      - name: Test with pytest
-        run: poetry run pytest --junitxml=junit/test-results.xml --cov=dbdicom tests/
+      - name: Run tests
+        run: uv run pytest --cov=osipy --junitxml=junit/test-results.xml
 
-      - name: Upload coverage to Codecov
-        if: runner.os == 'Windows'
-        uses: codecov/codecov-action@v3
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: junit/test-results.xml
