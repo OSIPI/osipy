@@ -30,7 +30,7 @@ class TestExportBids:
                 affine=affine,
                 quality_mask=np.ones(shape, dtype=bool),
                 model_name="ExtendedTofts",
-                fitting_method="least_squares",
+                fitting_method="lm",
                 literature_reference="Tofts PS et al. (1999). JMRI.",
             ),
             "ve": ParameterMap(
@@ -41,7 +41,7 @@ class TestExportBids:
                 affine=affine,
                 quality_mask=np.ones(shape, dtype=bool),
                 model_name="ExtendedTofts",
-                fitting_method="least_squares",
+                fitting_method="lm",
                 literature_reference="Tofts PS et al. (1999). JMRI.",
             ),
         }

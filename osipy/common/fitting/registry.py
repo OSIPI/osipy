@@ -43,7 +43,7 @@ def register_fitter_alias(alias: str, canonical: str) -> None:
     Parameters
     ----------
     alias : str
-        Alias name (e.g., 'least_squares').
+        Alias name.
     canonical : str
         Canonical registry name (e.g., 'lm').
     """

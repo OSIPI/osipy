@@ -417,7 +417,7 @@ pipeline:
     # center: [128, 128, 8]        # voxel center [x, y, z] (default: volume center)
     # radius: 10                   # radius in voxels
   fitting:
-    fitter: lm                     # lm | bayesian (aliases: least_squares, vectorized)
+    fitter: lm                     # lm | bayesian
     max_iterations: 100
     tolerance: 1.0e-6
     r2_threshold: 0.5             # minimum R^2 for a voxel fit to be considered valid

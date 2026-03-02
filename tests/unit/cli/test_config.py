@@ -404,9 +404,9 @@ class TestDCEFittingConfig:
     def test_dce_yaml_with_fitting_section(self) -> None:
         """DCE YAML with explicit fitting section loads correctly."""
         cfg = DCEPipelineYAML(
-            fitting={"fitter": "least_squares", "max_iterations": 200}
+            fitting={"fitter": "lm", "max_iterations": 200}
         )
-        assert cfg.fitting.fitter == "least_squares"
+        assert cfg.fitting.fitter == "lm"
         assert cfg.fitting.max_iterations == 200
         assert cfg.fitting.tolerance == 1e-6  # default preserved
 
@@ -417,7 +417,7 @@ class TestDCEFittingConfig:
             pipeline:
               model: tofts
               fitting:
-                fitter: least_squares
+                fitter: lm
                 max_iterations: 200
                 tolerance: 1.0e-8
                 r2_threshold: 0.6
@@ -430,7 +430,7 @@ class TestDCEFittingConfig:
         """)
         config = load_config(path)
         mc = config.get_modality_config()
-        assert mc.fitting.fitter == "least_squares"
+        assert mc.fitting.fitter == "lm"
         assert mc.fitting.max_iterations == 200
         assert mc.fitting.tolerance == 1e-8
         assert mc.fitting.r2_threshold == 0.6

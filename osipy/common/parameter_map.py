@@ -55,7 +55,7 @@ class ParameterMap:
     model_name : str
         Name of the model used to compute this parameter.
     fitting_method : str
-        Fitting algorithm used ('least_squares', 'bayesian').
+        Fitting algorithm used (e.g., 'levenberg_marquardt', 'bayesian').
     literature_reference : str
         Citation for the algorithm/model.
 
@@ -74,7 +74,7 @@ class ParameterMap:
     ...     affine=affine,
     ...     quality_mask=quality_mask,
     ...     model_name="ExtendedTofts",
-    ...     fitting_method="least_squares",
+    ...     fitting_method="levenberg_marquardt",
     ...     literature_reference="Tofts PS et al. (1999). JMRI.",
     ... )
 

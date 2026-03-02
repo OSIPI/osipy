@@ -93,7 +93,7 @@ Export analysis results in Brain Imaging Data Structure (BIDS) derivatives forma
         metadata={
             "model": "extended_tofts",
             "aif_type": "parker",
-            "fitting_method": "vectorized_lm",
+            "fitting_method": "lm",
             "r2_threshold": 0.5,
             "software": "osipy",
             "version": osipy.__version__,

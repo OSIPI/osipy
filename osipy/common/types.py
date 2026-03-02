@@ -77,15 +77,15 @@ class FittingMethod(Enum):
 
     Attributes
     ----------
-    LEAST_SQUARES : str
-        Non-linear least squares optimization.
+    LM : str
+        Levenberg-Marquardt non-linear least squares optimization.
     BAYESIAN : str
         Bayesian inference with uncertainty estimation.
     NEURAL_NETWORK : str
         Neural network-based fitting (future).
     """
 
-    LEAST_SQUARES = "least_squares"
+    LM = "lm"
     BAYESIAN = "bayesian"
     NEURAL_NETWORK = "neural_network"
 

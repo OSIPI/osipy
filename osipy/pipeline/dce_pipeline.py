@@ -67,7 +67,6 @@ class DCEPipelineConfig:
         Whether to save intermediate results.
     fitter : str | None
         Fitter registry name (e.g., 'lm', 'bayesian').
-        Also accepts aliases 'least_squares' and 'vectorized'.
     concentration_method : str
         Signal-to-concentration conversion method.
     bounds_override : dict[str, tuple[float, float]] | None

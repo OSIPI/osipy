@@ -107,7 +107,6 @@ def fit_model(
         Optional mask of voxels to fit. If None, fits all voxels.
     fitter : BaseFitter | str | None
         Fitter instance or registry name (e.g., 'lm', 'bayesian').
-        Also accepts aliases 'least_squares' and 'vectorized'.
         Uses LevenbergMarquardtFitter by default.
     progress_callback : Callable[[float], None] | None
         Optional callback for progress updates.

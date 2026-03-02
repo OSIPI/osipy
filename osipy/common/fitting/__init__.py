@@ -20,21 +20,11 @@ from osipy.common.fitting.registry import (
 )
 from osipy.common.fitting.result import FittingResult
 
-# Backward-compat aliases (registry)
-register_fitter_alias("least_squares", "lm")
-register_fitter_alias("vectorized", "lm")
-
-# Backward-compat aliases (class names)
-LeastSquaresFitter = LevenbergMarquardtFitter
-VectorizedFitter = LevenbergMarquardtFitter
-
 __all__ = [
     "BaseFitter",
     "BayesianFitter",
     "FittingResult",
-    "LeastSquaresFitter",
     "LevenbergMarquardtFitter",
-    "VectorizedFitter",
     "create_empty_maps",
     "create_parameter_maps",
     "get_fitter",

@@ -30,14 +30,6 @@ class TestFitterRegistry:
         fitter = get_fitter("lm")
         assert isinstance(fitter, LevenbergMarquardtFitter)
 
-    def test_get_fitter_least_squares_alias(self):
-        fitter = get_fitter("least_squares")
-        assert isinstance(fitter, LevenbergMarquardtFitter)
-
-    def test_get_fitter_vectorized_alias(self):
-        fitter = get_fitter("vectorized")
-        assert isinstance(fitter, LevenbergMarquardtFitter)
-
     def test_get_fitter_bayesian(self):
         fitter = get_fitter("bayesian")
         assert isinstance(fitter, BayesianFitter)
@@ -45,18 +37,6 @@ class TestFitterRegistry:
     def test_get_fitter_unknown_raises(self):
         with pytest.raises(DataValidationError, match="Unknown fitter"):
             get_fitter("nonexistent")
-
-
-class TestBackwardCompatClassAliases:
-    def test_least_squares_fitter_alias(self):
-        from osipy.common.fitting import LeastSquaresFitter
-
-        assert LeastSquaresFitter is LevenbergMarquardtFitter
-
-    def test_vectorized_fitter_alias(self):
-        from osipy.common.fitting import VectorizedFitter
-
-        assert VectorizedFitter is LevenbergMarquardtFitter
 
 
 class TestMergeBounds:
