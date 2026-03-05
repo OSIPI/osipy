@@ -38,3 +38,12 @@ jobs:
         with:
           name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
           path: junit/test-results.xml
+  
+  tests-complete:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test matrix result
+        if: needs.test.result != 'success'
+        run: exit 1
