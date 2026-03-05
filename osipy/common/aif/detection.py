@@ -160,7 +160,6 @@ def detect_aif(
     flat_mask = search_mask.ravel()
 
     # Compute signal characteristics for each voxel
-    n_voxels = flat_data.shape[0]
     baseline_indices = slice(0, min(5, n_timepoints // 4))
 
     # Baseline signal
@@ -178,8 +177,6 @@ def detect_aif(
     fwhm = _compute_fwhm(flat_data, time)
 
     # Score voxels based on arterial characteristics
-    scores = np.zeros(n_voxels)
-
     # High enhancement score
     enhancement_score = np.clip(enhancement_ratio / params.min_peak_enhancement, 0, 2)
 

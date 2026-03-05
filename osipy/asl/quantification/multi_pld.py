@@ -232,38 +232,8 @@ class BuxtonMultiPLDModel(BaseASLModel):
         """Return parameter bounds for CBF and ATT fitting."""
         return {"CBF": (0.0, 200.0), "ATT": (0.1, 5.0)}
 
-    def predict_signal(
-        self,
-        pld: NDArray[np.floating[Any]],
-        att: float,
-        cbf: float,
-        params: Any,
-    ) -> NDArray[np.floating[Any]]:
-        """Predict ASL signal at given PLDs using Buxton model.
 
-        Kept for backward compatibility with BaseATTModel interface.
-        """
-        xp = get_array_module(pld)
-        tau_s = params.label_duration / 1000.0
-        t1b_s = params.t1_blood / 1000.0
-        t1t_s = params.t1_tissue / 1000.0
-
-        result = _buxton_model_pcasl_batch(
-            pld,
-            xp.asarray([cbf]),
-            xp.asarray([att]),
-            xp.asarray([1.0]),  # unit M0 for signal prediction
-            tau_s,
-            t1b_s,
-            t1t_s,
-            params.labeling_efficiency,
-            params.partition_coefficient,
-            xp,
-        )[:, 0]
-        return result
-
-
-# Backward compatibility: ATT registry points to same model
+# Register in ATT registry under short name
 register_att_model("buxton")(BuxtonMultiPLDModel)
 
 

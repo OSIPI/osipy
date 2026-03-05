@@ -137,91 +137,6 @@ def fft_convolve(
     return result * dt
 
 
-def fft_deconvolve(
-    y: NDArray[np.floating],
-    h: NDArray[np.floating],
-    dt: float,
-    *,
-    regularization: float = 1e-10,
-) -> NDArray[np.floating]:
-    """Deconvolve a signal using FFT with Wiener regularization.
-
-    Computes f such that y = f * h (convolution), using FFT-based
-    division in the frequency domain with regularization.
-
-    Parameters
-    ----------
-    y : ndarray
-        Output signal (convolution result). Shape: (n,).
-    h : ndarray
-        Impulse response. Shape: (n,).
-    dt : float
-        Time step between samples in seconds.
-    regularization : float, default 1e-10
-        Regularization parameter to prevent division by zero.
-        Larger values give smoother but less accurate results.
-
-    Returns
-    -------
-    ndarray
-        Deconvolved signal. Shape: (n,).
-
-    Notes
-    -----
-    FFT deconvolution assumes periodic boundary conditions and uniform
-    sampling. It's fast but may introduce artifacts. For robust
-    deconvolution in pharmacokinetic modeling, consider using
-    matrix-based deconvolution (deconv()) with TSVD or Tikhonov
-    regularization.
-
-    The Wiener filter formula is:
-        F = Y * conj(H) / (|H|^2 + regularization)
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from osipy.common.convolution import fft_convolve, fft_deconvolve
-    >>> dt = 0.1
-    >>> n = 100
-    >>> t = np.arange(n) * dt
-    >>> f_true = np.exp(-t / 5)
-    >>> h = np.exp(-t / 10)
-    >>> y = fft_convolve(f_true, h, dt)
-    >>> f_recovered = fft_deconvolve(y, h, dt, regularization=1e-6)
-    """
-    xp = get_array_module(y)
-
-    y = xp.asarray(y, dtype=xp.float64)
-    h = xp.asarray(h, dtype=xp.float64)
-
-    n = len(y)
-    if n == 0:
-        return xp.array([], dtype=xp.float64)
-
-    # Ensure same length
-    if len(h) != n:
-        h_padded = xp.zeros(n, dtype=xp.float64)
-        h_padded[: min(n, len(h))] = h[: min(n, len(h))]
-        h = h_padded
-
-    # FFT — both numpy and cupy provide xp.fft.fft
-    Y = xp.fft.fft(y)
-    H = xp.fft.fft(h)
-
-    # Wiener deconvolution
-    H_conj = xp.conj(H)
-    H_power = xp.real(H * H_conj)
-    F = Y * H_conj / (H_power + regularization)
-
-    # Inverse FFT
-    f = xp.fft.ifft(F)
-
-    # Take real part and scale
-    f = xp.real(f) / dt
-
-    return f
-
-
 def convolve_aif(
     aif: NDArray[Any],
     impulse_response: NDArray[Any],
@@ -284,7 +199,3 @@ def convolve_aif(
     result = xp.fft.irfft(result_fft, n=n_fft, axis=0)
 
     return result[:n_time] * dt
-
-
-# Backward-compatibility alias
-convolve_aif_batch = convolve_aif

@@ -12,7 +12,7 @@ References
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 from osipy.common.backend.array_module import get_array_module, to_numpy
 from osipy.common.models.base import BaseSignalModel
@@ -25,11 +25,6 @@ if TYPE_CHECKING:
 @dataclass
 class ModelParameters:
     """Base class for model parameter dataclasses."""
-
-    pass
-
-
-P = TypeVar("P", bound=ModelParameters)
 
 
 class BasePerfusionModel[P: ModelParameters](BaseSignalModel):
@@ -69,7 +64,9 @@ class BasePerfusionModel[P: ModelParameters](BaseSignalModel):
         return "seconds"
 
     def _convert_time(
-        self, t: "NDArray[np.floating[Any]]", xp: Any
+        self,
+        t: "NDArray[np.floating[Any]]",
+        xp: Any,
     ) -> "NDArray[np.floating[Any]]":
         """Convert time array based on model's time_unit.
 

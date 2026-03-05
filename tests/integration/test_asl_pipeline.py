@@ -122,7 +122,7 @@ class TestASLPipelineIntegration:
 
     def test_pasl_difference_computation(self) -> None:
         """Test PASL label-control difference."""
-        from osipy.asl.quantification import compute_pasl_difference
+        from osipy.asl.quantification import compute_pcasl_difference
 
         np.random.seed(42)
 
@@ -130,7 +130,7 @@ class TestASLPipelineIntegration:
         control = np.random.uniform(900, 1100, shape)
         label = control - np.random.uniform(5, 20, shape)
 
-        delta_m = compute_pasl_difference(
+        delta_m = compute_pcasl_difference(
             label=label,
             control=control,
         )

@@ -12,7 +12,7 @@ import numpy as np
 
 from osipy.common.io.metadata.defaults import DEFAULT_IVIM_PARAMS, get_default_params
 from osipy.common.io.metadata.prompter import ParameterPrompter
-from osipy.common.io.metadata.validator import ParameterValidator, ValidationResult
+from osipy.common.io.metadata.validator import ParameterValidator
 from osipy.common.io.vendors.base import VendorMetadata
 from osipy.common.types import (
     AcquisitionParams,
@@ -463,18 +463,3 @@ class MetadataMapper:
         }
 
         return mapping.get(value_str, LabelingType.PCASL)
-
-    def validate(self, params: dict[str, Any]) -> ValidationResult:
-        """Validate parameters for the modality.
-
-        Parameters
-        ----------
-        params : dict[str, Any]
-            Parameter dictionary.
-
-        Returns
-        -------
-        ValidationResult
-            Validation result.
-        """
-        return self.validator.validate(params)

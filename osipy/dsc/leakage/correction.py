@@ -288,7 +288,6 @@ def _compute_reference_curve(
         Reference tissue ΔR2* curve.
     """
     xp = get_array_module(delta_r2)
-    delta_r2.shape[:-1]
     n_timepoints = delta_r2.shape[-1]
 
     if params.reference_tissue == "custom" and params.custom_reference_mask is not None:

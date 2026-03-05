@@ -225,3 +225,8 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
+[dependency-groups]
+dev = [
+    "vulture>=2.14",
+]
+

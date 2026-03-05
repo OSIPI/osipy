@@ -72,13 +72,12 @@ class DCEFittingConfig(BaseModel):
     @field_validator("fitter")
     @classmethod
     def validate_fitter(cls, v: str) -> str:
-        """Validate fitter name against registry (accepts aliases)."""
-        from osipy.common.fitting.registry import FITTER_ALIASES, FITTER_REGISTRY
+        """Validate fitter name against registry."""
+        from osipy.common.fitting.registry import FITTER_REGISTRY
 
-        if v not in FITTER_REGISTRY and v not in FITTER_ALIASES:
+        if v not in FITTER_REGISTRY:
             valid = sorted(FITTER_REGISTRY.keys())
-            aliases = sorted(FITTER_ALIASES.keys())
-            msg = f"Invalid fitter '{v}'. Valid: {valid}. Aliases: {aliases}"
+            msg = f"Invalid fitter '{v}'. Valid: {valid}"
             raise ValueError(msg)
         return v
 

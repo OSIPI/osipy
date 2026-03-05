@@ -35,7 +35,13 @@ logger = logging.getLogger(__name__)
 
 @register_concentration_model("spgr")
 def _convert_spgr(
-    signal, s0, t1_pre, tr, cos_a, sin_a, relaxivity, baseline_frames, concentration, xp
+    signal,
+    s0,
+    t1_pre,
+    tr,
+    cos_a,
+    relaxivity,
+    xp,
 ):
     """SPGR signal-to-concentration conversion."""
     # SPGR signal equation:
@@ -80,7 +86,13 @@ def _convert_spgr(
 
 @register_concentration_model("linear")
 def _convert_linear(
-    signal, s0, t1_pre, tr, cos_a, sin_a, relaxivity, baseline_frames, concentration, xp
+    signal,
+    s0,
+    t1_pre,
+    tr,
+    cos_a,
+    relaxivity,
+    xp,
 ):
     """Linear signal-to-concentration conversion."""
     # Simplified linear approximation for small concentration changes
@@ -103,7 +115,6 @@ def signal_to_concentration(
     signal: "NDArray[np.floating[Any]]",
     t1_map: ParameterMap | None,
     acquisition_params: DCEAcquisitionParams,
-    t1_blood: float = 1440.0,
     method: str = "spgr",
 ) -> "NDArray[np.floating[Any]]":
     """Convert DCE signal intensity to indicator concentration (OSIPI: P.SC1.001).
@@ -123,8 +134,6 @@ def signal_to_concentration(
         Acquisition parameters including TR (OSIPI: Q.MS1.006),
         flip_angle (OSIPI: Q.MS1.007), and relaxivity (OSIPI: Q.EL1.015).
         If `t1_map` is None, must include `t1_assumed` field.
-    t1_blood : float, default=1440.0
-        Blood T1 in milliseconds (default for 3T).
     method : str, default="spgr"
         Signal model: 'spgr' (spoiled gradient echo) or 'linear'.
 
@@ -185,7 +194,7 @@ def signal_to_concentration(
         # Create uniform T1 map from assumed value
         logger.info(
             f"Using assumed uniform T1 = {acquisition_params.t1_assumed:.0f} ms "
-            "(no measured T1 map provided)"
+            "(no measured T1 map provided)",
         )
         t1_map = create_uniform_t1_map(
             t1_ms=acquisition_params.t1_assumed,
@@ -229,7 +238,7 @@ def signal_to_concentration(
 
     logger.info(
         f"Converting signal to concentration: "
-        f"TR={tr}ms, FA={flip_angle_deg}°, r1={relaxivity}mM⁻¹s⁻¹"
+        f"TR={tr}ms, FA={flip_angle_deg}°, r1={relaxivity}mM⁻¹s⁻¹",
     )
 
     # Compute baseline signal (pre-contrast)
@@ -244,10 +253,6 @@ def signal_to_concentration(
 
     # Pre-compute constants for SPGR equation
     cos_a = float(xp.cos(flip_angle))
-    sin_a = float(xp.sin(flip_angle))
-
-    # Initialize concentration array
-    concentration = xp.zeros_like(signal)
 
     converter = get_concentration_model(method)
     concentration = converter(
@@ -256,10 +261,7 @@ def signal_to_concentration(
         t1_pre,
         tr,
         cos_a,
-        sin_a,
         relaxivity,
-        baseline_frames,
-        concentration,
         xp,
     )
 
@@ -271,7 +273,7 @@ def signal_to_concentration(
     n_total = nx * ny * nz
     logger.info(
         f"Signal-to-concentration complete: "
-        f"{n_valid}/{n_total} voxels with valid concentration"
+        f"{n_valid}/{n_total} voxels with valid concentration",
     )
 
     return concentration

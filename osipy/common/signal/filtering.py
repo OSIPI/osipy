@@ -60,8 +60,6 @@ def temporal_filter(
     >>> data = np.random.rand(64, 64, 20, 30)
     >>> smoothed = temporal_filter(data, filter_type="gaussian", sigma=1.0)
     """
-    get_array_module(data)
-
     if filter_type == "gaussian":
         if sigma <= 0:
             msg = "sigma must be positive"
@@ -269,9 +267,6 @@ def _median_filter1d_xp(
     n_voxels = int(xp.prod(xp.asarray(spatial_shape))) if spatial_shape else 1
     data_flat = data_padded.reshape(n_voxels, n_padded)
 
-    # Create output
-    result_flat = xp.zeros((n_voxels, n), dtype=data.dtype)
-
     # Sliding window median
     # Build a matrix of windows and compute median along window axis
     # Shape: (n_voxels, n, size)
@@ -355,11 +350,8 @@ def temporal_interpolate(
         return _interpolate_linear_xp(data, time_old, time_new)
     elif method == "cubic":
         return _interpolate_cubic_xp(data, time_old, time_new)
-    elif method == "nearest":
-        return _interpolate_nearest_xp(data, time_old, time_new)
     else:
-        msg = f"Unknown method: {method}"
-        raise DataValidationError(msg)
+        return _interpolate_nearest_xp(data, time_old, time_new)
 
 
 def _interpolate_linear_xp(
@@ -697,53 +689,3 @@ def resample_to_uniform(
     data_new = temporal_interpolate(data, time, time_new, method="linear")
 
     return data_new, time_new
-
-
-def gaussian_filter_xp(
-    data: "NDArray[np.floating[Any]]",
-    sigma: float | tuple[float, ...],
-) -> "NDArray[np.floating[Any]]":
-    """Apply Gaussian filter to N-dimensional data.
-
-    GPU/CPU agnostic implementation using separable 1D convolutions.
-    No scipy dependency.
-
-    Parameters
-    ----------
-    data : NDArray
-        Input data of any dimensionality.
-    sigma : float or tuple of floats
-        Standard deviation for Gaussian kernel. If float, same sigma
-        is used for all dimensions. If tuple, specifies sigma for each
-        dimension.
-
-    Returns
-    -------
-    NDArray
-        Filtered data with same shape as input.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from osipy.common.signal.filtering import gaussian_filter_xp
-    >>> data = np.random.rand(64, 64, 20)
-    >>> smoothed = gaussian_filter_xp(data, sigma=1.0)
-    """
-    get_array_module(data)
-
-    # Normalize sigma to tuple
-    if isinstance(sigma, (int, float)):
-        sigma = (float(sigma),) * data.ndim
-    else:
-        sigma = tuple(float(s) for s in sigma)
-
-    if len(sigma) != data.ndim:
-        msg = f"sigma must have {data.ndim} elements, got {len(sigma)}"
-        raise DataValidationError(msg)
-
-    result = data
-    for axis, s in enumerate(sigma):
-        if s > 0:
-            result = _gaussian_filter1d_xp(result, sigma=s, axis=axis)
-
-    return result

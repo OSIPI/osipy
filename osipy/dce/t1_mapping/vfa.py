@@ -56,67 +56,10 @@ class T1MappingResult:
     quality_mask: "NDArray[np.bool_] | None" = None
 
 
-def _fit_t1_linear(
-    signals: "NDArray[np.floating[Any]]",
-    flip_angles_rad: "NDArray[np.floating[Any]]",
-    tr: float,
-) -> tuple[float, float]:
-    """Fit T1 using linearized SPGR equation.
-
-    Uses the Deoni linear fit method:
-    S/sin(a) = E1 * S/tan(a) + M0(1-E1)
-
-    Parameters
-    ----------
-    signals : NDArray
-        Signal intensities at each flip angle.
-    flip_angles_rad : NDArray
-        Flip angles in radians.
-    tr : float
-        Repetition time in milliseconds.
-
-    Returns
-    -------
-    tuple[float, float]
-        (T1 in ms, M0)
-    """
-    xp = get_array_module(signals, flip_angles_rad)
-
-    # Linearize: y = S/sin(a), x = S/tan(a)
-    y = signals / xp.sin(flip_angles_rad)
-    x = signals / xp.tan(flip_angles_rad)
-
-    # Linear regression: y = slope * x + intercept
-    # slope = E1, intercept = M0 * (1 - E1)
-    n = len(signals)
-    sum_x = xp.sum(x)
-    sum_y = xp.sum(y)
-    sum_xy = xp.sum(x * y)
-    sum_xx = xp.sum(x * x)
-
-    denom = n * sum_xx - sum_x * sum_x
-    if abs(denom) < 1e-10:
-        return np.nan, np.nan
-
-    slope = (n * sum_xy - sum_x * sum_y) / denom
-    intercept = (sum_y - slope * sum_x) / n
-
-    # Extract T1 and M0
-    e1 = slope
-    if e1 <= 0 or e1 >= 1:
-        return np.nan, np.nan
-
-    t1 = -tr / xp.log(e1)
-    m0 = intercept / (1 - e1) if abs(1 - e1) > 1e-10 else np.nan
-
-    return t1, m0
-
-
 def _fit_t1_linear_vectorized(
     data: "NDArray[np.floating[Any]]",
     flip_angles_rad: "NDArray[np.floating[Any]]",
     tr: float,
-    mask: "NDArray[np.bool_] | None" = None,
 ) -> tuple["NDArray[np.floating[Any]]", "NDArray[np.floating[Any]]"]:
     """Vectorized T1 fitting for GPU acceleration.
 
@@ -130,8 +73,6 @@ def _fit_t1_linear_vectorized(
         Flip angles in radians.
     tr : float
         Repetition time in milliseconds.
-    mask : NDArray[np.bool_] | None
-        Brain mask. If None, process all voxels.
 
     Returns
     -------
@@ -302,7 +243,7 @@ def _compute_t1_vfa_impl(
     n_voxels = nx * ny * nz
     logger.info(
         f"T1 mapping complete: {n_processed}/{n_voxels} voxels "
-        f"({100 * n_processed / n_voxels:.1f}%)"
+        f"({100 * n_processed / n_voxels:.1f}%)",
     )
 
     t1_param_map = ParameterMap(

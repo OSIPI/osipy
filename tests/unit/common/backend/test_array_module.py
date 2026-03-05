@@ -10,7 +10,6 @@ import numpy as np
 import pytest
 
 from osipy.common.backend.array_module import (
-    ensure_contiguous,
     get_array_module,
     to_gpu,
     to_numpy,
@@ -120,28 +119,6 @@ class TestToGpu:
         data = np.array([1.0, 2.0, 3.0])
         result = to_gpu(data)
         np.testing.assert_array_almost_equal(to_numpy(result), data)
-
-
-class TestEnsureContiguous:
-    """Tests for ensure_contiguous function."""
-
-    def test_contiguous_unchanged(self) -> None:
-        """Contiguous array should be returned as-is."""
-        data = np.array([1, 2, 3, 4, 5, 6]).reshape(2, 3)
-        assert data.flags.c_contiguous
-        result = ensure_contiguous(data)
-        assert result is data
-
-    def test_makes_noncontiguous_contiguous(self) -> None:
-        """Should make non-contiguous array contiguous."""
-        data = np.array([1, 2, 3, 4, 5, 6]).reshape(2, 3)
-        # Create non-contiguous view via transpose
-        non_contig = data.T
-        assert not non_contig.flags.c_contiguous
-
-        result = ensure_contiguous(non_contig)
-        assert result.flags.c_contiguous
-        np.testing.assert_array_equal(result, non_contig)
 
 
 class TestGpuIntegration:

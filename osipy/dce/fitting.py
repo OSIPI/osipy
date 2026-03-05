@@ -250,12 +250,11 @@ def _fit_model_impl(
     # Handle mask
     if mask is None:
         fit_mask = xp.ones(spatial_shape, dtype=bool)
+    elif mask.ndim == 2 and ndim >= 2:
+        fit_mask = mask[:, :, xp.newaxis]
+        fit_mask = xp.broadcast_to(fit_mask, spatial_shape).copy()
     else:
-        if mask.ndim == 2 and ndim >= 2:
-            fit_mask = mask[:, :, xp.newaxis]
-            fit_mask = xp.broadcast_to(fit_mask, spatial_shape).copy()
-        else:
-            fit_mask = mask
+        fit_mask = mask
 
     # Create bound model (fixes time and AIF so fitter only sees free params)
     bound_model = BoundDCEModel(model, time, aif_conc)
@@ -282,7 +281,11 @@ def _fit_model_impl(
 
     # Compute R-squared map (vectorized)
     r_squared_map = _compute_r_squared_vectorized(
-        ct_4d, bound_model, param_maps, quality_mask, xp
+        ct_4d,
+        bound_model,
+        param_maps,
+        quality_mask,
+        xp,
     )
 
     # Reshape outputs if needed
@@ -402,7 +405,8 @@ def _compute_r_squared_vectorized(
     # predict_array_batch returns (n_time, n_voxels)
     try:
         ct_pred = bound_model.predict_array_batch(
-            params_batch, xp
+            params_batch,
+            xp,
         )  # (n_time, n_voxels)
         ct_pred = ct_pred.T  # (n_voxels, n_time) to match ct_masked
 
@@ -470,7 +474,9 @@ class _DelayAwareModel:
     """
 
     def __init__(
-        self, base_model: Any, delay_bounds: tuple[float, float] = (0.0, 60.0)
+        self,
+        base_model: Any,
+        delay_bounds: tuple[float, float] = (0.0, 60.0),
     ) -> None:
         self._base = base_model
         self._delay_bounds = delay_bounds
@@ -584,6 +590,8 @@ class _DelayAwareModel:
         return lower, upper
 
     def _convert_time(
-        self, t: NDArray[np.floating[Any]], xp: Any
+        self,
+        t: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         return self._base._convert_time(t, xp)

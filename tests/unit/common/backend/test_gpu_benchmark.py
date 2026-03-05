@@ -66,7 +66,7 @@ class TestConvolutionBenchmark:
 
     def test_batch_convolution_speedup(self) -> None:
         """GPU batch convolution should be faster than CPU for large data."""
-        from osipy.common.backend.convolution import convolve_aif_batch
+        from osipy.common.convolution import convolve_aif
 
         n_time = 100
         n_voxels = 10000  # Large dataset
@@ -78,10 +78,10 @@ class TestConvolutionBenchmark:
         irfs_gpu = cp.asarray(irfs_np)
 
         def cpu_compute() -> None:
-            convolve_aif_batch(aif_np, irfs_np)
+            convolve_aif(aif_np, irfs_np)
 
         def gpu_compute() -> None:
-            convolve_aif_batch(aif_gpu, irfs_gpu)
+            convolve_aif(aif_gpu, irfs_gpu)
             cp.cuda.Stream.null.synchronize()
 
         cpu_time = benchmark(cpu_compute, n_iterations=3)

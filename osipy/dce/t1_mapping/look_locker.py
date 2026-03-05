@@ -182,7 +182,7 @@ def compute_t1_look_locker(
     n_processed = int(np.sum(quality_mask))
     logger.info(
         f"Look-Locker T1 mapping complete: {n_processed}/{n_voxels} voxels "
-        f"({100 * n_processed / n_voxels:.1f}%)"
+        f"({100 * n_processed / n_voxels:.1f}%)",
     )
 
     t1_param_map = ParameterMap(

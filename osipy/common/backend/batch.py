@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -45,8 +45,6 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
 
 
 @dataclass

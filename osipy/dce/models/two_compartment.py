@@ -235,7 +235,9 @@ class TwoCompartmentModel(BasePerfusionModel[TwoCompartmentParams]):
         aif_peak_val = aif[aif_peak_idx]
         ct_at_peak = ct_batch[aif_peak_idx, :]  # (n_voxels,)
         safe_aif_peak = xp.where(
-            aif_peak_val > 0, aif_peak_val, xp.ones_like(aif_peak_val)
+            aif_peak_val > 0,
+            aif_peak_val,
+            xp.ones_like(aif_peak_val),
         )
         vp_batch = xp.where(
             aif_peak_val > 0,

@@ -47,7 +47,7 @@ def get_att_model(name: str):
 
     Returns
     -------
-    BaseATTModel
+    BaseASLModel
         Model instance.
 
     Raises

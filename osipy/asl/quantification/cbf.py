@@ -419,7 +419,7 @@ class CASLSinglePLDModel(BaseASLModel):
         return _quantify_pcasl(delta_m, m0, params)
 
 
-# Map LabelingScheme enum to registry name for backward-compat dispatch
+# Map LabelingScheme enum to registry name for dispatch
 _SCHEME_TO_MODEL: dict[LabelingScheme, str] = {
     LabelingScheme.PCASL: "pcasl_single_pld",
     LabelingScheme.CASL: "casl_single_pld",
@@ -428,7 +428,7 @@ _SCHEME_TO_MODEL: dict[LabelingScheme, str] = {
 
 
 # ---------------------------------------------------------------------------
-# Public API (backward-compatible)
+# Public API
 # ---------------------------------------------------------------------------
 
 
@@ -785,10 +785,6 @@ def compute_pcasl_difference(
         delta_m = xp.where(mask, delta_m, 0)
 
     return delta_m
-
-
-# Alias for PASL (same computation: control - label)
-compute_pasl_difference = compute_pcasl_difference
 
 
 def compute_cbf_uncertainty(

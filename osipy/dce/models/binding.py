@@ -57,7 +57,9 @@ class BoundDCEModel(BaseBoundModel):
         self._aif = xp.asarray(self._aif)
 
     def predict_array_batch(
-        self, free_params_batch: NDArray[np.floating[Any]], xp: Any
+        self,
+        free_params_batch: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         """Predict tissue concentration for a batch of voxels.
 
@@ -77,7 +79,9 @@ class BoundDCEModel(BaseBoundModel):
         return self._dce_model.predict_batch(self._t, self._aif, full_params, xp)
 
     def get_initial_guess_batch(
-        self, observed_batch: NDArray[np.floating[Any]], xp: Any
+        self,
+        observed_batch: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         """Get initial parameter guesses for a batch of voxels.
 
@@ -98,7 +102,10 @@ class BoundDCEModel(BaseBoundModel):
         """
         # Get full initial guesses from model
         full_guess = self._dce_model.get_initial_guess_batch(
-            observed_batch, self._aif, self._t, xp
+            observed_batch,
+            self._aif,
+            self._t,
+            xp,
         )
 
         if not self._fixed:

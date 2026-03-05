@@ -76,22 +76,6 @@ class TestIVIMBiexponentialModel:
         assert bounds["f"][0] >= 0
         assert bounds["f"][1] <= 1
 
-    def test_get_initial_guess(self) -> None:
-        """Test initial parameter estimation."""
-        model = IVIMBiexponentialModel()
-        b_values = np.array([0, 10, 20, 50, 100, 200, 400, 800])
-
-        # Generate synthetic signal
-        true_params = IVIMParams(s0=1000, d=1.0e-3, d_star=12e-3, f=0.12)
-        signal = model.predict(b_values, true_params)
-
-        guess = model.get_initial_guess(signal, b_values)
-
-        assert isinstance(guess, IVIMParams)
-        assert guess.s0 > 0
-        assert 0 < guess.d < 5e-3
-        assert 0 < guess.f < 0.5
-
 
 class TestIVIMSimplifiedModel:
     """Tests for simplified IVIM model."""

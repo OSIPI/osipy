@@ -228,8 +228,6 @@ class ASLPipeline:
             Pipeline results.
         """
         # Separate label and control
-        asl_data.shape[-1]
-
         if label_control_order == "label_first":
             label_data = asl_data[..., 0::2]  # Even indices
             control_data = asl_data[..., 1::2]  # Odd indices

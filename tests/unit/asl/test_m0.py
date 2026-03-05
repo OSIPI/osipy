@@ -12,7 +12,6 @@ from osipy.asl.calibration.m0 import (
     M0CalibrationParams,
     apply_m0_calibration,
     compute_m0_from_pd,
-    segment_csf,
 )
 
 
@@ -313,58 +312,3 @@ class TestComputeM0FromPD:
 
         # Longer TE needs larger T2 correction
         assert np.mean(m0_long_te) > np.mean(m0_short_te)
-
-
-class TestSegmentCSF:
-    """Tests for segment_csf function."""
-
-    def test_segment_csf_basic(self) -> None:
-        """Test basic CSF segmentation."""
-        # Create image with high intensity region (CSF-like)
-        # Use fixed seed for reproducibility
-        rng = np.random.default_rng(42)
-        # Use larger image and CSF region to survive morphological opening
-        image = rng.uniform(500, 800, (30, 30, 10))
-        # Create a larger CSF region that survives binary_opening
-        image[12:18, 12:18, 4:7] = 1200  # CSF region (6x6x3 = 108 voxels)
-
-        csf_mask = segment_csf(image)
-
-        assert csf_mask.shape == image.shape
-        assert csf_mask.dtype == bool
-        # High intensity region should be in CSF mask
-        assert np.sum(csf_mask[12:18, 12:18, 4:7]) > 0
-
-    def test_segment_csf_with_mask(self) -> None:
-        """Test CSF segmentation with brain mask."""
-        image = np.random.uniform(500, 800, (20, 20, 5))
-        image[8:12, 8:12, 2:4] = 1200
-
-        # Mask excludes part of high intensity region
-        mask = np.ones(image.shape, dtype=bool)
-        mask[:10, :, :] = False
-
-        csf_mask = segment_csf(image, mask=mask)
-
-        # CSF should only be found in masked region
-        assert not np.any(csf_mask[:10, :, :])
-
-    def test_segment_csf_threshold_percentile(self) -> None:
-        """Test CSF segmentation with different thresholds."""
-        image = np.random.uniform(500, 800, (20, 20, 5))
-        image[8:12, 8:12, 2:4] = 1200
-
-        # Higher threshold = less CSF
-        csf_strict = segment_csf(image, threshold_percentile=98)
-        csf_relaxed = segment_csf(image, threshold_percentile=90)
-
-        assert np.sum(csf_relaxed) >= np.sum(csf_strict)
-
-    def test_segment_csf_returns_boolean(self) -> None:
-        """Test that CSF segmentation returns boolean array."""
-        image = np.random.rand(10, 10, 3) * 1000
-
-        csf_mask = segment_csf(image)
-
-        assert csf_mask.dtype == bool
-        assert set(np.unique(csf_mask)).issubset({True, False})

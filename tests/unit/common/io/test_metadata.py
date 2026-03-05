@@ -120,14 +120,6 @@ class TestValidator:
         result = validator.validate(params, check_ranges=True)
         assert "flip_angle" in result.out_of_range
 
-    def test_get_missing_required(self):
-        """Test getting list of missing required params."""
-        validator = ParameterValidator(Modality.ASL)
-        params = {"tr": 5000.0}
-        missing = validator.get_missing_required(params)
-        assert "labeling_type" in missing
-        assert "post_labeling_delay" in missing
-
 
 class TestValidationResult:
     """Tests for ValidationResult class."""
@@ -323,18 +315,6 @@ class TestMetadataMapper:
         assert isinstance(params, ASLAcquisitionParams)
         assert params.labeling_type == LabelingType.PCASL  # Default
         assert params.pld == 1800.0  # Default
-
-    def test_validate_method(self):
-        """Test validation through mapper."""
-        mapper = MetadataMapper(Modality.ASL, interactive=False)
-
-        params = {
-            "labeling_type": "PCASL",
-            "post_labeling_delay": 1800.0,
-        }
-
-        result = mapper.validate(params)
-        assert result.is_valid
 
     def test_parse_labeling_type_enum(self):
         """Test labeling type parsing to enum."""

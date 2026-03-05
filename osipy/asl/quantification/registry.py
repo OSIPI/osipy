@@ -47,7 +47,7 @@ def get_quantification_model(name: str):
 
     Returns
     -------
-    BaseQuantificationModel
+    BaseASLModel
         Model instance.
 
     Raises

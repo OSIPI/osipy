@@ -81,14 +81,3 @@ def get_ivim_model(name: str, **kwargs: Any) -> IVIMModel:
         msg = f"Unknown IVIM model: {name}. Valid models: {valid}"
         raise DataValidationError(msg)
     return IVIM_MODEL_REGISTRY[name](**kwargs)
-
-
-def list_ivim_models() -> list[str]:
-    """Return names of all registered IVIM models.
-
-    Returns
-    -------
-    list[str]
-        Sorted list of registered model names.
-    """
-    return sorted(IVIM_MODEL_REGISTRY.keys())

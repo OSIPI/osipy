@@ -7,8 +7,6 @@ Functions
 ---------
 fit_ivim
     Fit IVIM bi-exponential model to DWI data.
-compute_perfusion_fraction
-    Compute perfusion fraction (f) from IVIM parameters.
 
 References
 ----------
@@ -27,7 +25,6 @@ from osipy.ivim.fitting import (
     IVIMFitResult,
     fit_ivim,
 )
-from osipy.ivim.fitting.estimators import fit_ivim_model
 from osipy.ivim.fitting.registry import (
     get_ivim_fitter,
     list_ivim_fitters,
@@ -39,7 +36,6 @@ from osipy.ivim.models import (
     IVIMParams,
     IVIMSimplifiedModel,
     get_ivim_model,
-    list_ivim_models,
     register_ivim_model,
 )
 
@@ -54,12 +50,10 @@ __all__ = [
     "IVIMSimplifiedModel",
     # Fitting
     "fit_ivim",
-    "fit_ivim_model",
     "get_ivim_fitter",
     # Registry
     "get_ivim_model",
     "list_ivim_fitters",
-    "list_ivim_models",
     # IVIM fitter registry
     "register_ivim_fitter",
     "register_ivim_model",

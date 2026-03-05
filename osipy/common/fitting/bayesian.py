@@ -15,7 +15,6 @@ import numpy as np
 from osipy.common.backend.array_module import get_array_module, to_numpy
 from osipy.common.fitting.base import BaseFitter
 from osipy.common.fitting.registry import register_fitter
-from osipy.common.fitting.result import FittingResult
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -79,88 +78,6 @@ class BayesianFitter(BaseFitter):
         )
         self.r2_threshold = 0.5
         self.compute_uncertainty = compute_uncertainty
-
-    def fit_voxel(
-        self,
-        model: "FittableModel",
-        observed: "NDArray[np.floating[Any]]",
-        initial_guess: dict[str, float] | None = None,
-        bounds_override: dict[str, tuple[float, float]] | None = None,
-    ) -> FittingResult:
-        """Fit model to single observation vector using Bayesian inference.
-
-        Delegates to ``fit_batch()`` with ``n_voxels=1``, matching the
-        pattern used by ``LevenbergMarquardtFitter``.
-
-        Parameters
-        ----------
-        model : FittableModel
-            Model with independent variables bound.
-        observed : NDArray
-            Observed data, shape ``(n_observations,)``.
-        initial_guess : dict[str, float] | None
-            Initial parameter values.
-        bounds_override : dict, optional
-            Per-parameter bound overrides.
-
-        Returns
-        -------
-        FittingResult
-            Fitting results with Bayesian uncertainty estimates.
-        """
-        xp = get_array_module(observed)
-        observed = xp.asarray(observed)
-
-        if initial_guess is not None:
-            p0 = np.array([initial_guess[p] for p in model.parameters])
-        else:
-            p0 = np.zeros(len(model.parameters))
-
-        try:
-            # Run via batch path with n_voxels=1
-            obs_batch = observed[:, xp.newaxis]  # (n_obs, 1)
-            params, r2, converged = self.fit_batch(model, obs_batch, bounds_override)
-
-            # Extract single-voxel results
-            fitted_params = dict(
-                zip(
-                    model.parameters,
-                    [float(v) for v in to_numpy(params[:, 0])],
-                    strict=True,
-                )
-            )
-            r_squared = float(to_numpy(r2[0]))
-            did_converge = bool(to_numpy(converged[0]))
-
-            # Compute residuals
-            pred = model.predict_array_batch(params, xp)[:, 0]
-            residuals = observed - pred
-
-            return FittingResult(
-                parameters=fitted_params,
-                residuals=to_numpy(residuals),
-                r_squared=r_squared,
-                converged=did_converge,
-                n_iterations=self.n_samples,
-                termination_reason=("converged" if did_converge else "max_iterations"),
-                model_name=model.name,
-                initial_guess=dict(zip(model.parameters, to_numpy(p0), strict=True)),
-                bounds=model.get_bounds(),
-            )
-
-        except Exception as e:
-            logger.warning(f"Bayesian fitting failed: {e}")
-            return FittingResult(
-                parameters=dict.fromkeys(model.parameters, np.nan),
-                residuals=np.full_like(to_numpy(observed), np.nan),
-                r_squared=0.0,
-                converged=False,
-                n_iterations=0,
-                termination_reason=f"exception: {e}",
-                model_name=model.name,
-                initial_guess=dict(zip(model.parameters, to_numpy(p0), strict=True)),
-                bounds=model.get_bounds(),
-            )
 
     # ------------------------------------------------------------------
     # Batch fitting (MAP via damped LM with prior)

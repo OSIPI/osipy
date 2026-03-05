@@ -359,9 +359,6 @@ def load_dicom(
         # Sort slices by temporal position, then by slice location
         slices_info.sort(key=lambda x: (x["temporal_pos"], x["slice_loc"]))
 
-        # Get sample shape from first slice
-        _ = slices_info[0]["pixel_array"].shape
-
         # Reshape into 4D and collect timing info
         data_4d = []
         trigger_times_ms: list[float | None] = []
