@@ -35,6 +35,10 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+# NumPy 2.0 renamed trapz -> trapezoid. Ensure compatibility with NumPy <2.0.
+if not hasattr(np, "trapezoid"):
+    np.trapezoid = np.trapz  # type: ignore[attr-defined] # noqa: NPY201
+
 if TYPE_CHECKING:
     from numpy.typing import ArrayLike, NDArray
 
