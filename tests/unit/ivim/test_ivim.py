@@ -77,7 +77,6 @@ class TestIVIMBiexponentialModel:
         assert bounds["f"][1] <= 1
 
 
-
 class TestIVIMSimplifiedModel:
     """Tests for simplified IVIM model."""
 

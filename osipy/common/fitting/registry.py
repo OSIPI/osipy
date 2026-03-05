@@ -56,9 +56,7 @@ def get_fitter(name: str):
     """
     if name not in FITTER_REGISTRY:
         valid = ", ".join(sorted(FITTER_REGISTRY.keys()))
-        raise DataValidationError(
-            f"Unknown fitter: {name}. Valid: {valid}"
-        )
+        raise DataValidationError(f"Unknown fitter: {name}. Valid: {valid}")
     return FITTER_REGISTRY[name]()
 
 

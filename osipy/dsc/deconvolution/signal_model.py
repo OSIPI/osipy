@@ -116,7 +116,9 @@ class BoundDSCModel(BaseBoundModel):
         self._Vh = xp.asarray(self._Vh)
 
     def predict_array_batch(
-        self, free_params_batch: NDArray[np.floating[Any]], xp: Any,
+        self,
+        free_params_batch: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         """Forward model: reconstruct C(t) from CBF, MTT, Ta.
 
@@ -151,7 +153,9 @@ class BoundDSCModel(BaseBoundModel):
         return cbf[xp.newaxis, :] * A
 
     def get_initial_guess_batch(
-        self, observed_batch: NDArray[np.floating[Any]], xp: Any,
+        self,
+        observed_batch: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         """Compute initial guesses from signal shape.
 

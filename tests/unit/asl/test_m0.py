@@ -312,5 +312,3 @@ class TestComputeM0FromPD:
 
         # Longer TE needs larger T2 correction
         assert np.mean(m0_long_te) > np.mean(m0_short_te)
-
-

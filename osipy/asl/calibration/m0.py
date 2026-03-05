@@ -447,5 +447,3 @@ def compute_m0_from_pd(
     m0 = pd_image * t1_factor * t2_factor
 
     return m0
-
-

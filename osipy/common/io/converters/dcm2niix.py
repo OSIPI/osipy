@@ -228,4 +228,3 @@ class Dcm2niixConverter:
         except subprocess.TimeoutExpired as err:
             msg = "dcm2niix conversion timed out"
             raise Dcm2niixError(msg) from err
-

@@ -293,7 +293,6 @@ class IVIMBiexponentialModel(IVIMModel):
         }
 
 
-
 class IVIMSimplifiedModel(IVIMModel):
     """Simplified IVIM model.
 

@@ -323,5 +323,3 @@ def create_montage(
 
     plt.tight_layout()
     return fig
-
-

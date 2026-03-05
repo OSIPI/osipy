@@ -172,7 +172,9 @@ def deconvolve_oSVD(
     target_oi = params.oscillation_index
 
     best_threshold = xp.full(
-        masked_conc.shape[0], params.threshold, dtype=concentration.dtype,
+        masked_conc.shape[0],
+        params.threshold,
+        dtype=concentration.dtype,
     )
     best_oi = xp.full(masked_conc.shape[0], xp.inf, dtype=concentration.dtype)
 

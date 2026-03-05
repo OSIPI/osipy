@@ -190,7 +190,6 @@ def expconv(
     return result * T_arr[xp.newaxis, :]
 
 
-
 def biexpconv(
     f: NDArray[np.floating],
     T1: float,

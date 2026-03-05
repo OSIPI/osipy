@@ -35,7 +35,13 @@ logger = logging.getLogger(__name__)
 
 @register_concentration_model("spgr")
 def _convert_spgr(
-    signal, s0, t1_pre, tr, cos_a, relaxivity, xp,
+    signal,
+    s0,
+    t1_pre,
+    tr,
+    cos_a,
+    relaxivity,
+    xp,
 ):
     """SPGR signal-to-concentration conversion."""
     # SPGR signal equation:
@@ -80,7 +86,13 @@ def _convert_spgr(
 
 @register_concentration_model("linear")
 def _convert_linear(
-    signal, s0, t1_pre, tr, cos_a, relaxivity, xp,
+    signal,
+    s0,
+    t1_pre,
+    tr,
+    cos_a,
+    relaxivity,
+    xp,
 ):
     """Linear signal-to-concentration conversion."""
     # Simplified linear approximation for small concentration changes

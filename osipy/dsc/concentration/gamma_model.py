@@ -90,7 +90,9 @@ class BoundGammaVariateModel(BaseBoundModel):
         return bounds
 
     def predict_array_batch(
-        self, free_params_batch: NDArray[np.floating[Any]], xp: Any,
+        self,
+        free_params_batch: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         """Predict gamma-variate concentration for a batch.
 
@@ -128,7 +130,9 @@ class BoundGammaVariateModel(BaseBoundModel):
         return result
 
     def get_initial_guess_batch(
-        self, observed_batch: NDArray[np.floating[Any]], xp: Any,
+        self,
+        observed_batch: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         """Get initial parameter guesses from curve shape.
 

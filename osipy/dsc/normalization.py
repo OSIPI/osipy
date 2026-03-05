@@ -175,7 +175,8 @@ def normalize_to_white_matter(
         if white_matter_mask.ndim == 2 and values.ndim == 3:
             # Expand 2D mask to 3D
             white_matter_mask = xp.broadcast_to(
-                white_matter_mask[..., np.newaxis], values.shape,
+                white_matter_mask[..., np.newaxis],
+                values.shape,
             ).copy()
         else:
             msg = (
@@ -216,7 +217,10 @@ def normalize_to_white_matter(
         normalized_values = values / ref_value
 
     normalized_values = xp.nan_to_num(
-        normalized_values, nan=0.0, posinf=0.0, neginf=0.0,
+        normalized_values,
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0,
     )
 
     # Create normalized parameter map

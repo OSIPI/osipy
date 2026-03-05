@@ -121,7 +121,6 @@ class TestValidator:
         assert "flip_angle" in result.out_of_range
 
 
-
 class TestValidationResult:
     """Tests for ValidationResult class."""
 

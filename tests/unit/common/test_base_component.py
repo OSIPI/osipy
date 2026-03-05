@@ -171,5 +171,3 @@ class TestAIFComponentsAreComponents:
         detector = MultiCriteriaAIFDetector()
         assert isinstance(detector, BaseComponent)
         assert detector.reference
-
-

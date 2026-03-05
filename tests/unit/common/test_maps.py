@@ -94,7 +94,9 @@ def _call_plot_parameter_comparison_two():
         pytest.param(_call_plot_parameter_map_basic, id="parameter_map_basic"),
         pytest.param(_call_plot_parameter_map_with_mask, id="parameter_map_with_mask"),
         pytest.param(_call_plot_parameter_comparison, id="parameter_comparison"),
-        pytest.param(_call_plot_parameter_comparison_two, id="parameter_comparison_two"),
+        pytest.param(
+            _call_plot_parameter_comparison_two, id="parameter_comparison_two"
+        ),
     ],
 )
 def test_map_visualization(call_factory) -> None:
