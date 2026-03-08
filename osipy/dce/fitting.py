@@ -657,7 +657,11 @@ def _compute_r_squared_vectorized(
         r_squared[quality_mask] = r2_values
 
     except Exception:
-        pass
+        logger.warning(
+            "R-squared computation failed; returning zero map. "
+            "Parameter maps are still valid.",
+            exc_info=True,
+        )
 
     return r_squared
 
