@@ -24,6 +24,7 @@ References
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -38,6 +39,8 @@ from osipy.common.fitting.registry import get_fitter
 from osipy.common.parameter_map import ParameterMap
 from osipy.dce.models.binding import BoundDCEModel
 from osipy.dce.models.registry import get_model
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -420,7 +423,11 @@ def _compute_r_squared_vectorized(
         r_squared[quality_mask] = r2_values
 
     except Exception:
-        pass
+        logger.warning(
+            "R-squared computation failed; returning zero map. "
+            "Parameter maps are still valid.",
+            exc_info=True,
+        )
 
     return r_squared
 
