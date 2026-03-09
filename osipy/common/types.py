@@ -256,3 +256,38 @@ AnyAcquisitionParams = (
     | ASLAcquisitionParams
     | IVIMAcquisitionParams
 )
+
+
+@dataclass
+class AnalysisResult:
+    """Standardised pipeline output contract.
+
+    Every call to :func:`osipy.pipeline.run_analysis` returns this object,
+    regardless of modality.  Downstream consumers (CLI tools, batch scripts,
+    visualisation code) only need to know this single class — they never have
+    to branch on modality to extract parameter maps or masks.
+
+    Attributes
+    ----------
+    modality : Modality
+        Source pipeline (DCE, DSC, ASL, or IVIM).
+    parameter_maps : dict[str, ParameterMap]
+        All output parameter maps keyed by OSIPI CAPLEX name
+        (e.g. ``'Ktrans'``, ``'CBF'``, ``'D'``).
+        **Guaranteed**: always a non-empty dict, never ``None``.
+    quality_mask : NDArray[np.bool_]
+        Boolean array marking valid voxels, same spatial shape as
+        the parameter maps.  **Guaranteed**: always present, never ``None``.
+    provenance : dict[str, Any]
+        Audit trail for reproducibility.  Contains at minimum:
+
+        * ``osipy_version`` – library version string
+        * ``captured_at``  – ISO-8601 UTC timestamp of the analysis run
+        * ``modality``     – modality value string
+        * ``config``       – serialised pipeline configuration dict
+    """
+
+    modality: Modality
+    parameter_maps: "dict[str, ParameterMap]"
+    quality_mask: "NDArray[np.bool_]"
+    provenance: "dict[str, Any]" = field(default_factory=dict)

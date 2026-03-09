@@ -12,7 +12,7 @@ OSIPI Task Force 4.1/4.2 publications
 
 import json as _json
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -186,7 +186,7 @@ class ValidationReport:
             "tolerances": {
                 k: v for k, v in self.tolerances.items() if k in self.parameters
             },
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "version": getattr(osipy, "__version__", "unknown"),
         }
 

@@ -12,7 +12,7 @@ References
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from osipy.common.backend.array_module import get_array_module, to_numpy
 from osipy.common.models.base import BaseSignalModel
@@ -32,7 +32,7 @@ class ModelParameters:
 P = TypeVar("P", bound=ModelParameters)
 
 
-class BasePerfusionModel[P: ModelParameters](BaseSignalModel):
+class BasePerfusionModel(BaseSignalModel, Generic[P]):
     """Abstract base class for perfusion pharmacokinetic models.
 
     All DCE/DSC models must inherit from this class and implement

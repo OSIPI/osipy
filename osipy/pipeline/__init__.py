@@ -29,11 +29,12 @@ from osipy.pipeline.asl_pipeline import ASLPipeline, ASLPipelineConfig
 from osipy.pipeline.dce_pipeline import DCEPipeline, DCEPipelineConfig
 from osipy.pipeline.dsc_pipeline import DSCPipeline, DSCPipelineConfig
 from osipy.pipeline.ivim_pipeline import IVIMPipeline, IVIMPipelineConfig
-from osipy.pipeline.runner import PipelineResult, run_analysis
+from osipy.pipeline.runner import AnalysisResult, PipelineResult, run_analysis
 
 __all__ = [
     "ASLPipeline",
     "ASLPipelineConfig",
+    "AnalysisResult",
     "DCEPipeline",
     "DCEPipelineConfig",
     "DSCPipeline",
