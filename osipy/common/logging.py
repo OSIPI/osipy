@@ -8,7 +8,7 @@ levels for diagnostics and audit trails.
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
 
@@ -34,7 +34,7 @@ class JsonFormatter(logging.Formatter):
             JSON-formatted log entry.
         """
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "module": record.module,

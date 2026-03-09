@@ -13,7 +13,7 @@ ASL-BIDS: https://bids-specification.readthedocs.io/en/stable/modality-specific-
 import csv
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -160,7 +160,7 @@ def export_bids(
             "Name": "osipy",
             "Version": __version__,
         },
-        "Timestamp": datetime.now(timezone.utc).isoformat(),
+        "Timestamp": datetime.now(UTC).isoformat(),
         "Parameters": {},
     }
 

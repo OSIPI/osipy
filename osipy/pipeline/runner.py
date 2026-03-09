@@ -86,7 +86,7 @@ def _make_provenance(
 
     prov: dict[str, Any] = {
         "osipy_version": __version__,
-        "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat(
+        "captured_at": datetime.datetime.now(datetime.UTC).isoformat(
             timespec="seconds"
         ),
         "modality": modality.value,

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -1005,7 +1005,7 @@ def _save_metadata(
     metadata: dict[str, Any] = {
         "osipy_version": __version__,
         "modality": config.modality,
-        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "timestamp": datetime.now(tz=UTC).isoformat(),
         "data_path": str(data_path),
         "config": config.model_dump(),
     }
