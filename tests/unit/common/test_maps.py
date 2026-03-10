@@ -53,21 +53,21 @@ def _call_plot_parameter_map_with_mask():
     return plot_parameter_map(_make_map_with_mask(), show_mask=True)
 
 
-def _call_plot_parameter_grid():
-    """plot_parameter_grid with three maps."""
-    from osipy.common.visualization.maps import plot_parameter_grid
+def _call_plot_parameter_comparison():
+    """plot_parameter_comparison with three maps."""
+    from osipy.common.visualization.maps import plot_parameter_comparison
 
     maps = [
         _make_single_map("Ktrans", "K^{trans}", "min-1"),
         _make_single_map("ve", "v_e", ""),
         _make_single_map("vp", "v_p", ""),
     ]
-    return plot_parameter_grid(maps, slice_idx=10)
+    return plot_parameter_comparison(maps, slice_idx=10)
 
 
-def _call_plot_map_comparison():
-    """plot_map_comparison between two maps."""
-    from osipy.common.visualization.maps import plot_map_comparison
+def _call_plot_parameter_comparison_two():
+    """plot_parameter_comparison between two maps."""
+    from osipy.common.visualization.maps import plot_parameter_comparison
 
     values1 = np.random.rand(64, 64, 20) * 0.3
     values2 = values1 + np.random.randn(64, 64, 20) * 0.05
@@ -85,45 +85,7 @@ def _call_plot_map_comparison():
         values=values2,
         affine=np.eye(4),
     )
-    return plot_map_comparison(map1, map2, slice_idx=10)
-
-
-def _call_plot_parameter_histogram():
-    """Basic plot_parameter_histogram call."""
-    from osipy.common.visualization.maps import plot_parameter_histogram
-
-    values = np.random.rand(64, 64, 20) * 0.3
-    param_map = ParameterMap(
-        name="Ktrans",
-        symbol="K^{trans}",
-        units="min-1",
-        values=values,
-        affine=np.eye(4),
-    )
-    return plot_parameter_histogram(param_map)
-
-
-def _call_plot_parameter_scatter():
-    """Basic plot_parameter_scatter call."""
-    from osipy.common.visualization.maps import plot_parameter_scatter
-
-    ktrans = np.random.rand(64, 64, 20) * 0.3
-    ve = np.random.rand(64, 64, 20) * 0.5
-    map1 = ParameterMap(
-        name="Ktrans",
-        symbol="K^{trans}",
-        units="min-1",
-        values=ktrans,
-        affine=np.eye(4),
-    )
-    map2 = ParameterMap(
-        name="ve",
-        symbol="v_e",
-        units="",
-        values=ve,
-        affine=np.eye(4),
-    )
-    return plot_parameter_scatter(map1, map2)
+    return plot_parameter_comparison(map1, map2, slice_idx=10)
 
 
 @pytest.mark.parametrize(
@@ -131,10 +93,10 @@ def _call_plot_parameter_scatter():
     [
         pytest.param(_call_plot_parameter_map_basic, id="parameter_map_basic"),
         pytest.param(_call_plot_parameter_map_with_mask, id="parameter_map_with_mask"),
-        pytest.param(_call_plot_parameter_grid, id="parameter_grid"),
-        pytest.param(_call_plot_map_comparison, id="map_comparison"),
-        pytest.param(_call_plot_parameter_histogram, id="parameter_histogram"),
-        pytest.param(_call_plot_parameter_scatter, id="parameter_scatter"),
+        pytest.param(_call_plot_parameter_comparison, id="parameter_comparison"),
+        pytest.param(
+            _call_plot_parameter_comparison_two, id="parameter_comparison_two"
+        ),
     ],
 )
 def test_map_visualization(call_factory) -> None:

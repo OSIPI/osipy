@@ -19,7 +19,7 @@ class TestConvolutionEquivalence:
     def test_convolve_aif_equivalence(self) -> None:
         """GPU and CPU convolve_aif should produce identical results."""
         cp = pytest.importorskip("cupy")
-        from osipy.common.backend.convolution import convolve_aif
+        from osipy.common.convolution import convolve_aif
 
         n = 100
         aif = np.exp(-0.1 * np.arange(n))
@@ -44,7 +44,7 @@ class TestConvolutionEquivalence:
     def test_convolve_aif_batch_equivalence(self) -> None:
         """GPU batch convolution should match CPU."""
         cp = pytest.importorskip("cupy")
-        from osipy.common.backend.convolution import convolve_aif_batch
+        from osipy.common.convolution import convolve_aif
 
         n_time = 50
         n_voxels = 100
@@ -54,8 +54,8 @@ class TestConvolutionEquivalence:
         )
         dt = 0.5
 
-        cpu_result = convolve_aif_batch(aif, irfs, dt=dt)
-        gpu_result = convolve_aif_batch(cp.asarray(aif), cp.asarray(irfs), dt=dt)
+        cpu_result = convolve_aif(aif, irfs, dt=dt)
+        gpu_result = convolve_aif(cp.asarray(aif), cp.asarray(irfs), dt=dt)
         gpu_result_np = cp.asnumpy(gpu_result)
 
         np.testing.assert_array_almost_equal(cpu_result, gpu_result_np, decimal=4)
@@ -63,7 +63,7 @@ class TestConvolutionEquivalence:
     def test_deconvolve_svd_equivalence(self) -> None:
         """GPU SVD deconvolution should match CPU."""
         cp = pytest.importorskip("cupy")
-        from osipy.common.backend.convolution import deconvolve_svd
+        from osipy.common.convolution import deconvolve_svd
 
         n = 50
         ct = np.random.randn(n)

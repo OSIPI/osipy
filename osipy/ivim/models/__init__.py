@@ -20,9 +20,7 @@ from osipy.ivim.models.biexponential import (
     IVIMSimplifiedModel,
 )
 from osipy.ivim.models.registry import (
-    IVIM_MODEL_REGISTRY,
     get_ivim_model,
-    list_ivim_models,
     register_ivim_model,
 )
 
@@ -32,12 +30,10 @@ register_ivim_model("biexponential")(IVIMBiexponentialModel)
 register_ivim_model("simplified")(IVIMSimplifiedModel)
 
 __all__ = [
-    "IVIM_MODEL_REGISTRY",
     "IVIMBiexponentialModel",
     "IVIMModel",
     "IVIMParams",
     "IVIMSimplifiedModel",
     "get_ivim_model",
-    "list_ivim_models",
     "register_ivim_model",
 ]

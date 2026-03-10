@@ -1,0 +1,25 @@
+modality: asl
+pipeline:
+  labeling_scheme: pcasl           # pcasl | pasl | casl
+  pld: 1800.0                     # ms, post-labeling delay
+  label_duration: 1800.0          # ms, labeling duration
+  t1_blood: 1650.0                # ms, longitudinal relaxation time of blood
+  labeling_efficiency: 0.85       # labeling efficiency (0 to 1)
+  m0_method: single               # single | voxelwise | reference_region
+  t1_tissue: 1330.0               # ms, longitudinal relaxation time of tissue
+  partition_coefficient: 0.9      # blood-brain partition coefficient (mL/g)
+  difference_method: pairwise     # pairwise | surround | mean
+  label_control_order: label_first  # label_first | control_first
+data:
+  format: auto                     # auto | nifti | dicom | bids
+  # m0_data: sub-Sub1_m0scan.nii.gz             # M0 calibration image (M0=1.0 if omitted)
+  # mask: brain_mask.nii.gz        # tissue mask, relative to data_path or absolute
+  # subject: "01"                  # BIDS subject ID (required when format: bids)
+  # session: "01"                  # BIDS session ID
+output:
+  format: nifti                    # nifti
+backend:
+  force_cpu: false
+logging:
+  level: INFO                      # DEBUG | INFO | WARNING | ERROR
+

@@ -11,7 +11,6 @@ from osipy.common.exceptions import DataValidationError
 logger = logging.getLogger(__name__)
 
 FITTER_REGISTRY: dict[str, type] = {}
-FITTER_ALIASES: dict[str, str] = {}
 
 
 def register_fitter(name: str):
@@ -37,28 +36,13 @@ def register_fitter(name: str):
     return decorator
 
 
-def register_fitter_alias(alias: str, canonical: str) -> None:
-    """Register an alias for a canonical fitter name.
-
-    Parameters
-    ----------
-    alias : str
-        Alias name.
-    canonical : str
-        Canonical registry name (e.g., 'lm').
-    """
-    FITTER_ALIASES[alias] = canonical
-
-
 def get_fitter(name: str):
     """Get a fitter instance by name.
-
-    Resolves aliases before lookup.
 
     Parameters
     ----------
     name : str
-        Registry key or alias for the fitter.
+        Registry key for the fitter.
 
     Returns
     -------
@@ -70,14 +54,10 @@ def get_fitter(name: str):
     DataValidationError
         If the fitter name is not recognized.
     """
-    resolved = FITTER_ALIASES.get(name, name)
-    if resolved not in FITTER_REGISTRY:
+    if name not in FITTER_REGISTRY:
         valid = ", ".join(sorted(FITTER_REGISTRY.keys()))
-        aliases = ", ".join(sorted(FITTER_ALIASES.keys()))
-        raise DataValidationError(
-            f"Unknown fitter: {name}. Valid: {valid}. Aliases: {aliases}"
-        )
-    return FITTER_REGISTRY[resolved]()
+        raise DataValidationError(f"Unknown fitter: {name}. Valid: {valid}")
+    return FITTER_REGISTRY[name]()
 
 
 def list_fitters() -> list[str]:

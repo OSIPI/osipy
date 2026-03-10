@@ -26,8 +26,6 @@ if TYPE_CHECKING:
 class ModelParameters:
     """Base class for model parameter dataclasses."""
 
-    pass
-
 
 class BasePerfusionModel[P: ModelParameters](BaseSignalModel):
     """Abstract base class for perfusion pharmacokinetic models.
@@ -66,7 +64,9 @@ class BasePerfusionModel[P: ModelParameters](BaseSignalModel):
         return "seconds"
 
     def _convert_time(
-        self, t: "NDArray[np.floating[Any]]", xp: Any
+        self,
+        t: "NDArray[np.floating[Any]]",
+        xp: Any,
     ) -> "NDArray[np.floating[Any]]":
         """Convert time array based on model's time_unit.
 

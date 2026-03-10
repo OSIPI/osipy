@@ -19,15 +19,13 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-import numpy as np
-
-from osipy.common.backend.array_module import get_array_module, to_numpy
+from osipy.common.backend.array_module import get_array_module
 from osipy.common.backend.config import get_backend
 from osipy.common.fitting.base import BaseFitter
 from osipy.common.fitting.registry import register_fitter
-from osipy.common.fitting.result import FittingResult
 
 if TYPE_CHECKING:
+    import numpy as np
     from numpy.typing import NDArray
 
     from osipy.common.models.fittable import FittableModel
@@ -80,92 +78,6 @@ class LevenbergMarquardtFitter(BaseFitter):
             chunk_size if chunk_size is not None else get_backend().default_batch_size
         )
         self.r2_threshold = r2_threshold
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def fit_voxel(
-        self,
-        model: FittableModel,
-        observed: NDArray[np.floating[Any]],
-        initial_guess: dict[str, float] | None = None,
-        bounds_override: dict[str, tuple[float, float]] | None = None,
-    ) -> FittingResult:
-        """Fit model to a single observation vector.
-
-        Wraps the batch path with ``n_voxels=1``.
-
-        Parameters
-        ----------
-        model : FittableModel
-            Model with independent variables bound.
-        observed : NDArray
-            Observed data, shape ``(n_observations,)``.
-        initial_guess : dict[str, float] | None
-            Initial parameter values. If None, uses model's guess.
-        bounds_override : dict, optional
-            Per-parameter bound overrides.
-
-        Returns
-        -------
-        FittingResult
-            Fitting results including parameters and quality metrics.
-        """
-        xp = get_array_module(observed)
-        observed = xp.asarray(observed)
-
-        # Get initial guess
-        if initial_guess is not None:
-            p0 = np.array([initial_guess[p] for p in model.parameters])
-        else:
-            p0 = np.zeros(len(model.parameters))
-
-        try:
-            # Run via batch path with n_voxels=1
-            obs_batch = observed[:, xp.newaxis]  # (n_obs, 1)
-            params, r2, converged = self.fit_batch(model, obs_batch, bounds_override)
-
-            # Extract single-voxel results
-            fitted_params = dict(
-                zip(
-                    model.parameters,
-                    [float(v) for v in to_numpy(params[:, 0])],
-                    strict=True,
-                )
-            )
-            r_squared = float(to_numpy(r2[0]))
-            did_converge = bool(to_numpy(converged[0]))
-
-            # Compute residuals
-            pred = model.predict_array_batch(params, xp)[:, 0]
-            residuals = observed - pred
-
-            return FittingResult(
-                parameters=fitted_params,
-                residuals=to_numpy(residuals),
-                r_squared=r_squared,
-                converged=did_converge,
-                n_iterations=self.max_iterations,
-                termination_reason="converged" if did_converge else "max_iterations",
-                model_name=model.name,
-                initial_guess=dict(zip(model.parameters, to_numpy(p0), strict=True)),
-                bounds=model.get_bounds(),
-            )
-
-        except Exception as e:
-            logger.warning(f"Fitting failed: {e}")
-            return FittingResult(
-                parameters=dict.fromkeys(model.parameters, np.nan),
-                residuals=np.full_like(to_numpy(observed), np.nan),
-                r_squared=0.0,
-                converged=False,
-                n_iterations=0,
-                termination_reason=f"exception: {e}",
-                model_name=model.name,
-                initial_guess=dict(zip(model.parameters, to_numpy(p0), strict=True)),
-                bounds=model.get_bounds(),
-            )
 
     # ------------------------------------------------------------------
     # Core batch LM algorithm
@@ -395,7 +307,6 @@ class LevenbergMarquardtFitter(BaseFitter):
             Parameter updates, shape ``(n_params, n_voxels)``.
         """
         n_params = jtj.shape[0]
-        jtj.shape[2]
         delta = xp.zeros_like(jtr)
 
         if n_params == 2:

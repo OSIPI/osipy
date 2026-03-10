@@ -98,8 +98,6 @@ class BoundDSCModel(BaseBoundModel):
         n = len(time)
         dt = float(time[1] - time[0]) if n > 1 else 1.0
         self._dt = dt
-        self._n_timepoints = n
-        self._matrix_type = matrix_type
 
         if matrix_type == "circulant":
             A = _build_circulant_matrix_xp(self._aif, n, xp) * dt
@@ -118,7 +116,9 @@ class BoundDSCModel(BaseBoundModel):
         self._Vh = xp.asarray(self._Vh)
 
     def predict_array_batch(
-        self, free_params_batch: NDArray[np.floating[Any]], xp: Any
+        self,
+        free_params_batch: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         """Forward model: reconstruct C(t) from CBF, MTT, Ta.
 
@@ -153,7 +153,9 @@ class BoundDSCModel(BaseBoundModel):
         return cbf[xp.newaxis, :] * A
 
     def get_initial_guess_batch(
-        self, observed_batch: NDArray[np.floating[Any]], xp: Any
+        self,
+        observed_batch: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         """Compute initial guesses from signal shape.
 

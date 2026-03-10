@@ -16,7 +16,6 @@ from osipy.common.fitting.registry import (
     get_fitter,
     list_fitters,
     register_fitter,
-    register_fitter_alias,
 )
 from osipy.common.fitting.result import FittingResult
 
@@ -30,5 +29,4 @@ __all__ = [
     "get_fitter",
     "list_fitters",
     "register_fitter",
-    "register_fitter_alias",
 ]

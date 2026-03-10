@@ -27,7 +27,7 @@ def get_concentration_model(name: str) -> Callable:
     if name not in _CONCENTRATION_MODEL_REGISTRY:
         valid = ", ".join(sorted(_CONCENTRATION_MODEL_REGISTRY.keys()))
         raise DataValidationError(
-            f"Unknown concentration model: {name}. Valid: {valid}"
+            f"Unknown concentration model: {name}. Valid: {valid}",
         )
     return _CONCENTRATION_MODEL_REGISTRY[name]
 

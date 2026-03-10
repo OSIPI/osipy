@@ -90,7 +90,9 @@ class BoundGammaVariateModel(BaseBoundModel):
         return bounds
 
     def predict_array_batch(
-        self, free_params_batch: NDArray[np.floating[Any]], xp: Any
+        self,
+        free_params_batch: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         """Predict gamma-variate concentration for a batch.
 
@@ -128,7 +130,9 @@ class BoundGammaVariateModel(BaseBoundModel):
         return result
 
     def get_initial_guess_batch(
-        self, observed_batch: NDArray[np.floating[Any]], xp: Any
+        self,
+        observed_batch: NDArray[np.floating[Any]],
+        xp: Any,
     ) -> NDArray[np.floating[Any]]:
         """Get initial parameter guesses from curve shape.
 
@@ -156,9 +160,6 @@ class BoundGammaVariateModel(BaseBoundModel):
         peak_conc = xp.max(observed_batch, axis=0)
 
         # t0: estimate from first significant rise
-        xp.mean(observed_batch[:5, :], axis=0) + 2 * xp.std(
-            observed_batch[:5, :], axis=0
-        )
         # Simple heuristic: t0 is a few frames before peak
         t0_idx = xp.maximum(peak_idx - 3, 0)
         t0_init = self._time[t0_idx]

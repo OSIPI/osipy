@@ -150,7 +150,6 @@ def deconv_osvd(
     aif: NDArray[np.floating],
     t: NDArray[np.floating],
     *,
-    tol: float = 0.1,
     osc_threshold: float = 0.035,
 ) -> NDArray[np.floating]:
     """Oscillation-index SVD deconvolution.
@@ -166,9 +165,6 @@ def deconv_osvd(
         Arterial input function. Shape: (n_times,).
     t : ndarray
         Time points in seconds. Shape: (n_times,).
-    tol : float, default 0.1
-        Initial tolerance for TSVD. Will be adjusted based on
-        oscillation index.
     osc_threshold : float, default 0.035
         Target oscillation index threshold. The algorithm finds
         the smallest truncation that keeps oscillations below this.

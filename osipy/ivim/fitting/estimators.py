@@ -35,7 +35,6 @@ from osipy.common.exceptions import FittingError
 from osipy.common.fitting.base import BaseFitter
 from osipy.common.fitting.least_squares import LevenbergMarquardtFitter
 from osipy.common.parameter_map import ParameterMap
-from osipy.ivim.models import get_ivim_model
 from osipy.ivim.models.biexponential import IVIMBiexponentialModel
 from osipy.ivim.models.binding import BoundIVIMModel
 
@@ -247,67 +246,6 @@ def fit_ivim(
     )
 
 
-def fit_ivim_model(
-    model_name: str,
-    signal: "NDArray[np.floating[Any]]",
-    b_values: "NDArray[np.floating[Any]]",
-    mask: "NDArray[np.bool_] | None" = None,
-    params: IVIMFitParams | None = None,
-    progress_callback: Callable[[float], None] | None = None,
-) -> IVIMFitResult:
-    """Fit a named IVIM model to DWI data using registry-driven dispatch.
-
-    This is the registry-driven entry point that mirrors the DCE
-    ``fit_model()`` pattern. It looks up the model from the IVIM
-    registry and delegates to the shared fitting logic.
-
-    Parameters
-    ----------
-    model_name : str
-        Registered model name (e.g. ``'biexponential'``, ``'simplified'``).
-    signal : NDArray[np.floating]
-        DWI signal data, shape (..., n_b_values).
-    b_values : NDArray[np.floating]
-        b-values in s/mm².
-    mask : NDArray[np.bool_] | None
-        Brain/tissue mask.
-    params : IVIMFitParams | None
-        Fitting parameters.
-    progress_callback : Callable[[float], None] | None
-        Progress callback function.
-
-    Returns
-    -------
-    IVIMFitResult
-        Fitted parameter maps.
-
-    Raises
-    ------
-    DataValidationError
-        If ``model_name`` is not found in the registry.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from osipy.ivim import fit_ivim_model
-    >>> signal = np.random.rand(64, 64, 10, 8) * 1000
-    >>> b_values = np.array([0, 10, 20, 50, 100, 200, 400, 800])
-    >>> result = fit_ivim_model("biexponential", signal, b_values)
-    """
-    # Validate that the model exists in the registry (raises DataValidationError)
-    _model = get_ivim_model(model_name)
-    logger.info("Using IVIM model '%s' (%s)", model_name, _model.name)
-
-    # Delegate to shared fitting logic
-    return fit_ivim(
-        signal=signal,
-        b_values=b_values,
-        mask=mask,
-        params=params,
-        progress_callback=progress_callback,
-    )
-
-
 def _fit_ivim_vectorized(
     signal: "NDArray[np.floating[Any]]",
     b_values: "NDArray[np.floating[Any]]",
@@ -482,7 +420,6 @@ def _ivim_bayesian(
 ) -> dict[str, ParameterMap]:
     """Two-stage Bayesian MAP IVIM fitting with empirical priors."""
     from osipy.ivim.fitting.bayesian_ivim import TwoStageBayesianIVIMFitter
-    from osipy.ivim.models.biexponential import IVIMBiexponentialModel
 
     # Ensure 4D for fit_image
     if signal.ndim == 3:

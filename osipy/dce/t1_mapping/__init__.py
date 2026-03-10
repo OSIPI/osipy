@@ -13,7 +13,6 @@ References
 """
 
 from osipy.common.dataset import PerfusionDataset
-from osipy.common.parameter_map import ParameterMap  # noqa: F401
 from osipy.dce.t1_mapping.look_locker import compute_t1_look_locker
 from osipy.dce.t1_mapping.registry import (
     get_t1_method,

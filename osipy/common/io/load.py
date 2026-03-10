@@ -416,7 +416,6 @@ def _load_dicom(
     # Fall back to direct DICOM loading
     try:
         import pydicom
-        from pydicom.errors import InvalidDicomError  # noqa: F401
     except ImportError as e:
         msg = "pydicom is required for DICOM loading"
         raise ImportError(msg) from e

@@ -131,16 +131,6 @@ def _conv_nonuniform(
     n = len(t)
     result = xp.zeros(n, dtype=f.dtype)
 
-    # Compute slopes for piecewise-linear interpolation
-    dt = xp.diff(t)
-    df = xp.diff(f)
-    dh = xp.diff(h)
-
-    # Avoid division by zero
-    dt_safe = xp.where(dt > 0, dt, 1.0)
-    df / dt_safe
-    dh / dt_safe
-
     # Convolution using trapezoidal integration
     # For each output point i, sum contributions from intervals [j, j+1]
     for i in range(1, n):

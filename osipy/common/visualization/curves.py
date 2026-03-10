@@ -24,100 +24,6 @@ except ImportError:
     HAS_MATPLOTLIB = False
 
 
-def plot_time_concentration_curve(
-    time: "NDArray[np.floating[Any]]",
-    concentration: "NDArray[np.floating[Any]] | dict[str, NDArray[np.floating[Any]]]",
-    aif: "NDArray[np.floating[Any]] | None" = None,
-    fitted: "NDArray[np.floating[Any]] | None" = None,
-    error: "NDArray[np.floating[Any]] | None" = None,
-    title: str = "Time-Concentration Curve",
-    xlabel: str = "Time (s)",
-    ylabel: str = "Concentration (mM)",
-    show_grid: bool = True,
-    ax: Any | None = None,
-    figsize: tuple[float, float] = (10, 6),
-) -> Any:
-    """Plot time-concentration curve(s).
-
-    Parameters
-    ----------
-    time : NDArray
-        Time points.
-    concentration : NDArray or dict
-        Concentration values. If dict, plots multiple named curves.
-    aif : NDArray, optional
-        Arterial input function to overlay.
-    fitted : NDArray, optional
-        Fitted/predicted concentration values.
-    error : NDArray, optional
-        Error bars for concentration.
-    title : str
-        Plot title.
-    xlabel, ylabel : str
-        Axis labels.
-    show_grid : bool
-        Whether to show grid.
-    ax : matplotlib.axes.Axes, optional
-        Axes to plot on.
-    figsize : tuple
-        Figure size if creating new figure.
-
-    Returns
-    -------
-    matplotlib.figure.Figure or matplotlib.axes.Axes
-        The figure or axes with the plot.
-    """
-    if not HAS_MATPLOTLIB:
-        msg = "matplotlib is required for visualization"
-        raise ImportError(msg)
-
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize)
-    else:
-        fig = ax.figure
-
-    # Handle dict of multiple curves
-    if isinstance(concentration, dict):
-        for label, conc in concentration.items():
-            ax.plot(time, conc, label=label)
-        ax.legend()
-    else:
-        if error is not None:
-            ax.errorbar(
-                time,
-                concentration,
-                yerr=error,
-                fmt="o-",
-                label="Measured",
-                markersize=4,
-                capsize=3,
-            )
-        else:
-            ax.plot(time, concentration, "o-", label="Measured", markersize=4)
-
-        if fitted is not None:
-            ax.plot(time, fitted, "-", label="Fitted", linewidth=2)
-
-    if aif is not None:
-        ax2 = ax.twinx()
-        ax2.plot(time, aif, "r-", label="AIF", alpha=0.7)
-        ax2.set_ylabel("AIF (mM)", color="r")
-        ax2.tick_params(axis="y", labelcolor="r")
-
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
-    if show_grid:
-        ax.grid(True, alpha=0.3)
-    if (
-        fitted is not None
-        or (isinstance(concentration, dict) is False and error is None)
-    ) and fitted is not None:
-        ax.legend()
-
-    return fig
-
-
 def plot_time_course(
     time: "NDArray[np.floating[Any]]",
     signal: "NDArray[np.floating[Any]]",
@@ -175,70 +81,6 @@ def plot_time_course(
     ax.grid(True, alpha=0.3)
 
     return ax
-
-
-def plot_signal_timecourse(
-    time: "NDArray[np.floating[Any]]",
-    signal: "NDArray[np.floating[Any]]",
-    baseline_end: float | None = None,
-    title: str = "Signal Time Course",
-    xlabel: str = "Time (s)",
-    ylabel: str = "Signal",
-    ax: Any | None = None,
-    figsize: tuple[float, float] = (10, 6),
-) -> Any:
-    """Plot signal time course with optional baseline indication.
-
-    Parameters
-    ----------
-    time : NDArray
-        Time points.
-    signal : NDArray
-        Signal values.
-    baseline_end : float, optional
-        Time at which baseline ends. Will draw a vertical line.
-    title : str
-        Plot title.
-    xlabel, ylabel : str
-        Axis labels.
-    ax : matplotlib.axes.Axes, optional
-        Axes to plot on.
-    figsize : tuple
-        Figure size.
-
-    Returns
-    -------
-    matplotlib.figure.Figure or matplotlib.axes.Axes
-        The figure or axes with the plot.
-    """
-    if not HAS_MATPLOTLIB:
-        msg = "matplotlib is required for visualization"
-        raise ImportError(msg)
-
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize)
-    else:
-        fig = ax.figure
-
-    ax.plot(time, signal, "b-", linewidth=1.5)
-
-    if baseline_end is not None:
-        ax.axvline(
-            baseline_end,
-            color="gray",
-            linestyle="--",
-            label=f"Baseline end ({baseline_end}s)",
-        )
-        # Shade baseline region
-        ax.axvspan(time[0], baseline_end, alpha=0.1, color="gray")
-        ax.legend()
-
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
-    ax.grid(True, alpha=0.3)
-
-    return fig
 
 
 def plot_aif(
@@ -471,7 +313,3 @@ def plot_multi_curves(
     ax.grid(True, alpha=0.3)
 
     return ax
-
-
-# Aliases for backward compatibility
-plot_signal_time_course = plot_time_course

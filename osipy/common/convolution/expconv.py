@@ -190,10 +190,6 @@ def expconv(
     return result * T_arr[xp.newaxis, :]
 
 
-# Backward-compatibility alias
-expconv_batch = expconv
-
-
 def biexpconv(
     f: NDArray[np.floating],
     T1: float,
@@ -273,9 +269,6 @@ def _biexpconv_limit(
 
     f = xp.asarray(f)
     t = xp.asarray(t)
-
-    n = len(t)
-    xp.zeros(n, dtype=f.dtype)
 
     # Use numerical differentiation with small delta
     delta = T * 1e-6

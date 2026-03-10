@@ -31,19 +31,12 @@ References
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-# NumPy 2.0 renamed trapz -> trapezoid. Ensure compatibility with NumPy <2.0.
-if not hasattr(np, "trapezoid"):
-    np.trapezoid = np.trapezoid  # type: ignore[attr-defined]
-
 if TYPE_CHECKING:
     from numpy.typing import ArrayLike, NDArray
-
-# Type variable for array types
-ArrayType = TypeVar("ArrayType", bound="ArrayLike")
 
 # Cache the CuPy module to avoid repeated imports
 _cupy_module: Any = None
@@ -237,26 +230,3 @@ def to_gpu(array: ArrayLike) -> Any:
     except Exception:
         # Fallback to NumPy if GPU transfer fails
         return to_numpy(array)
-
-
-def ensure_contiguous(array: ArrayLike) -> Any:
-    """Ensure array is contiguous in memory (C-order).
-
-    Parameters
-    ----------
-    array : ArrayLike
-        Input array.
-
-    Returns
-    -------
-    array
-        Contiguous array of the same type (NumPy or CuPy).
-
-    Notes
-    -----
-    This is important for GPU operations which often require contiguous memory.
-    """
-    xp = get_array_module(array)
-    if not array.flags.c_contiguous:  # type: ignore[union-attr]
-        return xp.ascontiguousarray(array)
-    return array

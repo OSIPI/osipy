@@ -172,7 +172,9 @@ def deconvolve_oSVD(
     target_oi = params.oscillation_index
 
     best_threshold = xp.full(
-        masked_conc.shape[0], params.threshold, dtype=concentration.dtype
+        masked_conc.shape[0],
+        params.threshold,
+        dtype=concentration.dtype,
     )
     best_oi = xp.full(masked_conc.shape[0], xp.inf, dtype=concentration.dtype)
 
@@ -581,84 +583,6 @@ def _build_toeplitz_matrix_xp(
     diff = row_idx - col_idx
     A = xp.where(diff >= 0, aif[diff], 0.0)
     return A
-
-
-def _apply_svd_truncation_xp(
-    U: "NDArray[np.floating[Any]]",
-    S: "NDArray[np.floating[Any]]",
-    Vh: "NDArray[np.floating[Any]]",
-    c: "NDArray[np.floating[Any]]",
-    threshold: float,
-    xp: Any,
-) -> "NDArray[np.floating[Any]]":
-    """Apply SVD truncation to solve linear system (xp-compatible).
-
-    GPU/CPU agnostic implementation.
-
-    Parameters
-    ----------
-    U, S, Vh : NDArray
-        SVD components from xp.linalg.svd.
-    c : NDArray
-        Right-hand side vector.
-    threshold : float
-        Truncation threshold as fraction of max singular value.
-    xp : module
-        Array module (numpy or cupy).
-
-    Returns
-    -------
-    NDArray
-        Solution vector.
-    """
-    s_max = S[0]
-    s_thresh = threshold * s_max
-
-    # Truncated pseudo-inverse
-    S_inv = xp.zeros_like(S)
-    mask = s_thresh < S
-    S_inv[mask] = 1.0 / S[mask]
-
-    # Compute solution: r = V @ diag(S_inv) @ U.T @ c
-    r = Vh.T @ (S_inv * (U.T @ c))
-
-    return r
-
-
-def _compute_oscillation_index_xp(
-    r: "NDArray[np.floating[Any]]",
-    xp: Any,
-) -> float:
-    """Compute oscillation index of residue function (xp-compatible).
-
-    The oscillation index measures the amount of oscillation
-    in the residue function, defined as the sum of differences
-    between consecutive points normalized by the maximum.
-
-    GPU/CPU agnostic implementation.
-
-    Parameters
-    ----------
-    r : NDArray
-        Residue function.
-    xp : module
-        Array module (numpy or cupy).
-
-    Returns
-    -------
-    float
-        Oscillation index.
-    """
-    r_max = xp.max(xp.abs(r))
-    r_max_val = float(to_numpy(r_max))
-    if r_max_val < 1e-10:
-        return 0.0
-
-    # Sum of absolute differences
-    diff = xp.abs(r[1:] - r[:-1])  # xp-compatible diff
-    oi = xp.sum(diff) / (r_max * len(r))
-
-    return float(to_numpy(oi))
 
 
 # --- Strategy classes wrapping existing functions ---

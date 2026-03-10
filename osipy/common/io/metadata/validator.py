@@ -289,22 +289,3 @@ class ParameterValidator:
                     )
             except (ValueError, TypeError):
                 pass
-
-    def get_missing_required(self, params: dict[str, Any]) -> list[str]:
-        """Get list of missing required parameters.
-
-        Parameters
-        ----------
-        params : dict[str, Any]
-            Parameter dictionary.
-
-        Returns
-        -------
-        list[str]
-            Names of missing required parameters.
-        """
-        missing = []
-        for param in self.required:
-            if param not in params or params[param] is None:
-                missing.append(param)
-        return missing

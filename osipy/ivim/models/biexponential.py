@@ -31,7 +31,6 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import numpy as np
 
 from osipy.common.backend.array_module import get_array_module
-from osipy.common.exceptions import DataValidationError
 from osipy.common.models.base import BaseSignalModel
 
 if TYPE_CHECKING:
@@ -293,72 +292,6 @@ class IVIMBiexponentialModel(IVIMModel):
             "f": (0.0, 0.7),  # Perfusion fraction (OSIPI allows up to 0.7)
         }
 
-    def get_initial_guess(
-        self,
-        signal: "NDArray[np.floating[Any]]",
-        b_values: "NDArray[np.floating[Any]]",
-    ) -> IVIMParams:
-        """Compute initial parameter guess.
-
-        Uses a two-step approach:
-        1. Fit mono-exponential at high b-values to estimate D
-        2. Use ratio at b=0 to estimate f
-
-        Parameters
-        ----------
-        signal : NDArray[np.floating]
-            Measured signal at each b-value.
-        b_values : NDArray[np.floating]
-            b-values.
-
-        Returns
-        -------
-        IVIMParams
-            Initial parameter estimates.
-        """
-        xp = get_array_module(signal, b_values)
-
-        # S0 from b=0 signal
-        b0_idx = xp.argmin(b_values)
-        s0_init = signal[b0_idx]
-
-        # Fit D from high b-values (b > 200)
-        high_b_mask = b_values > 200
-        if xp.sum(high_b_mask) >= 2:
-            # Log-linear fit
-            log_signal = xp.log(signal[high_b_mask] / s0_init + 1e-10)
-            b_high = b_values[high_b_mask]
-
-            # Linear regression: log(S/S0) = -b × D
-            A = xp.stack([b_high, xp.ones_like(b_high)], axis=1)
-            result = xp.linalg.lstsq(A, log_signal, rcond=None)
-            coeffs = result[0]  # coeffs[0] = slope, coeffs[1] = intercept
-            d_init = -coeffs[0]
-        else:
-            d_init = 1.0e-3
-
-        # Estimate f from ratio
-        # At b=0: S(0) = S0
-        # At low b: signal drops due to D* component
-        low_b_idx = xp.argmin(xp.abs(b_values - 50))  # Find b~50
-        if b_values[low_b_idx] > 10:
-            # Extrapolate from high-b fit
-            s_diffusion_only = s0_init * xp.exp(-b_values[low_b_idx] * d_init)
-            f_init = 1 - signal[low_b_idx] / s_diffusion_only
-            f_init = xp.clip(f_init, 0.01, 0.5)
-        else:
-            f_init = 0.1
-
-        # D* is typically 10× D
-        d_star_init = 10.0e-3
-
-        return IVIMParams(
-            s0=float(s0_init),
-            d=float(xp.clip(d_init, 0.5e-3, 3.0e-3)),
-            d_star=float(d_star_init),
-            f=float(f_init),
-        )
-
 
 class IVIMSimplifiedModel(IVIMModel):
     """Simplified IVIM model.
@@ -454,73 +387,3 @@ class IVIMSimplifiedModel(IVIMModel):
             "D": (0.1e-3, 5.0e-3),
             "f": (0.0, 0.5),
         }
-
-
-def compute_adc(
-    signal: "NDArray[np.floating[Any]]",
-    b_values: "NDArray[np.floating[Any]]",
-    b_threshold: float = 100.0,
-) -> "NDArray[np.floating[Any]]":
-    """Compute apparent diffusion coefficient (ADC).
-
-    ADC is computed from mono-exponential fit at high b-values
-    where perfusion contribution is minimal.
-
-    Parameters
-    ----------
-    signal : NDArray[np.floating]
-        Signal intensity at each b-value, shape (..., n_b).
-    b_values : NDArray[np.floating]
-        b-values in s/mm².
-    b_threshold : float
-        Minimum b-value to include in fit.
-
-    Returns
-    -------
-    NDArray[np.floating]
-        ADC map in mm²/s.
-    """
-    xp = get_array_module(signal, b_values)
-
-    # Select b-values above threshold
-    mask = b_values >= b_threshold
-    b_high = b_values[mask]
-
-    if len(b_high) < 2:
-        msg = f"Need at least 2 b-values above threshold ({b_threshold})"
-        raise DataValidationError(msg)
-
-    # Get signal at selected b-values
-    signal_high = signal[..., mask]
-
-    # Normalize by b=0 signal
-    b0_idx = xp.argmin(b_values)
-    s0 = signal[..., b0_idx : b0_idx + 1]
-    s0 = xp.maximum(s0, 1e-10)
-
-    log_ratio = xp.log(signal_high / s0 + 1e-10)
-
-    # Linear fit: log(S/S0) = -b × ADC
-    # Solve for each voxel using least squares
-    spatial_shape = signal.shape[:-1]
-
-    # Flatten spatial dimensions
-    log_ratio_flat = log_ratio.reshape(-1, len(b_high))
-
-    # Design matrix
-    X = xp.column_stack([xp.ones(len(b_high)), -b_high])
-
-    # Vectorized batch solve using normal equations
-    # X: (n_b, 2) -- same for all voxels
-    # log_ratio_flat: (n_voxels, n_b)
-    XtX_inv = xp.linalg.inv(X.T @ X)  # (2, 2)
-    pseudo_inv = XtX_inv @ X.T  # (2, n_b)
-    coeffs_all = pseudo_inv @ log_ratio_flat.T  # (2, n_voxels)
-    adc_flat = coeffs_all[1, :]  # ADC is the second coefficient (slope of -b)
-
-    adc = adc_flat.reshape(spatial_shape)
-
-    # Ensure positive ADC
-    adc = xp.maximum(adc, 0)
-
-    return adc

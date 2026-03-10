@@ -99,9 +99,7 @@ def load_nifti(
     # Check for NaN/Inf values
     if np.any(~np.isfinite(data)):
         # Log warning but don't fail - handle gracefully
-        import logging
-
-        logging.warning(
+        logger.warning(
             "NIfTI data contains NaN or infinite values. "
             "Consider preprocessing data before analysis."
         )

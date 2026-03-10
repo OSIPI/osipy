@@ -126,7 +126,6 @@ def export_bids(
         prefix = f"{prefix}_ses-{session_id}"
 
     # Export each parameter map
-    exported_files: list[str] = []
     for param_name, param_map in parameter_maps.items():
         # Create NIfTI image
         nifti_img = nib.Nifti1Image(
@@ -149,7 +148,6 @@ def export_bids(
         filename = f"{prefix}_{param_name}.nii.gz"
         nifti_path = perf_dir / filename
         nib.save(nifti_img, nifti_path)
-        exported_files.append(filename)
 
         logger.info(f"Exported {param_name} to {nifti_path}")
 
@@ -390,15 +388,6 @@ def load_bids_with_m0(
                 break
 
     if m0_file and m0_file.exists():
-        # Load M0 sidecar if available
-        m0_sidecar_file = m0_file.with_suffix("").with_suffix(".json")
-        if m0_file.name.endswith(".nii.gz"):
-            m0_sidecar_file = Path(str(m0_file)[:-7] + ".json")
-
-        if m0_sidecar_file.exists():
-            with m0_sidecar_file.open() as f:
-                json.load(f)
-
         # Load M0 NIfTI
         m0_img = nib.load(m0_file)
         m0_data = np.asarray(m0_img.dataobj, dtype=np.float64)

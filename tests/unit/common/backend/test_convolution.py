@@ -1,6 +1,6 @@
 """Unit tests for GPU-optimized convolution operations.
 
-Tests for osipy.common.backend.convolution module.
+Tests for osipy.common.convolution module.
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ scipy_signal = pytest.importorskip(
 
 from osipy.common.convolution import (
     convolve_aif,
-    convolve_aif_batch,
     deconvolve_svd,
     deconvolve_svd_batch,
 )
@@ -94,7 +93,7 @@ class TestConvolveAif:
 
 
 class TestConvolveAifBatch:
-    """Tests for convolve_aif_batch function."""
+    """Tests for convolve_aif function."""
 
     def test_single_aif_multiple_irf(self) -> None:
         """Should convolve single AIF with multiple IRFs."""
@@ -105,7 +104,7 @@ class TestConvolveAifBatch:
             -0.05 * np.arange(n_time)[:, np.newaxis]
         )
 
-        result = convolve_aif_batch(aif, irfs)
+        result = convolve_aif(aif, irfs)
 
         assert result.shape == (n_time, n_voxels)
 
@@ -117,7 +116,7 @@ class TestConvolveAifBatch:
         irfs = np.random.rand(n_time, n_voxels) * 0.1
         dt = 0.5
 
-        batch_result = convolve_aif_batch(aif, irfs, dt=dt)
+        batch_result = convolve_aif(aif, irfs, dt=dt)
 
         # Compare with loop version
         for v in range(n_voxels):
@@ -136,7 +135,7 @@ class TestConvolveAifBatch:
         irfs = np.random.randn(60, 10)
 
         with pytest.raises(DataValidationError, match="Time dimension"):
-            convolve_aif_batch(aif, irfs)
+            convolve_aif(aif, irfs)
 
 
 class TestDeconvolveSvd:

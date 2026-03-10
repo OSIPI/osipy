@@ -31,8 +31,8 @@ from osipy.common.convolution.deconv import (
     deconvolve_svd,
     deconvolve_svd_batch,
 )
-from osipy.common.convolution.expconv import biexpconv, expconv, expconv_batch, nexpconv
-from osipy.common.convolution.fft import convolve_aif, convolve_aif_batch, fft_convolve
+from osipy.common.convolution.expconv import biexpconv, expconv, nexpconv
+from osipy.common.convolution.fft import convolve_aif, fft_convolve
 from osipy.common.convolution.matrix import convmat, invconvmat
 from osipy.common.convolution.registry import (
     get_convolution,
@@ -45,12 +45,10 @@ __all__ = [
     "conv",
     "convmat",
     "convolve_aif",
-    "convolve_aif_batch",
     "deconv",
     "deconvolve_svd",
     "deconvolve_svd_batch",
     "expconv",
-    "expconv_batch",
     "fft_convolve",
     "get_convolution",
     "invconvmat",

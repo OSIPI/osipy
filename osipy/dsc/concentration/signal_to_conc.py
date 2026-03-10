@@ -204,47 +204,6 @@ def delta_r2_to_concentration(
     return concentration
 
 
-def compute_aif_concentration(
-    signal: "NDArray[np.floating[Any]]",
-    te: float,
-    hematocrit: float = 0.45,
-    baseline_frames: int = 10,
-) -> "NDArray[np.floating[Any]]":
-    """Compute arterial concentration from DSC signal.
-
-    Applies whole blood to plasma correction for AIF.
-
-    Parameters
-    ----------
-    signal : NDArray[np.floating]
-        Arterial signal intensity, shape (n_timepoints,).
-    te : float
-        Echo time in milliseconds.
-    hematocrit : float
-        Blood hematocrit value (default 0.45).
-    baseline_frames : int
-        Number of baseline frames.
-
-    Returns
-    -------
-    NDArray[np.floating]
-        Arterial plasma concentration in mM.
-    """
-    # Convert to ΔR2*
-    delta_r2 = signal_to_delta_r2(signal, te, baseline_frames)
-
-    # Convert to whole blood concentration
-    # Using default r2* for blood (higher than tissue)
-    r2_blood = 50.0  # s⁻¹ mM⁻¹ (typical for blood at 1.5T)
-    c_blood = delta_r2 / r2_blood
-
-    # Convert to plasma concentration
-    # C_plasma = C_blood / (1 - Hct)
-    c_plasma = c_blood / (1 - hematocrit)
-
-    return c_plasma
-
-
 def gamma_variate_fit(
     concentration: "NDArray[np.floating[Any]]",
     time: "NDArray[np.floating[Any]]",

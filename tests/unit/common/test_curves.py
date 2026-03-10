@@ -12,21 +12,6 @@ import numpy as np
 import pytest
 
 
-def _make_time_conc_basic():
-    """Basic time-concentration curve args."""
-    time = np.linspace(0, 60, 30)
-    concentration = np.sin(time / 10) * 10 + 5
-    return {"time": time, "concentration": concentration}
-
-
-def _make_time_conc_with_aif():
-    """Time-concentration curve with AIF overlay."""
-    time = np.linspace(0, 60, 30)
-    tissue_conc = np.sin(time / 10) * 10 + 5
-    aif = np.exp(-((time - 15) ** 2) / 50) * 50
-    return {"time": time, "concentration": tissue_conc, "aif": aif}
-
-
 def _make_residue():
     """Residue function args."""
     time = np.linspace(0, 30, 60)
@@ -41,26 +26,9 @@ def _make_aif():
     return {"time": time, "aif": aif}
 
 
-def _make_signal():
-    """Basic signal time course args."""
-    time = np.linspace(0, 60, 60)
-    signal = 1000 * np.exp(-time / 100) + np.random.randn(60) * 10
-    return {"time": time, "signal": signal}
-
-
 @pytest.mark.parametrize(
     "import_name, kwargs_factory",
     [
-        pytest.param(
-            "plot_time_concentration_curve",
-            _make_time_conc_basic,
-            id="time_concentration_basic",
-        ),
-        pytest.param(
-            "plot_time_concentration_curve",
-            _make_time_conc_with_aif,
-            id="time_concentration_with_aif",
-        ),
         pytest.param(
             "plot_residue_function",
             _make_residue,
@@ -70,11 +38,6 @@ def _make_signal():
             "plot_aif",
             _make_aif,
             id="aif_basic",
-        ),
-        pytest.param(
-            "plot_signal_timecourse",
-            _make_signal,
-            id="signal_timecourse",
         ),
     ],
 )

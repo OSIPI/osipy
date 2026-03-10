@@ -18,7 +18,6 @@ References
    Magn Reson Med 60(6):1488-1497.
 """
 
-import math
 from dataclasses import dataclass
 from enum import Enum
 
@@ -162,99 +161,3 @@ def compute_labeling_efficiency(
     }
 
     return defaults.get(scheme, 0.85)
-
-
-def get_recommended_pld(
-    scheme: LabelingScheme,
-    age: str = "adult",
-) -> float:
-    """Get recommended post-labeling delay.
-
-    Parameters
-    ----------
-    scheme : LabelingScheme
-        Labeling scheme.
-    age : str
-        Age group: 'adult', 'pediatric', or 'elderly'.
-
-    Returns
-    -------
-    float
-        Recommended PLD in milliseconds.
-
-    Notes
-    -----
-    Based on ISMRM consensus recommendations:
-    - Adults: 1800 ms (pCASL), 1500-2000 ms (PASL)
-    - Pediatric: 1500 ms
-    - Elderly/vascular disease: 2000 ms
-    """
-    if scheme == LabelingScheme.PASL:
-        base_pld = {
-            "adult": 1800.0,
-            "pediatric": 1500.0,
-            "elderly": 2000.0,
-        }
-    else:  # CASL/pCASL
-        base_pld = {
-            "adult": 1800.0,
-            "pediatric": 1500.0,
-            "elderly": 2000.0,
-        }
-
-    return base_pld.get(age, 1800.0)
-
-
-def compute_transit_time_correction(
-    pld: float,
-    transit_time: float,
-    t1_blood: float,
-    label_duration: float | None = None,
-) -> float:
-    """Compute transit time correction factor.
-
-    For cases where PLD is shorter than arterial transit time (ATT),
-    a correction factor accounts for incomplete delivery of labeled blood.
-
-    Parameters
-    ----------
-    pld : float
-        Post-labeling delay in milliseconds.
-    transit_time : float
-        Arterial transit time in milliseconds.
-    t1_blood : float
-        T1 of blood in milliseconds.
-    label_duration : float | None
-        Labeling duration (for pCASL/CASL) in milliseconds.
-
-    Returns
-    -------
-    float
-        Correction factor (multiply CBF by this).
-    """
-    pld_s = pld / 1000.0
-    att_s = transit_time / 1000.0
-    t1b_s = t1_blood / 1000.0
-
-    if pld_s >= att_s:
-        # PLD long enough - no correction needed
-        return 1.0
-
-    if label_duration is None:
-        # PASL case
-        correction = math.exp((att_s - pld_s) / t1b_s)
-    else:
-        # pCASL/CASL case - more complex
-        tau_s = label_duration / 1000.0
-        if att_s < tau_s:
-            # ATT within labeling duration
-            correction = math.exp((att_s - pld_s) / t1b_s)
-        else:
-            # ATT longer than labeling
-            correction = (
-                math.exp((att_s - pld_s) / t1b_s)
-                * (1 - math.exp(-tau_s / t1b_s))
-                / (1 - math.exp(-(tau_s - att_s + pld_s) / t1b_s))
-            )
-
-    return float(correction)
