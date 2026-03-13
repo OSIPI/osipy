@@ -82,7 +82,7 @@ if TYPE_CHECKING:
     from osipy.common.dataset import PerfusionDataset
     from osipy.common.io import export_bids, load_dicom, load_nifti, load_perfusion
     from osipy.common.parameter_map import ParameterMap
-    from osipy.common.types import AIFType, FittingMethod, LabelingType, Modality
+    from osipy.common.types import AIFType, AnalysisResult, FittingMethod, LabelingType, Modality
     from osipy.dce import (
         ExtendedToftsModel,
         PatlakModel,
@@ -122,6 +122,8 @@ __all__ = [
     "ASLPipeline",
     # AIF
     "ArterialInputFunction",
+    # Result contract
+    "AnalysisResult",
     # Pipelines
     "DCEPipeline",
     "DSCPipeline",
@@ -217,6 +219,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ParameterMap": ("osipy.common.parameter_map", "ParameterMap"),
     # Types
     "AIFType": ("osipy.common.types", "AIFType"),
+    "AnalysisResult": ("osipy.common.types", "AnalysisResult"),
     "FittingMethod": ("osipy.common.types", "FittingMethod"),
     "LabelingType": ("osipy.common.types", "LabelingType"),
     "Modality": ("osipy.common.types", "Modality"),

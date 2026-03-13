@@ -59,6 +59,7 @@ from osipy.common.types import (
     AcquisitionParams,
     AIFType,
     ASLAcquisitionParams,
+    AnalysisResult,
     DCEAcquisitionParams,
     DSCAcquisitionParams,
     FittingMethod,
@@ -73,6 +74,8 @@ __all__ = [
     "ASLAcquisitionParams",
     # Acquisition parameters
     "AcquisitionParams",
+    # Result contract
+    "AnalysisResult",
     "DCEAcquisitionParams",
     "DSCAcquisitionParams",
     "DataValidationError",
