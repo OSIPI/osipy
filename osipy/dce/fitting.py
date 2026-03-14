@@ -24,6 +24,7 @@ References
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -45,6 +46,8 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from osipy.common.fitting.base import BaseFitter
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -419,8 +422,8 @@ def _compute_r_squared_vectorized(
         r2_values = xp.where(ss_tot > 1e-10, 1.0 - ss_res / ss_tot, 0.0)
         r_squared[quality_mask] = r2_values
 
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("R² computation failed, map will be all zeros: %s", e)
 
     return r_squared
 
