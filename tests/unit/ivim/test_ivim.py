@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from osipy.common.parameter_map import ParameterMap
 from osipy.ivim import (
     FittingMethod,
     IVIMBiexponentialModel,
@@ -12,6 +13,7 @@ from osipy.ivim import (
     IVIMSimplifiedModel,
     fit_ivim,
 )
+from osipy.ivim.fitting.estimators import _apply_ivim_quality_and_swap
 
 
 def generate_ivim_signal(
@@ -208,3 +210,74 @@ class TestIVIMFitParams:
         )
         assert params.method == FittingMethod.FULL
         assert params.b_threshold == 150.0
+
+
+class TestQualityMaskSwapInteraction:
+    """Regression tests for D*/D swap + quality mask ordering (issue #107)."""
+
+    @staticmethod
+    def _make_param_maps(
+        d_vals: np.ndarray, ds_vals: np.ndarray, f_vals: np.ndarray
+    ) -> dict[str, ParameterMap]:
+        affine = np.eye(4)
+        shape = d_vals.shape
+        qmask = np.ones(shape, dtype=bool)
+        return {
+            "D": ParameterMap(
+                name="D", symbol="D", units="mm²/s",
+                values=d_vals.copy(), affine=affine, quality_mask=qmask.copy(),
+            ),
+            "D*": ParameterMap(
+                name="D*", symbol="D*", units="mm²/s",
+                values=ds_vals.copy(), affine=affine, quality_mask=qmask.copy(),
+            ),
+            "f": ParameterMap(
+                name="f", symbol="f", units="",
+                values=f_vals.copy(), affine=affine, quality_mask=qmask.copy(),
+            ),
+        }
+
+    def test_swapped_voxel_passes_quality(self) -> None:
+        """Voxel with D > D* should pass quality after swap (regression #107)."""
+        # Optimizer returned D=2e-3, D*=1e-3 (needs swap)
+        # After swap: D=1e-3, D*=2e-3 — both within valid bounds
+        param_maps = self._make_param_maps(
+            d_vals=np.array([[[2e-3]]]),
+            ds_vals=np.array([[[1e-3]]]),
+            f_vals=np.array([[[0.15]]]),
+        )
+
+        _apply_ivim_quality_and_swap(param_maps)
+
+        # Values should be swapped
+        assert param_maps["D"].values[0, 0, 0] == pytest.approx(1e-3)
+        assert param_maps["D*"].values[0, 0, 0] == pytest.approx(2e-3)
+        # Quality mask must be True — this voxel is valid post-swap
+        assert param_maps["D"].quality_mask[0, 0, 0]
+
+    def test_already_ordered_voxel_unaffected(self) -> None:
+        """Voxel with D < D* should pass quality without swap."""
+        param_maps = self._make_param_maps(
+            d_vals=np.array([[[1e-3]]]),
+            ds_vals=np.array([[[10e-3]]]),
+            f_vals=np.array([[[0.1]]]),
+        )
+
+        _apply_ivim_quality_and_swap(param_maps)
+
+        assert param_maps["D"].values[0, 0, 0] == pytest.approx(1e-3)
+        assert param_maps["D*"].values[0, 0, 0] == pytest.approx(10e-3)
+        assert param_maps["D"].quality_mask[0, 0, 0]
+
+    def test_out_of_bounds_rejected_even_after_swap(self) -> None:
+        """Voxel that fails domain bounds should be rejected regardless of swap."""
+        # D=200e-3 far exceeds the 5e-3 upper bound even after swap
+        param_maps = self._make_param_maps(
+            d_vals=np.array([[[200e-3]]]),
+            ds_vals=np.array([[[1e-3]]]),
+            f_vals=np.array([[[0.1]]]),
+        )
+
+        _apply_ivim_quality_and_swap(param_maps)
+
+        assert not param_maps["D"].quality_mask[0, 0, 0]
