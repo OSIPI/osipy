@@ -352,18 +352,8 @@ def _apply_ivim_quality_and_swap(param_maps: dict[str, ParameterMap]) -> None:
     if "D*" in param_maps:
         ds_vals = param_maps["D*"].values
 
-        # Domain quality mask
-        quality = (
-            fitter_qmask
-            & (d_vals > 0)
-            & (d_vals < 5e-3)
-            & (ds_vals > d_vals)
-            & (ds_vals < 100e-3)
-            & (f_vals >= 0)
-            & (f_vals <= 0.7)
-        )
-
-        # Ensure D* > D (swap if needed)
+        # Ensure D* > D (swap if needed) -- must happen BEFORE quality mask
+        # so the mask is evaluated on physiologically valid (post-swap) values.
         swap = d_vals > ds_vals
         d_swapped = xp.where(swap, ds_vals, d_vals)
         ds_swapped = xp.where(swap, d_vals, ds_vals)
@@ -371,6 +361,17 @@ def _apply_ivim_quality_and_swap(param_maps: dict[str, ParameterMap]) -> None:
         # Update values in-place via array views
         d_map.values[...] = d_swapped
         param_maps["D*"].values[...] = ds_swapped
+
+        # Domain quality mask -- evaluated on post-swap values
+        quality = (
+            fitter_qmask
+            & (d_swapped > 0)
+            & (d_swapped < 5e-3)
+            & (ds_swapped > d_swapped)
+            & (ds_swapped < 100e-3)
+            & (f_vals >= 0)
+            & (f_vals <= 0.7)
+        )
     else:
         quality = (
             fitter_qmask
