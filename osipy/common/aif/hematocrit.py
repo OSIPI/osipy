@@ -32,7 +32,7 @@ def correct_hematocrit(
     aif: ArterialInputFunction | NDArray[np.floating[Any]],
     hematocrit: float = DEFAULT_HEMATOCRIT,
 ) -> ArterialInputFunction | NDArray[np.floating[Any]]:
-    """Scale an AIF from whole-blood to plasma concentration: Cp = Cb / (1 - Hct)."""
+    """Scale an aif from whole blood to plasma concentration: Cp = Cb / (1 - Hct)."""
     _validate_hematocrit(hematocrit)
 
     if isinstance(aif, ArterialInputFunction):
