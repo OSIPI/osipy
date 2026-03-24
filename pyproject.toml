@@ -181,7 +181,6 @@ ignore = [
     "RUF001", # Ambiguous unicode character in string (scientific notation)
     "RUF002", # Ambiguous unicode character in docstring (Greek letters)
     "RUF003", # Ambiguous unicode character in comment
-    "UP038",  # Use X | Y in isinstance (deprecated rule, tuple form is fine)
 ]
 
 [tool.ruff.lint.per-file-ignores]

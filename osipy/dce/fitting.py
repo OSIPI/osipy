@@ -85,6 +85,7 @@ def fit_model(
     progress_callback: Callable[[float], None] | None = None,
     bounds_override: dict[str, tuple[float, float]] | None = None,
     fit_delay: bool = False,
+    hematocrit: float | None = None,
 ) -> DCEFitResult:
     """Fit a named DCE pharmacokinetic model to concentration data.
 
@@ -115,6 +116,10 @@ def fit_model(
     fit_delay : bool
         If True, adds an arterial delay parameter to the model and fits
         it jointly with the other parameters. Default False.
+    hematocrit : float or None, optional
+        When set, the AIF gets scaled from whole-blood to plasma
+        concentration before fitting (divides by 1 - Hct).  A typical
+        adult value is 0.45.  Leaving this as None skips the step.
 
     Returns
     -------
@@ -144,6 +149,13 @@ def fit_model(
     model = get_model(model_name)
     if fit_delay:
         model = _DelayAwareModel(model)
+
+    # Apply hematocrit correction to AIF before fitting
+    if hematocrit is not None:
+        from osipy.common.aif.hematocrit import correct_hematocrit
+
+        aif = correct_hematocrit(aif, hematocrit=hematocrit)
+
     return _fit_model_impl(
         model,
         concentration,
