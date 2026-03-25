@@ -1,15 +1,12 @@
 """Unit tests for IVIM signal reconstruction and RMSE residual maps."""
 
 import numpy as np
-import pytest
 
 from osipy.ivim import (
-    IVIMFitParams,
     compute_rmse_map,
     fit_ivim,
     reconstruct_ivim_signal,
 )
-from osipy.ivim.fitting.residuals import compute_rmse_map, reconstruct_ivim_signal
 
 
 # ---------------------------------------------------------------------------
@@ -103,9 +100,11 @@ class TestComputeRMSEMap:
 
         # Only check well-fitted voxels
         good = result.quality_mask
-        if good.any():
-            rmse_good = rmse.values[good]
-            assert float(np.nanmax(rmse_good)) < 50.0  # < 5% of S0=1000
+        assert bool(good.any()), (
+            "Expected at least one well-fitted voxel for noise-free synthetic data"
+        )
+        rmse_good = rmse.values[good]
+        assert float(np.nanmax(rmse_good)) < 50.0  # < 5% of S0=1000
 
     def test_rmse_map_shape_matches_spatial(self) -> None:
         """RMSE map spatial shape must match parameter map shapes."""

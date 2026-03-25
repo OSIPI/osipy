@@ -20,14 +20,13 @@ References
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-import numpy as np
+from typing import TYPE_CHECKING, Any
 
 from osipy.common.backend.array_module import get_array_module
 from osipy.common.parameter_map import ParameterMap
 
 if TYPE_CHECKING:
+    import numpy as np
     from numpy.typing import NDArray
 
 
@@ -36,8 +35,8 @@ def reconstruct_ivim_signal(
     d_star_map: ParameterMap,
     f_map: ParameterMap,
     s0_map: ParameterMap,
-    b_values: "NDArray",
-) -> "NDArray":
+    b_values: "NDArray[np.floating[Any]]",
+) -> "NDArray[np.floating[Any]]":
     """Reconstruct IVIM bi-exponential signal from fitted parameter maps.
 
     Computes the predicted signal at each voxel using the IVIM model:
@@ -56,12 +55,12 @@ def reconstruct_ivim_signal(
         Perfusion fraction (f) map, shape (...,), dimensionless.
     s0_map : ParameterMap
         Baseline signal (S0) map, shape (...,), arbitrary units.
-    b_values : NDArray
+    b_values : NDArray[np.floating]
         b-values in s/mm², shape (n_b,).
 
     Returns
     -------
-    NDArray
+    NDArray[np.floating]
         Reconstructed signal, shape (..., n_b).
 
     Examples
@@ -97,13 +96,13 @@ def reconstruct_ivim_signal(
 
 
 def compute_rmse_map(
-    signal: "NDArray",
+    signal: "NDArray[np.floating[Any]]",
     d_map: ParameterMap,
     d_star_map: ParameterMap,
     f_map: ParameterMap,
     s0_map: ParameterMap,
-    b_values: "NDArray",
-    mask: "NDArray | None" = None,
+    b_values: "NDArray[np.floating[Any]]",
+    mask: "NDArray[np.bool_] | None" = None,
 ) -> ParameterMap:
     """Compute per-voxel RMSE between observed and fitted IVIM signal.
 
@@ -119,7 +118,7 @@ def compute_rmse_map(
 
     Parameters
     ----------
-    signal : NDArray
+    signal : NDArray[np.floating]
         Observed signal, shape (..., n_b).
     d_map : ParameterMap
         Fitted D map, shape (...,).
@@ -129,9 +128,9 @@ def compute_rmse_map(
         Fitted f map, shape (...,).
     s0_map : ParameterMap
         Fitted S0 map, shape (...,).
-    b_values : NDArray
+    b_values : NDArray[np.floating]
         b-values in s/mm², shape (n_b,).
-    mask : NDArray | None
+    mask : NDArray[np.bool_] | None
         Boolean spatial mask, shape (...,). If ``None``, all voxels
         are included.
 
@@ -144,6 +143,11 @@ def compute_rmse_map(
         - ``units`` = ``"a.u."``
         - ``values`` shape = spatial shape of ``d_map.values``
         - unmasked voxels set to ``NaN``
+
+    Raises
+    ------
+    ValueError
+        If ``signal`` shape is incompatible with the fitted parameter maps.
 
     Examples
     --------
@@ -164,20 +168,34 @@ def compute_rmse_map(
     xp = get_array_module(d_map.values)
 
     signal_arr = xp.asarray(signal)
-    spatial_shape = d_map.values.shape
 
-    # Reconstruct fitted signal: shape (*spatial_shape, n_b)
+    # Reconstruct fitted signal: shape (*spatial_dims, n_b)
     signal_fit = reconstruct_ivim_signal(
         d_map, d_star_map, f_map, s0_map, b_values
     )
 
-    # Reshape observed signal to match (*spatial_shape, n_b) if needed
+    # Validate or fix signal shape
     if signal_arr.shape != signal_fit.shape:
-        signal_arr = signal_arr.reshape(signal_fit.shape)
+        spatial_shape = d_map.values.shape
+        n_b = signal_fit.shape[-1]
+        # Allow singleton-z expansion: maps (x, y, 1), signal (x, y, n_b)
+        if (
+            len(spatial_shape) == 3
+            and spatial_shape[2] == 1
+            and signal_arr.shape == (spatial_shape[0], spatial_shape[1], n_b)
+        ):
+            signal_arr = signal_arr[..., xp.newaxis, :]
+        else:
+            msg = (
+                f"Incompatible signal shape for RMSE computation: "
+                f"got {signal_arr.shape}, expected {signal_fit.shape}. "
+                f"Only omission of a singleton z-dimension is supported."
+            )
+            raise ValueError(msg)
 
     # Per-voxel RMSE over b-value axis (last axis)
     residuals = signal_arr - signal_fit
-    rmse_vals = xp.sqrt(xp.mean(residuals ** 2, axis=-1))  # (*spatial_shape,)
+    rmse_vals = xp.sqrt(xp.mean(residuals ** 2, axis=-1))  # (*spatial_dims,)
 
     # Apply mask — NaN for unmasked voxels
     if mask is not None:
@@ -187,7 +205,7 @@ def compute_rmse_map(
             mask_arr = mask_arr.reshape(
                 mask_arr.shape + (1,) * (rmse_vals.ndim - mask_arr.ndim)
             )
-        nan_val = xp.full(rmse_vals.shape, xp.nan if hasattr(xp, "nan") else float("nan"))
+        nan_val = xp.full(rmse_vals.shape, float("nan"))
         rmse_vals = xp.where(mask_arr, rmse_vals, nan_val)
 
     return ParameterMap(

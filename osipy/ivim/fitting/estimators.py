@@ -245,8 +245,12 @@ def fit_ivim(
         rmse = compute_rmse_map(
             signal, d_map, d_star_map, f_map, s0_map, b_values, mask=mask
         )
-    except Exception:  # noqa: BLE001
-        logger.warning("RMSE computation failed; rmse_map will be None.")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "RMSE computation failed; rmse_map will be None. %s",
+            exc,
+            exc_info=True,
+        )
         rmse = None
 
     return IVIMFitResult(
