@@ -265,7 +265,7 @@ def _fit_model_impl(
 
     # Perform fitting
     try:
-        param_maps = fitter.fit_image(
+        param_maps: dict[str, ParameterMap] = fitter.fit_image(
             model=bound_model,
             data=ct_4d,
             mask=fit_mask,
@@ -427,7 +427,7 @@ def _compute_r_squared_vectorized(
         logger.warning(
             "R-squared computation failed; the R\u00b2 map will be zeros. "
             "This may indicate a model prediction error or incompatible "
-            "array shapes.  %s",
+            "array shapes. %s",
             exc,
             exc_info=True,
         )

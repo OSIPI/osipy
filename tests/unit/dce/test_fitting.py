@@ -306,7 +306,7 @@ class TestRSquaredWarningOnFailure:
         xp = np
         ct_4d = xp.ones((2, 2, 1, 10))
         quality_mask = xp.ones((2, 2, 1), dtype=bool)
-        param_maps: dict = {}
+        param_maps: dict[str, ParameterMap] = {}
 
         # A bound_model whose predict_array_batch raises
         bound_model = MagicMock()
