@@ -149,7 +149,13 @@ def compute_snr(
        doi:10.1016/j.neuroimage.2023.120136
     """
     params = params or ASLSNRParams()
-    xp = get_array_module(cbf_map)
+    xp = get_array_module(cbf_map, noise_mask)
+
+    # Coerce masks to backend-compatible boolean arrays so that NumPy/CuPy
+    # mixed calls do not silently upcast or fail.
+    noise_mask = xp.asarray(noise_mask).astype(bool)
+    if brain_mask is not None:
+        brain_mask = xp.asarray(brain_mask).astype(bool)
 
     # ------------------------------------------------------------------
     # Input validation
@@ -158,6 +164,13 @@ def compute_snr(
         msg = (
             f"cbf_map shape {cbf_map.shape} must match "
             f"noise_mask shape {noise_mask.shape}"
+        )
+        raise DataValidationError(msg)
+
+    if brain_mask is not None and brain_mask.shape != cbf_map.shape:
+        msg = (
+            f"brain_mask shape {brain_mask.shape} does not match "
+            f"cbf_map shape {cbf_map.shape}"
         )
         raise DataValidationError(msg)
 
@@ -174,19 +187,41 @@ def compute_snr(
     # Noise estimation
     # ------------------------------------------------------------------
     noise_values = cbf_map[noise_mask]
-    noise_std = float(xp.std(noise_values))
+
+    # Filter out non-finite values (NaN/Inf) that may originate from upstream
+    # processing, then re-check the minimum voxel count.
+    finite_mask = xp.isfinite(noise_values)
+    noise_values_finite = noise_values[finite_mask]
+    n_noise_finite = int(noise_values_finite.size)
+    if n_noise_finite < params.min_noise_voxels:
+        msg = (
+            f"noise_mask contains {n_noise} voxels, but only "
+            f"{n_noise_finite} are finite; at least "
+            f"{params.min_noise_voxels} finite voxels are required for a "
+            f"reliable noise estimate"
+        )
+        raise DataValidationError(msg)
+
+    noise_std = float(xp.std(noise_values_finite))
+    if not np.isfinite(noise_std):
+        msg = "Noise standard deviation is non-finite; check cbf_map and noise_mask."
+        raise DataValidationError(msg)
 
     logger.debug(
-        "Noise estimate: std=%.4f from %d voxels",
+        "Noise estimate: std=%.4f from %d finite voxels",
         noise_std,
-        n_noise,
+        n_noise_finite,
     )
 
-    # Guard against zero noise (e.g., synthetic data)
+    # Guard against zero noise (e.g., perfectly uniform synthetic data).
+    # We substitute a tiny value so computation continues, but flag all
+    # brain voxels as low-quality via the SNR threshold check.
     if noise_std == 0.0:
         logger.warning(
-            "Noise standard deviation is zero; SNR map will be inf/nan. "
-            "Check that noise_mask selects real background voxels."
+            "Noise standard deviation is zero (substituting 1e-10). "
+            "SNR values will be very large; all voxels may fail the "
+            "quality threshold. Check that noise_mask selects real "
+            "background voxels."
         )
         noise_std_safe = 1e-10
     else:
@@ -197,6 +232,10 @@ def compute_snr(
     # ------------------------------------------------------------------
     snr = cbf_map / noise_std_safe
 
+    # Sanitize non-finite values (NaN/Inf) that can arise if cbf_map itself
+    # contains non-finite entries, consistent with other osipy modules.
+    snr = xp.where(xp.isfinite(snr), snr, xp.zeros_like(snr))
+
     # Zero out noise region in SNR map (not a brain measurement)
     snr = xp.where(noise_mask, xp.zeros_like(snr), snr)
 
@@ -205,6 +244,9 @@ def compute_snr(
     # ------------------------------------------------------------------
     if brain_mask is None:
         brain_mask = ~noise_mask
+    else:
+        # Ensure brain_mask never overlaps the noise region.
+        brain_mask = brain_mask & ~noise_mask
 
     # ------------------------------------------------------------------
     # Quality mask — voxels meeting SNR threshold

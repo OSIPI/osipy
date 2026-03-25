@@ -192,6 +192,16 @@ class TestComputeSNR:
         with pytest.raises(DataValidationError, match="shape"):
             compute_snr(cbf, noise_mask)
 
+    def test_brain_mask_shape_mismatch_raises_error(self) -> None:
+        """Test that brain_mask with wrong shape raises DataValidationError."""
+        cbf = np.ones((10, 10, 5)) * 60.0
+        noise_mask = np.zeros((10, 10, 5), dtype=bool)
+        noise_mask[0, :, :] = True
+        brain_mask = np.ones((10, 10, 4), dtype=bool)  # wrong shape
+
+        with pytest.raises(DataValidationError, match="brain_mask shape"):
+            compute_snr(cbf, noise_mask, brain_mask=brain_mask)
+
     def test_too_few_noise_voxels_raises_error(self) -> None:
         """Test that too few noise voxels raise DataValidationError."""
         cbf = np.ones((10, 10, 5)) * 60.0
@@ -201,6 +211,39 @@ class TestComputeSNR:
         params = ASLSNRParams(min_noise_voxels=10)
         with pytest.raises(DataValidationError, match="noise_mask contains only"):
             compute_snr(cbf, noise_mask, params=params)
+
+    def test_nan_values_in_noise_region_filtered(self) -> None:
+        """Test that NaN values in noise region are filtered out."""
+        np.random.seed(7)
+        shape = (10, 10, 5)
+        cbf = np.ones(shape) * 60.0
+        noise_mask = np.zeros(shape, dtype=bool)
+        noise_mask[0, :, :] = True  # 100 noise voxels
+
+        # Give finite noise voxels realistic variation (std ≈ 3)
+        cbf[0, :, :] = np.random.normal(loc=0.0, scale=3.0, size=(10, 5))
+        # Inject NaN in half the noise region — should still compute std from rest
+        cbf[0, :5, :] = np.nan
+
+        params = ASLSNRParams(min_noise_voxels=10)
+        result = compute_snr(cbf, noise_mask, params=params)
+        assert np.isfinite(result.noise_std)
+        assert result.noise_std > 0.0
+
+    def test_brain_mask_overlap_with_noise_stripped(self) -> None:
+        """Test that brain_mask overlapping noise_mask is silently clipped."""
+        shape = (10, 10, 5)
+        cbf = np.ones(shape) * 60.0
+        noise_mask = np.zeros(shape, dtype=bool)
+        noise_mask[0, :, :] = True
+
+        # brain_mask deliberately overlaps noise region
+        brain_mask = np.ones(shape, dtype=bool)  # covers everything
+
+        result = compute_snr(cbf, noise_mask, brain_mask=brain_mask)
+
+        # Noise region should not appear as good-quality brain voxels
+        assert not np.any(result.quality_mask[noise_mask])
 
     def test_with_explicit_brain_mask(self, synthetic_data: dict) -> None:
         """Test compute_snr with an explicit brain mask."""
@@ -228,3 +271,4 @@ class TestComputeSNR:
         np.testing.assert_array_equal(
             result_no_mask.quality_mask, result_with_mask.quality_mask
         )
+
