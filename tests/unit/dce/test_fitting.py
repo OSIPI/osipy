@@ -286,3 +286,42 @@ class TestDelayFitting:
                 f"Delay should be near 0 for non-delayed data, "
                 f"got {recovered_delay:.2f}"
             )
+
+
+class TestRSquaredWarningOnFailure:
+    """Tests that R-squared failures emit a warning instead of passing silently.
+
+    Regression test for issue #102: ``except Exception: pass`` in
+    ``_compute_r_squared_vectorized`` silently swallowed all errors,
+    making it impossible to diagnose fitting problems.
+    """
+
+    def test_r_squared_failure_emits_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A model prediction error must log a WARNING, not pass silently."""
+        import logging
+        from unittest.mock import MagicMock
+
+        from osipy.dce.fitting import _compute_r_squared_vectorized
+
+        xp = np
+        ct_4d = xp.ones((2, 2, 1, 10))
+        quality_mask = xp.ones((2, 2, 1), dtype=bool)
+        param_maps: dict = {}
+
+        # A bound_model whose predict_array_batch raises
+        bound_model = MagicMock()
+        bound_model.parameters = []
+        bound_model.predict_array_batch.side_effect = RuntimeError("simulated failure")
+
+        with caplog.at_level(logging.WARNING, logger="osipy.dce.fitting"):
+            result = _compute_r_squared_vectorized(
+                ct_4d, bound_model, param_maps, quality_mask, xp
+            )
+
+        assert "R-squared computation failed" in caplog.text, (
+            "Expected a WARNING about R-squared failure but none was emitted"
+        )
+        assert np.all(result == 0.0), (
+            "R-squared map should be zeros when computation fails"
+        )
+
