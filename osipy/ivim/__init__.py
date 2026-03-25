@@ -25,6 +25,10 @@ from osipy.ivim.fitting import (
     IVIMFitResult,
     fit_ivim,
 )
+from osipy.ivim.fitting.residuals import (
+    compute_rmse_map,
+    reconstruct_ivim_signal,
+)
 from osipy.ivim.fitting.registry import (
     get_ivim_fitter,
     list_ivim_fitters,
@@ -57,4 +61,7 @@ __all__ = [
     # IVIM fitter registry
     "register_ivim_fitter",
     "register_ivim_model",
+    # Residuals
+    "compute_rmse_map",
+    "reconstruct_ivim_signal",
 ]

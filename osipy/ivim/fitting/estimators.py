@@ -37,6 +37,7 @@ from osipy.common.fitting.least_squares import LevenbergMarquardtFitter
 from osipy.common.parameter_map import ParameterMap
 from osipy.ivim.models.biexponential import IVIMBiexponentialModel
 from osipy.ivim.models.binding import BoundIVIMModel
+from osipy.ivim.fitting.residuals import compute_rmse_map
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -101,6 +102,9 @@ class IVIMFitResult:
         Mask of successfully fitted voxels.
     r_squared : NDArray[np.floating] | None
         Goodness of fit (R^2) map.
+    rmse_map : ParameterMap | None
+        Per-voxel RMSE residual map (a.u.) between observed and
+        reconstructed IVIM signal.  ``None`` if computation fails.
     fitting_stats : dict[str, Any]
         Fitting statistics.
     """
@@ -111,6 +115,7 @@ class IVIMFitResult:
     s0_map: ParameterMap
     quality_mask: "NDArray[np.bool_]"
     r_squared: "NDArray[np.floating[Any]] | None" = None
+    rmse_map: ParameterMap | None = None
     fitting_stats: dict[str, Any] = field(default_factory=dict)
 
 
@@ -235,6 +240,15 @@ def fit_ivim(
         d_map.values, d_star_map.values, f_map.values, quality_mask
     )
 
+    # Compute RMSE residual map
+    try:
+        rmse = compute_rmse_map(
+            signal, d_map, d_star_map, f_map, s0_map, b_values, mask=mask
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning("RMSE computation failed; rmse_map will be None.")
+        rmse = None
+
     return IVIMFitResult(
         d_map=d_map,
         d_star_map=d_star_map,
@@ -242,6 +256,7 @@ def fit_ivim(
         s0_map=s0_map,
         quality_mask=quality_mask,
         r_squared=r_squared_values,
+        rmse_map=rmse,
         fitting_stats=fitting_stats,
     )
 
