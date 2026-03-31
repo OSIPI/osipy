@@ -1,0 +1,3 @@
+Summary
+
+This PR replaces the current hard-coded YAML templates used in dump_defaults() with an auto-generated YAML output derived directly from the project’s Pydantic configuration models. This ensures that all config fields are always up-to-date with the underlying model definitions and eliminates the risk of drift between template strings and actual config fields.
