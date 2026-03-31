@@ -1,0 +1,3 @@
+Delay fitting functionality already exists in the library layer but is not exposed to users via the CLI or YAML configuration:
+
+In DCE:
