@@ -83,12 +83,8 @@ class LoggingConfig(BaseModel):
 class DCEFittingConfig(BaseModel):
     """DCE model fitting configuration from YAML."""
 
-    fitter: str = Field(
-        default="lm", description="fitting method (lm | bayesian)"
-    )
-    max_iterations: int = Field(
-        default=100, description="maximum LM iterations"
-    )
+    fitter: str = Field(default="lm", description="fitting method (lm | bayesian)")
+    max_iterations: int = Field(default=100, description="maximum LM iterations")
     tolerance: float = Field(default=1e-6, description="convergence tolerance")
     r2_threshold: float = Field(
         default=0.5, description="minimum R^2 for a valid voxel fit"
@@ -209,12 +205,8 @@ class DCEAcquisitionYAML(BaseModel):
 class ROIConfig(BaseModel):
     """Region-of-interest configuration for limiting processing."""
 
-    enabled: bool = Field(
-        default=False, description="set true to process only an ROI"
-    )
-    center: list[int] | None = Field(
-        default=None, description="voxel center [x, y, z]"
-    )
+    enabled: bool = Field(default=False, description="set true to process only an ROI")
+    center: list[int] | None = Field(default=None, description="voxel center [x, y, z]")
     radius: int = Field(default=10, description="radius in voxels")
 
 
@@ -302,9 +294,7 @@ class DSCPipelineYAML(BaseModel):
     apply_leakage_correction: bool = Field(
         default=True, description="apply BSW leakage correction"
     )
-    svd_threshold: float = Field(
-        default=0.2, description="SVD truncation threshold"
-    )
+    svd_threshold: float = Field(default=0.2, description="SVD truncation threshold")
     baseline_frames: int = Field(
         default=10, description="number of pre-bolus baseline frames"
     )
@@ -337,9 +327,7 @@ class ASLPipelineYAML(BaseModel):
         default="pcasl", description="labeling scheme (pcasl | pasl | casl)"
     )
     pld: float = Field(default=1800.0, description="post-labeling delay (ms)")
-    label_duration: float = Field(
-        default=1800.0, description="labeling duration (ms)"
-    )
+    label_duration: float = Field(default=1800.0, description="labeling duration (ms)")
     t1_blood: float = Field(default=1650.0, description="T1 of blood (ms)")
     labeling_efficiency: float = Field(
         default=0.85, description="labeling efficiency (0 to 1)"
@@ -598,20 +586,14 @@ def _generate_section_yaml(
         if _is_model_class(annotation):
             # Nested Pydantic model — render as a YAML sub-section
             section_lines = [f"{indent}{field_name}:{comment_suffix}"]
-            section_lines.extend(
-                _generate_section_yaml(annotation, indent_level + 1)
-            )
+            section_lines.extend(_generate_section_yaml(annotation, indent_level + 1))
             active_lines.extend(section_lines)
         elif default is None:
             # Optional field — emit as a commented-out line
-            commented_lines.append(
-                f"{indent}# {field_name}: null{comment_suffix}"
-            )
+            commented_lines.append(f"{indent}# {field_name}: null{comment_suffix}")
         else:
             yaml_val = _format_yaml_value(default)
-            active_lines.append(
-                f"{indent}{field_name}: {yaml_val}{comment_suffix}"
-            )
+            active_lines.append(f"{indent}{field_name}: {yaml_val}{comment_suffix}")
 
     return active_lines + commented_lines
 

@@ -591,9 +591,9 @@ class TestDumpDefaults:
 
             for name, field_info in model_cls.model_fields.items():
                 # Field must appear as 'name:' or '# name:'
-                assert (
-                    f"{name}:" in text
-                ), f"Field '{context}{name}' missing from {modality} template"
+                assert f"{name}:" in text, (
+                    f"Field '{context}{name}' missing from {modality} template"
+                )
                 # Recurse into nested models
                 annotation = field_info.annotation
                 try:
