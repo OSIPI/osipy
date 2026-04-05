@@ -68,6 +68,20 @@ class DCEFittingConfig(BaseModel):
     r2_threshold: float = 0.5
     bounds: dict[str, list[float]] | None = None
     initial_guess: dict[str, float] | None = None
+    fit_delay: bool = False
+    delay_bounds: list[float] = [0.0, 60.0]
+
+    @field_validator("delay_bounds")
+    @classmethod
+    def validate_delay_bounds(cls, v: list[float]) -> list[float]:
+        """Validate delay_bounds is a [lower, upper] pair."""
+        if len(v) != 2:
+            msg = f"delay_bounds must be [lower, upper], got {v}"
+            raise ValueError(msg)
+        if v[0] > v[1]:
+            msg = f"delay_bounds lower > upper: {v}"
+            raise ValueError(msg)
+        return v
 
     @field_validator("fitter")
     @classmethod

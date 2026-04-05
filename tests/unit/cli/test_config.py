@@ -359,6 +359,43 @@ class TestDCEFittingConfig:
         assert cfg.r2_threshold == 0.5
         assert cfg.bounds is None
         assert cfg.initial_guess is None
+        assert cfg.fit_delay is False
+        assert cfg.delay_bounds == [0.0, 60.0]
+
+    def test_fit_delay_enabled(self) -> None:
+        """fit_delay can be set to True."""
+        cfg = DCEFittingConfig(fit_delay=True)
+        assert cfg.fit_delay is True
+
+    def test_delay_bounds_custom(self) -> None:
+        """Custom delay_bounds parses correctly."""
+        cfg = DCEFittingConfig(delay_bounds=[0.0, 30.0])
+        assert cfg.delay_bounds == [0.0, 30.0]
+
+    def test_delay_bounds_wrong_length(self) -> None:
+        """delay_bounds with != 2 elements raises ValidationError."""
+        with pytest.raises(ValidationError, match="delay_bounds must be"):
+            DCEFittingConfig(delay_bounds=[0.0, 30.0, 60.0])
+
+    def test_delay_bounds_lower_gt_upper(self) -> None:
+        """delay_bounds lower > upper raises ValidationError."""
+        with pytest.raises(ValidationError, match="delay_bounds lower > upper"):
+            DCEFittingConfig(delay_bounds=[60.0, 0.0])
+
+    def test_delay_from_yaml(self, tmp_config) -> None:
+        """Delay fitting options survive YAML round-trip."""
+        path = tmp_config("""\
+            modality: dce
+            pipeline:
+              model: tofts
+              fitting:
+                fit_delay: true
+                delay_bounds: [0.0, 30.0]
+        """)
+        config = load_config(path)
+        mc = config.get_modality_config()
+        assert mc.fitting.fit_delay is True
+        assert mc.fitting.delay_bounds == [0.0, 30.0]
 
     def test_invalid_fitter(self) -> None:
         """Invalid fitter name raises ValidationError."""
