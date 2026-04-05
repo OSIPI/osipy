@@ -564,6 +564,55 @@ class TestDumpDefaults:
             # Should not raise - validates pipeline section too
             config.get_modality_config()
 
+    @pytest.mark.parametrize(
+        "modality,pipeline_cls",
+        [
+            ("dce", DCEPipelineYAML),
+            ("dsc", DSCPipelineYAML),
+            ("asl", ASLPipelineYAML),
+            ("ivim", IVIMPipelineYAML),
+        ],
+    )
+    def test_dump_defaults_covers_all_model_fields(
+        self, modality: str, pipeline_cls: type
+    ) -> None:
+        """Every Pydantic model field appears in the generated template.
+
+        This prevents drift between the config schema and the dumped
+        defaults (the root cause of issue #129).  A field can appear
+        either as an active YAML key or as a commented-out line.
+        """
+        template = dump_defaults(modality)
+
+        def _assert_fields_present(
+            model_cls: type, text: str, context: str = ""
+        ) -> None:
+            from pydantic import BaseModel as _BM
+
+            for name, field_info in model_cls.model_fields.items():
+                # Field must appear as 'name:' or '# name:'
+                assert f"{name}:" in text, (
+                    f"Field '{context}{name}' missing from {modality} template"
+                )
+                # Recurse into nested models
+                annotation = field_info.annotation
+                try:
+                    is_nested = isinstance(annotation, type) and issubclass(
+                        annotation, _BM
+                    )
+                except TypeError:
+                    is_nested = False
+                if is_nested:
+                    _assert_fields_present(
+                        annotation, text, context=f"{context}{name}."
+                    )
+
+        _assert_fields_present(pipeline_cls, template)
+
+        # Also check shared sections
+        for section_cls in (DataConfig, OutputConfig, BackendConfig, LoggingConfig):
+            _assert_fields_present(section_cls, template)
+
 
 # ---------------------------------------------------------------------------
 # TestCLIParser
