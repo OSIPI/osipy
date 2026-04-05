@@ -3,6 +3,11 @@
 Provides validation models for each modality (DCE, DSC, ASL, IVIM),
 a top-level ``PipelineConfig`` model, ``load_config()`` for parsing
 YAML files, and ``dump_defaults()`` for generating commented templates.
+
+The ``dump_defaults()`` function auto-generates YAML from Pydantic model
+introspection, so every ``Field(description=...)`` annotation automatically
+appears in the output.  This eliminates drift between the config schema
+and the dumped templates.
 """
 
 from __future__ import annotations
@@ -12,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -25,33 +30,49 @@ logger = logging.getLogger(__name__)
 class DataConfig(BaseModel):
     """Data loading configuration."""
 
-    format: str = "auto"
-    mask: str | None = None
-    t1_map: str | None = None
-    aif_file: str | None = None
-    m0_data: str | None = None
-    b_values: list[float] | None = None
-    b_values_file: str | None = None
-    subject: str | None = None
-    session: str | None = None
+    format: str = Field(
+        default="auto", description="data format (auto | nifti | dicom | bids)"
+    )
+    mask: str | None = Field(default=None, description="tissue mask path")
+    t1_map: str | None = Field(
+        default=None, description="pre-computed T1 map (DCE only)"
+    )
+    aif_file: str | None = Field(
+        default=None, description="custom AIF file (requires aif_source: manual)"
+    )
+    m0_data: str | None = Field(
+        default=None, description="M0 calibration image (ASL only)"
+    )
+    b_values: list[float] | None = Field(
+        default=None, description="b-values in s/mm^2 (IVIM only)"
+    )
+    b_values_file: str | None = Field(
+        default=None, description="path to b-values text file"
+    )
+    subject: str | None = Field(default=None, description="BIDS subject ID")
+    session: str | None = Field(default=None, description="BIDS session ID")
 
 
 class OutputConfig(BaseModel):
     """Output configuration."""
 
-    format: str = "nifti"
+    format: str = Field(default="nifti", description="output format")
 
 
 class BackendConfig(BaseModel):
     """GPU/CPU backend configuration."""
 
-    force_cpu: bool = False
+    force_cpu: bool = Field(
+        default=False, description="force CPU even if GPU is available"
+    )
 
 
 class LoggingConfig(BaseModel):
     """Logging configuration."""
 
-    level: str = "INFO"
+    level: str = Field(
+        default="INFO", description="log level (DEBUG | INFO | WARNING | ERROR)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -62,12 +83,24 @@ class LoggingConfig(BaseModel):
 class DCEFittingConfig(BaseModel):
     """DCE model fitting configuration from YAML."""
 
-    fitter: str = "lm"
-    max_iterations: int = 100
-    tolerance: float = 1e-6
-    r2_threshold: float = 0.5
-    bounds: dict[str, list[float]] | None = None
-    initial_guess: dict[str, float] | None = None
+    fitter: str = Field(
+        default="lm", description="fitting method (lm | bayesian)"
+    )
+    max_iterations: int = Field(
+        default=100, description="maximum LM iterations"
+    )
+    tolerance: float = Field(default=1e-6, description="convergence tolerance")
+    r2_threshold: float = Field(
+        default=0.5, description="minimum R^2 for a valid voxel fit"
+    )
+    bounds: dict[str, list[float]] | None = Field(
+        default=None,
+        description="per-parameter bounds override {name: [lower, upper]}",
+    )
+    initial_guess: dict[str, float] | None = Field(
+        default=None,
+        description="per-parameter initial guess override {name: value}",
+    )
 
     @field_validator("fitter")
     @classmethod
@@ -102,19 +135,34 @@ class DCEFittingConfig(BaseModel):
 class BayesianIVIMFittingConfig(BaseModel):
     """Bayesian IVIM fitting configuration from YAML."""
 
-    prior_scale: float = 1.5
-    noise_std: float | None = None
-    compute_uncertainty: bool = True
+    prior_scale: float = Field(
+        default=1.5, description="prior distribution scale factor"
+    )
+    noise_std: float | None = Field(
+        default=None, description="noise standard deviation (null for auto-estimate)"
+    )
+    compute_uncertainty: bool = Field(
+        default=True, description="compute parameter uncertainty estimates"
+    )
 
 
 class IVIMFittingConfig(BaseModel):
     """IVIM model fitting configuration from YAML."""
 
-    max_iterations: int = 500
-    tolerance: float = 1e-6
-    bounds: dict[str, list[float]] | None = None
-    initial_guess: dict[str, float] | None = None
-    bayesian: BayesianIVIMFittingConfig = BayesianIVIMFittingConfig()
+    max_iterations: int = Field(default=500, description="maximum iterations")
+    tolerance: float = Field(default=1e-6, description="convergence tolerance")
+    bounds: dict[str, list[float]] | None = Field(
+        default=None,
+        description="per-parameter bounds override {name: [lower, upper]}",
+    )
+    initial_guess: dict[str, float] | None = Field(
+        default=None,
+        description="per-parameter initial guess override {name: value}",
+    )
+    bayesian: BayesianIVIMFittingConfig = Field(
+        default_factory=BayesianIVIMFittingConfig,
+        description="Bayesian fitting options (used when fitting_method: bayesian)",
+    )
 
     @field_validator("bounds")
     @classmethod
@@ -142,32 +190,69 @@ class IVIMFittingConfig(BaseModel):
 class DCEAcquisitionYAML(BaseModel):
     """DCE acquisition parameters from YAML."""
 
-    tr: float | None = None
-    flip_angles: list[float] | None = None
-    baseline_frames: int = 5
-    relaxivity: float = 4.5
-    t1_assumed: float | None = None
+    tr: float | None = Field(default=None, description="repetition time (ms)")
+    flip_angles: list[float] | None = Field(
+        default=None, description="VFA flip angles (degrees)"
+    )
+    baseline_frames: int = Field(
+        default=5, description="number of pre-contrast baseline frames"
+    )
+    relaxivity: float = Field(
+        default=4.5, description="contrast agent r1 relaxivity (mM^-1 s^-1)"
+    )
+    t1_assumed: float | None = Field(
+        default=None,
+        description="assumed T1 when no T1 map is available (ms)",
+    )
 
 
 class ROIConfig(BaseModel):
     """Region-of-interest configuration for limiting processing."""
 
-    enabled: bool = False
-    center: list[int] | None = None
-    radius: int = 10
+    enabled: bool = Field(
+        default=False, description="set true to process only an ROI"
+    )
+    center: list[int] | None = Field(
+        default=None, description="voxel center [x, y, z]"
+    )
+    radius: int = Field(default=10, description="radius in voxels")
 
 
 class DCEPipelineYAML(BaseModel):
     """DCE pipeline settings from YAML."""
 
-    model: str = "extended_tofts"
-    t1_mapping_method: str = "vfa"
-    aif_source: str = "population"
-    population_aif: str = "parker"
-    save_intermediate: bool = False
-    acquisition: DCEAcquisitionYAML = DCEAcquisitionYAML()
-    roi: ROIConfig = ROIConfig()
-    fitting: DCEFittingConfig = DCEFittingConfig()
+    model: str = Field(
+        default="extended_tofts",
+        description="PK model (tofts | extended_tofts | patlak | 2cxm | 2cum)",
+    )
+    t1_mapping_method: str = Field(
+        default="vfa", description="T1 mapping method (vfa | look_locker)"
+    )
+    aif_source: str = Field(
+        default="population", description="AIF source (population | detect | manual)"
+    )
+    population_aif: str = Field(
+        default="parker",
+        description=(
+            "population AIF model"
+            " (parker | georgiou | fritz_hansen | weinmann | mcgrath)"
+        ),
+    )
+    save_intermediate: bool = Field(
+        default=False, description="save intermediate results"
+    )
+    acquisition: DCEAcquisitionYAML = Field(
+        default_factory=DCEAcquisitionYAML,
+        description="acquisition parameters",
+    )
+    roi: ROIConfig = Field(
+        default_factory=ROIConfig,
+        description="region-of-interest settings",
+    )
+    fitting: DCEFittingConfig = Field(
+        default_factory=DCEFittingConfig,
+        description="model fitting settings",
+    )
 
     @field_validator("model")
     @classmethod
@@ -210,12 +295,22 @@ class DCEPipelineYAML(BaseModel):
 class DSCPipelineYAML(BaseModel):
     """DSC pipeline settings from YAML."""
 
-    te: float = 30.0
-    deconvolution_method: str = "oSVD"
-    apply_leakage_correction: bool = True
-    svd_threshold: float = 0.2
-    baseline_frames: int = 10
-    hematocrit_ratio: float = 0.73
+    te: float = Field(default=30.0, description="echo time (ms)")
+    deconvolution_method: str = Field(
+        default="oSVD", description="deconvolution method (oSVD | cSVD | sSVD)"
+    )
+    apply_leakage_correction: bool = Field(
+        default=True, description="apply BSW leakage correction"
+    )
+    svd_threshold: float = Field(
+        default=0.2, description="SVD truncation threshold"
+    )
+    baseline_frames: int = Field(
+        default=10, description="number of pre-bolus baseline frames"
+    )
+    hematocrit_ratio: float = Field(
+        default=0.73, description="large-to-small vessel hematocrit ratio"
+    )
 
     @field_validator("deconvolution_method")
     @classmethod
@@ -238,16 +333,33 @@ class DSCPipelineYAML(BaseModel):
 class ASLPipelineYAML(BaseModel):
     """ASL pipeline settings from YAML."""
 
-    labeling_scheme: str = "pcasl"
-    pld: float = 1800.0
-    label_duration: float = 1800.0
-    t1_blood: float = 1650.0
-    labeling_efficiency: float = 0.85
-    m0_method: str = "single"
-    t1_tissue: float = 1330.0
-    partition_coefficient: float = 0.9
-    difference_method: str = "pairwise"
-    label_control_order: str = "label_first"
+    labeling_scheme: str = Field(
+        default="pcasl", description="labeling scheme (pcasl | pasl | casl)"
+    )
+    pld: float = Field(default=1800.0, description="post-labeling delay (ms)")
+    label_duration: float = Field(
+        default=1800.0, description="labeling duration (ms)"
+    )
+    t1_blood: float = Field(default=1650.0, description="T1 of blood (ms)")
+    labeling_efficiency: float = Field(
+        default=0.85, description="labeling efficiency (0 to 1)"
+    )
+    m0_method: str = Field(
+        default="single",
+        description="M0 calibration method (single | voxelwise | reference_region)",
+    )
+    t1_tissue: float = Field(default=1330.0, description="T1 of tissue (ms)")
+    partition_coefficient: float = Field(
+        default=0.9, description="blood-brain partition coefficient (mL/g)"
+    )
+    difference_method: str = Field(
+        default="pairwise",
+        description="ASL difference method (pairwise | surround | mean)",
+    )
+    label_control_order: str = Field(
+        default="label_first",
+        description="label/control ordering (label_first | control_first)",
+    )
 
     @field_validator("labeling_scheme")
     @classmethod
@@ -288,10 +400,21 @@ class ASLPipelineYAML(BaseModel):
 class IVIMPipelineYAML(BaseModel):
     """IVIM pipeline settings from YAML."""
 
-    fitting_method: str = "segmented"
-    b_threshold: float = 200.0
-    normalize_signal: bool = True
-    fitting: IVIMFittingConfig = IVIMFittingConfig()
+    fitting_method: str = Field(
+        default="segmented",
+        description="fitting method (segmented | full | bayesian)",
+    )
+    b_threshold: float = Field(
+        default=200.0,
+        description="b-value threshold separating D and D* regimes (s/mm^2)",
+    )
+    normalize_signal: bool = Field(
+        default=True, description="normalize signal to S(b=0)"
+    )
+    fitting: IVIMFittingConfig = Field(
+        default_factory=IVIMFittingConfig,
+        description="fitting options",
+    )
 
     @field_validator("fitting_method")
     @classmethod
@@ -392,148 +515,115 @@ def load_config(path: str | Path) -> PipelineConfig:
 
 
 # ---------------------------------------------------------------------------
-# dump_defaults
+# dump_defaults — auto-generated from Pydantic model introspection
 # ---------------------------------------------------------------------------
 
-_DEFAULT_TEMPLATES: dict[str, str] = {
-    "dce": """\
-modality: dce
-pipeline:
-  model: extended_tofts            # tofts | extended_tofts | patlak | 2cxm | 2cum
-  t1_mapping_method: vfa           # vfa | look_locker
-  aif_source: population           # population | detect | manual
-  population_aif: parker           # parker | georgiou | fritz_hansen | weinmann | mcgrath
-  save_intermediate: false
-  acquisition:
-    baseline_frames: 5
-    relaxivity: 4.5                # mM^-1 s^-1, contrast agent r1 relaxivity
-    # --- overrides: auto-detected from DICOM when available ---
-    # tr: 5.0                      # ms, repetition time of the dynamic acquisition
-    # flip_angles: [2, 5, 10, 15]  # degrees, VFA flip angles for T1 mapping
-    # t1_assumed: 1400.0           # ms, assumed T1 when no T1 map data exists
-  roi:
-    enabled: false                 # set true to process only an ROI for faster iteration
-    # center: [128, 128, 8]        # voxel center [x, y, z] (default: volume center)
-    # radius: 10                   # radius in voxels
-  fitting:
-    fitter: lm                     # lm | bayesian
-    max_iterations: 100
-    tolerance: 1.0e-6
-    r2_threshold: 0.5             # minimum R^2 for a voxel fit to be considered valid
-    # bounds:                      # override model defaults (omit to use model defaults)
-    #   Ktrans: [0.0, 5.0]        # [lower, upper], 1/min
-    #   ve: [0.001, 1.0]          # [lower, upper], mL/100mL
-    #   vp: [0.0, 0.2]            # [lower, upper], mL/100mL
-    # initial_guess:               # override data-driven initial estimates
-    #   Ktrans: 0.1               # 1/min
-    #   ve: 0.2                   # mL/100mL
-    #   vp: 0.02                  # mL/100mL
-data:
-  format: auto                     # auto | nifti | dicom | bids
-  # mask: brain_mask.nii.gz        # tissue mask, relative to data_path or absolute
-  # t1_map: t1_map.nii.gz          # pre-computed T1 map (skips T1 mapping step)
-  # aif_file: aif.txt              # custom AIF (requires aif_source: manual)
-  # subject: "01"                  # BIDS subject ID (required when format: bids)
-  # session: "01"                  # BIDS session ID
-output:
-  format: nifti                    # nifti
-backend:
-  force_cpu: false
-logging:
-  level: INFO                      # DEBUG | INFO | WARNING | ERROR
-""",
-    "dsc": """\
-modality: dsc
-pipeline:
-  te: 30.0                         # ms, echo time
-  deconvolution_method: oSVD       # oSVD | cSVD | sSVD
-  apply_leakage_correction: true
-  svd_threshold: 0.2               # truncation threshold for SVD
-  baseline_frames: 10              # number of pre-bolus frames for baseline
-  hematocrit_ratio: 0.73           # large-to-small vessel hematocrit ratio
-data:
-  format: auto                     # auto | nifti | dicom | bids
-  # mask: brain_mask.nii.gz        # tissue mask, relative to data_path or absolute
-  # subject: "01"                  # BIDS subject ID (required when format: bids)
-  # session: "01"                  # BIDS session ID
-output:
-  format: nifti                    # nifti
-backend:
-  force_cpu: false
-logging:
-  level: INFO                      # DEBUG | INFO | WARNING | ERROR
-""",
-    "asl": """\
-modality: asl
-pipeline:
-  labeling_scheme: pcasl           # pcasl | pasl | casl
-  pld: 1800.0                     # ms, post-labeling delay
-  label_duration: 1800.0          # ms, labeling duration
-  t1_blood: 1650.0                # ms, longitudinal relaxation time of blood
-  labeling_efficiency: 0.85       # labeling efficiency (0 to 1)
-  m0_method: single               # single | voxelwise | reference_region
-  t1_tissue: 1330.0               # ms, longitudinal relaxation time of tissue
-  partition_coefficient: 0.9      # blood-brain partition coefficient (mL/g)
-  difference_method: pairwise     # pairwise | surround | mean
-  label_control_order: label_first  # label_first | control_first
-data:
-  format: auto                     # auto | nifti | dicom | bids
-  # m0_data: m0.nii.gz             # M0 calibration image (M0=1.0 if omitted)
-  # mask: brain_mask.nii.gz        # tissue mask, relative to data_path or absolute
-  # subject: "01"                  # BIDS subject ID (required when format: bids)
-  # session: "01"                  # BIDS session ID
-output:
-  format: nifti                    # nifti
-backend:
-  force_cpu: false
-logging:
-  level: INFO                      # DEBUG | INFO | WARNING | ERROR
-""",
-    "ivim": """\
-modality: ivim
-pipeline:
-  fitting_method: segmented        # segmented | full | bayesian
-  b_threshold: 200.0              # s/mm^2, threshold separating D and D* regimes
-  normalize_signal: true          # normalize to S(b=0) before fitting
-  fitting:
-    max_iterations: 500
-    tolerance: 1.0e-6
-    # bounds:                      # override model defaults (omit to use model defaults)
-    #   S0: [0.0, 1.0e+10]        # signal units
-    #   D: [1.0e-4, 5.0e-3]       # mm^2/s
-    #   D_star: [2.0e-3, 0.1]     # mm^2/s
-    #   f: [0.0, 0.7]             # dimensionless
-    # initial_guess:               # override data-driven initial estimates
-    #   D: 1.0e-3                 # mm^2/s
-    #   D_star: 0.01              # mm^2/s
-    #   f: 0.1                    # dimensionless
-    # bayesian:                    # only used when fitting_method: bayesian
-    #   n_samples: 1000
-    #   n_burn: 200
-    #   n_thin: 2
-    #   prior_d: [1.0e-3, 5.0e-4]       # [mean, std] mm^2/s
-    #   prior_d_star: [0.015, 0.01]      # [mean, std] mm^2/s
-    #   prior_f: [0.1, 0.1]             # [mean, std]
-    #   proposal_scale: 0.1
-data:
-  format: auto                     # auto | nifti | dicom | bids
-  # b_values: [0, 10, 20, 50, 100, 200, 400, 800]  # s/mm^2 (auto-detected from DICOM/BIDS)
-  # b_values_file: bvals.txt       # alternative: load b-values from text file
-  # mask: brain_mask.nii.gz        # tissue mask, relative to data_path or absolute
-  # subject: "01"                  # BIDS subject ID (required when format: bids)
-  # session: "01"                  # BIDS session ID
-output:
-  format: nifti                    # nifti
-backend:
-  force_cpu: false
-logging:
-  level: INFO                      # DEBUG | INFO | WARNING | ERROR
-""",
-}
+
+def _is_model_class(annotation: Any) -> bool:
+    """Return True if *annotation* is a Pydantic BaseModel subclass."""
+    try:
+        return isinstance(annotation, type) and issubclass(annotation, BaseModel)
+    except TypeError:
+        return False
+
+
+def _format_yaml_value(value: Any) -> str:
+    """Format a Python value as a YAML scalar string."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float):
+        s = repr(value)
+        if "e" in s or "E" in s:
+            # Normalise exponent: 1e-06 -> 1.0e-6
+            parts = s.lower().split("e")
+            if "." not in parts[0]:
+                parts[0] += ".0"
+            exp_val = int(parts[1])
+            parts[1] = str(exp_val)
+            s = "e".join(parts)
+        elif "." not in s:
+            s += ".0"
+        return s
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        # Quote strings that YAML would misinterpret
+        if value.lower() in ("true", "false", "null", "yes", "no", "on", "off"):
+            return f'"{value}"'
+        return value
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return "[]"
+        items = ", ".join(_format_yaml_value(v) for v in value)
+        return f"[{items}]"
+    return str(value)
+
+
+def _generate_section_yaml(
+    model_cls: type[BaseModel],
+    indent_level: int = 0,
+) -> list[str]:
+    """Generate commented YAML lines from a Pydantic model's fields.
+
+    Active fields (non-None defaults) are emitted first, followed by
+    commented-out optional fields (None defaults).  Nested Pydantic
+    sub-models are recursed into and rendered as YAML sub-sections.
+    ``Field(description=...)`` values appear as inline ``# comments``.
+    """
+    indent = "  " * indent_level
+    active_lines: list[str] = []
+    commented_lines: list[str] = []
+
+    for field_name, field_info in model_cls.model_fields.items():
+        # Resolve the effective default value
+        default = field_info.default
+        # Pydantic v2 stores mutable defaults via default_factory
+        try:
+            from pydantic_core import PydanticUndefinedType
+
+            if isinstance(default, PydanticUndefinedType):
+                if field_info.default_factory is not None:
+                    default = field_info.default_factory()
+                else:
+                    default = None
+        except ImportError:
+            pass
+
+        description = field_info.description
+        annotation = field_info.annotation
+        comment_suffix = f"  # {description}" if description else ""
+
+        if _is_model_class(annotation):
+            # Nested Pydantic model — render as a YAML sub-section
+            section_lines = [f"{indent}{field_name}:{comment_suffix}"]
+            section_lines.extend(
+                _generate_section_yaml(annotation, indent_level + 1)
+            )
+            active_lines.extend(section_lines)
+        elif default is None:
+            # Optional field — emit as a commented-out line
+            commented_lines.append(
+                f"{indent}# {field_name}: null{comment_suffix}"
+            )
+        else:
+            yaml_val = _format_yaml_value(default)
+            active_lines.append(
+                f"{indent}{field_name}: {yaml_val}{comment_suffix}"
+            )
+
+    return active_lines + commented_lines
 
 
 def dump_defaults(modality: str) -> str:
     """Generate a commented YAML template for the given modality.
+
+    The template is auto-generated from Pydantic model field definitions,
+    so it always reflects the current schema.  Fields with non-None
+    defaults are emitted as active YAML; optional fields (default None)
+    are shown as commented-out lines.  ``Field(description=...)`` values
+    appear as inline comments.
 
     Parameters
     ----------
@@ -551,8 +641,27 @@ def dump_defaults(modality: str) -> str:
         If modality is not recognized.
     """
     modality = modality.lower()
-    if modality not in _DEFAULT_TEMPLATES:
-        valid = sorted(_DEFAULT_TEMPLATES.keys())
+    if modality not in _MODALITY_PIPELINE_MODELS:
+        valid = sorted(_MODALITY_PIPELINE_MODELS.keys())
         msg = f"Unknown modality '{modality}'. Valid: {valid}"
         raise ValueError(msg)
-    return _DEFAULT_TEMPLATES[modality]
+
+    pipeline_cls = _MODALITY_PIPELINE_MODELS[modality]
+
+    lines = [f"modality: {modality}"]
+
+    # Pipeline section (modality-specific)
+    lines.append("pipeline:")
+    lines.extend(_generate_section_yaml(pipeline_cls, indent_level=1))
+
+    # Shared sections
+    for section_name, section_cls in [
+        ("data", DataConfig),
+        ("output", OutputConfig),
+        ("backend", BackendConfig),
+        ("logging", LoggingConfig),
+    ]:
+        lines.append(f"{section_name}:")
+        lines.extend(_generate_section_yaml(section_cls, indent_level=1))
+
+    return "\n".join(lines) + "\n"
