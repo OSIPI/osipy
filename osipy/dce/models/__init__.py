@@ -13,7 +13,7 @@ Available models:
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 .. [3] Sourbron SP, Buckley DL. MRM 2011;66(3):735-745.
 """
 

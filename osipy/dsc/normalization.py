@@ -11,7 +11,7 @@ References
 .. [2] Boxerman JL et al. (2006). Relative cerebral blood volume maps corrected
    for contrast agent extravasation significantly correlate with glioma tumor
    grade, whereas uncorrected maps do not. AJNR 27(4):859-867.
-.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 from __future__ import annotations

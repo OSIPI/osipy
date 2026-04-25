@@ -5,7 +5,7 @@ This module implements the Standard Tofts model for DCE-MRI analysis.
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 .. [3] Tofts PS, Kermode AG. MRM 1991;17(2):357-367.
 """
 
@@ -33,7 +33,8 @@ class ToftsParams(ModelParameters):
         Represents transfer from plasma to EES.
     ve : float
         Extravascular extracellular volume fraction (OSIPI: Q.PH1.001),
-        mL/100mL, range [0, 1].
+        unitless fraction [0, 1] (CAPLEX lists mL/100mL; osipy uses the
+        equivalent fraction convention).
     """
 
     ktrans: float = 0.1
@@ -60,7 +61,7 @@ class ToftsModel(BasePerfusionModel[ToftsParams]):
         Volume transfer constant (OSIPI: Q.PH1.008), 1/min.
     ve : float
         Extravascular extracellular volume fraction (OSIPI: Q.PH1.001),
-        mL/100mL.
+        unitless fraction [0, 1].
 
     Notes
     -----
@@ -81,7 +82,7 @@ class ToftsModel(BasePerfusionModel[ToftsParams]):
     References
     ----------
     .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
     .. [3] Tofts PS, Kermode AG. MRM 1991;17(2):357-367.
     """
 
@@ -103,7 +104,7 @@ class ToftsModel(BasePerfusionModel[ToftsParams]):
     @property
     def parameter_units(self) -> dict[str, str]:
         """Return parameter units."""
-        return {"Ktrans": "1/min", "ve": "mL/100mL"}
+        return {"Ktrans": "1/min", "ve": "fraction"}
 
     @property
     def reference(self) -> str:

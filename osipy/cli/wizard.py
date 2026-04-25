@@ -582,6 +582,6 @@ def run_wizard() -> None:
         print("Aborted.")
         return
 
-    out.write_text(yaml_str)
+    out.write_text(yaml_str, encoding="utf-8")
     print(f"\nConfig written to {out}")
     print(f"Next step: osipy {out} /path/to/data")

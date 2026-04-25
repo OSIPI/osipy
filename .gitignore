@@ -68,5 +68,6 @@ tests/fixtures/osipi_dro/*.nii.gz
 data/
 outputs/
 output/
+test_runs/
 .claude/
 site/

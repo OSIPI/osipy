@@ -153,7 +153,7 @@ def _load_osipi_dro(dro_path: Path) -> DROData:
     # Look for metadata
     json_files = list(dro_path.glob("*.json"))
     if json_files:
-        with json_files[0].open() as f:
+        with json_files[0].open(encoding="utf-8") as f:
             metadata = json.load(f)
 
     return DROData(

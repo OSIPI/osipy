@@ -19,7 +19,7 @@ References
 .. [3] Paulson ES, Schmainda KM (2008). Comparison of dynamic susceptibility-
    weighted contrast-enhanced MR methods: recommendations for measuring
    relative cerebral blood volume in brain tumors. Radiology 249(2):601-613.
-.. [4] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [4] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 from dataclasses import dataclass
@@ -132,7 +132,7 @@ def correct_leakage(
     References
     ----------
     .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 
     Examples
     --------

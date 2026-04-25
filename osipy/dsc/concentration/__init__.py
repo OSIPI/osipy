@@ -7,7 +7,7 @@ relaxation rate changes. Requires echo time TE (OSIPI: Q.MS1.005).
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 from osipy.dsc.concentration.signal_to_conc import (

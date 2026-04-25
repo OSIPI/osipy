@@ -171,13 +171,20 @@ Used at the pipeline level and by end users for data loading and export. The mod
 !!! example "I/O function signatures"
 
     ```python
-    # NIfTI loading
-    def load_nifti(path, time_points=None):
+    # NIfTI loading (auto-reads adjacent BIDS sidecar)
+    def load_nifti(path, modality=None, acquisition_params=None,
+                   sidecar_json=None, interactive=False):
         """Load NIfTI file into PerfusionDataset."""
 
-    # DICOM loading
-    def load_dicom(path, series_uid=None):
-        """Load DICOM series into PerfusionDataset."""
+    # DICOM — observe first, then load
+    def discover_dicom(path) -> list[SeriesInfo]:
+        """Walk a directory, group files by SeriesInstanceUID,
+        and annotate each series with a best-effort role_hint
+        (dynamic, dynamic_frame, vfa, t1_look_locker, unknown)."""
+
+    def load_dicom_series(series, modality=None) -> PerfusionDataset:
+        """Load one SeriesInfo (3D/4D) or a list of per-timepoint
+        frames (stacked into 4D) into a PerfusionDataset."""
 
     # BIDS export
     def export_bids(output_dir, subject, parameters, ...):
@@ -600,8 +607,8 @@ tests/
 | numpy | Array operations | Yes |
 | nibabel | NIfTI I/O | Yes |
 | pydicom | DICOM I/O | Yes |
-| pybids | BIDS support | Yes |
 | matplotlib | Visualization | Yes |
+| dcm2niix | DICOM→NIfTI conversion (bundled binary) | Yes |
 
 ### Optional Dependencies
 

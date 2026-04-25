@@ -10,7 +10,7 @@ NO scipy dependency - uses xp.linalg operations.
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 .. [3] Sourbron SP, Buckley DL. MRM 2011;66(3):735-745.
 .. [4] Brix G et al. MRM 2004;52(2):420-429.
 """
@@ -39,9 +39,9 @@ class TwoCompartmentParams(ModelParameters):
         Permeability-surface area product (OSIPI: Q.PH1.004) in mL/min/100mL.
     ve : float
         Extravascular extracellular volume fraction (OSIPI: Q.PH1.001),
-        mL/100mL.
+        unitless fraction [0, 1].
     vp : float
-        Plasma volume fraction (OSIPI: Q.PH1.001), mL/100mL.
+        Plasma volume fraction (OSIPI: Q.PH1.001), unitless fraction [0, 1].
     """
 
     fp: float = 15.0  # ml/100ml/min
@@ -65,9 +65,9 @@ class TwoCompartmentModel(BasePerfusionModel[TwoCompartmentParams]):
         Permeability-surface area product (OSIPI: Q.PH1.004), mL/min/100mL.
     ve : float
         Extravascular extracellular volume fraction (OSIPI: Q.PH1.001),
-        mL/100mL.
+        unitless fraction [0, 1].
     vp : float
-        Plasma volume fraction (OSIPI: Q.PH1.001), mL/100mL.
+        Plasma volume fraction (OSIPI: Q.PH1.001), unitless fraction [0, 1].
 
     Notes
     -----
@@ -94,7 +94,7 @@ class TwoCompartmentModel(BasePerfusionModel[TwoCompartmentParams]):
     References
     ----------
     .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
     .. [3] Sourbron SP, Buckley DL. MRM 2011;66(3):735-745.
     """
 
@@ -119,8 +119,8 @@ class TwoCompartmentModel(BasePerfusionModel[TwoCompartmentParams]):
         return {
             "Fp": "mL/min/100mL",
             "PS": "mL/min/100mL",
-            "ve": "mL/100mL",
-            "vp": "mL/100mL",
+            "ve": "fraction",
+            "vp": "fraction",
         }
 
     @property

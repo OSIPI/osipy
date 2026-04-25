@@ -11,7 +11,7 @@ notation for exponents (e.g. ``"mm^2/s"``, ``"min^-1"``).
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 from dataclasses import dataclass, field

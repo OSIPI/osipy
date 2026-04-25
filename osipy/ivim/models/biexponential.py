@@ -17,11 +17,16 @@ References
 ----------
 .. [1] Le Bihan D et al. (1988). Separation of diffusion and perfusion
    in intravoxel incoherent motion MR imaging. Radiology 168(2):497-505.
+   doi:10.1148/radiology.168.2.3393671. PMID 3393671.
 .. [2] Lemke A et al. (2010). An in vivo verification of the intravoxel
    incoherent motion effect in diffusion-weighted imaging of the abdomen.
    Magn Reson Med 64(6):1580-1585.
-.. [3] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [4] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [3] Federau C et al. (2014). IVIM perfusion imaging in acute stroke:
+   initial clinical experience. AJNR 35:256-262.
+   doi:10.3174/ajnr.A3686. PMID 23928134. Source for typical f, D, D*
+   ranges in brain tissue.
+.. [4] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
+.. [5] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 from abc import ABC, abstractmethod
@@ -197,6 +202,13 @@ class IVIMBiexponentialModel(IVIMModel):
 
     This model assumes that D* >> D, so the perfusion component
     decays rapidly at low b-values.
+
+    Note on formulation: Le Bihan's 1988 original formulation had the
+    fast term as ``exp(-b*(D+D*))``. The simplified ``exp(-b*D*)`` form
+    used here collapses when ``D* >> D`` (typical in vivo:
+    D ≈ 10⁻³ mm²/s, D* ≈ 10⁻² mm²/s). The Le Bihan 1988 abstract
+    (PMID 3393671) does not print the equation; the simplified form
+    matches consensus usage in modern IVIM literature.
 
     References
     ----------

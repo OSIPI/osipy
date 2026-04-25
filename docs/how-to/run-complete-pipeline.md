@@ -30,31 +30,61 @@ result = osipy.run_analysis(
 
 ## DCE Pipeline
 
-Complete DCE-MRI analysis from raw data:
-
 ```python
-import osipy
-from osipy.pipeline import DCEPipeline, DCEPipelineConfig
+from pathlib import Path
 
-# Create pipeline with config object
-config = DCEPipelineConfig(
-    model="extended_tofts",
-    aif_source="population",
-    population_aif="parker",
-    t1_mapping_method="vfa",
+import numpy as np
+
+import osipy
+from osipy.common.io import save_nifti
+from osipy.dce import DCEAcquisitionParams
+
+DATA_DIR = Path("/path/to/dce_dicom_dir")
+OUT = Path("osipy_output")
+
+# 1. Discover + load DICOM (VFA for T1 mapping, dynamic for DCE).
+series = osipy.discover_dicom(DATA_DIR)
+perf = osipy.load_dicom_series(
+    next(s for s in series if s.role_hint == "dynamic"),
+    modality=osipy.Modality.DCE,
+)
+vfa = osipy.load_dicom_series(
+    [s for s in series if s.role_hint == "vfa"],
+    modality=osipy.Modality.DCE,
 )
 
-pipeline = DCEPipeline(config)
+# 2. Configure + run the pipeline.
+config = osipy.DCEPipelineConfig(
+    acquisition_params=DCEAcquisitionParams(
+        tr=perf.acquisition_params.tr,
+        te=perf.acquisition_params.te,
+        flip_angles=[perf.acquisition_params.flip_angle],
+        baseline_frames=5,
+        relaxivity=4.5,
+    ),
+)
+result = osipy.DCEPipeline(config).run(
+    perf,
+    time=perf.time_points,
+    t1_data=vfa,
+    flip_angles=vfa.acquisition_params.flip_angles,
+    tr=vfa.acquisition_params.tr,
+)
 
-# Run pipeline with data
-result = pipeline.run(dce_data, time)
-
-# Access results (DCEPipelineResult wraps DCEFitResult)
-fit = result.fit_result
-ktrans = fit.parameter_maps["Ktrans"].values
-print(f"Ktrans mean: {ktrans[fit.quality_mask].mean():.4f}")
-print(f"Valid voxels: {fit.quality_mask.sum()}")
+# 3. Save parameter maps + quality mask.
+OUT.mkdir(exist_ok=True)
+for name, pmap in result.fit_result.parameter_maps.items():
+    save_nifti(
+        pmap, OUT / f"{name.lower().replace('*', '_star')}.nii.gz", affine=perf.affine
+    )
+save_nifti(
+    result.fit_result.quality_mask.astype(np.uint8),
+    OUT / "quality_mask.nii.gz",
+    affine=perf.affine,
+)
 ```
+
+Pass a pre-computed T1 map via `t1_map=` instead of `t1_data=` to skip VFA fitting.
 
 ### Arterial Delay Estimation
 
@@ -131,10 +161,13 @@ from osipy.pipeline import ASLPipeline, ASLPipelineConfig
 # Create pipeline with config object
 config = ASLPipelineConfig(
     labeling_scheme=LabelingScheme.PCASL,
+    # Defaults match ISMRM consensus for healthy adults <70y
+    # (Alsop et al. 2015, doi:10.1002/mrm.25197, PMC4190138, Table 1).
+    # For older adults or clinical populations, use pld=2000.0.
     label_duration=1800.0,          # ms
     pld=1800.0,                     # ms
-    t1_blood=1650.0,                # ms at 3T
-    labeling_efficiency=0.85,
+    t1_blood=1650.0,                # ms at 3T (Lu 2004 PMID 15334591)
+    labeling_efficiency=0.85,       # pCASL (Alsop Table 3)
 )
 
 pipeline = ASLPipeline(config)

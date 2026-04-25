@@ -207,6 +207,6 @@ class ValidationReport:
         json_str = _json.dumps(data, indent=2, default=str)
 
         if path is not None:
-            Path(path).write_text(json_str)
+            Path(path).write_text(json_str, encoding="utf-8")
 
         return json_str

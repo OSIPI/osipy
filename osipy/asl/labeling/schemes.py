@@ -142,9 +142,12 @@ def compute_labeling_efficiency(
 
     Notes
     -----
-    Default efficiencies per ISMRM consensus (Alsop et al., 2015):
+    Default efficiencies per ISMRM consensus (Alsop et al.,
+    Magn Reson Med 2015;73:102-116, doi:10.1002/mrm.25197,
+    PMC4190138) Table 3:
     - PASL: 0.98
-    - CASL: 0.71
+    - CASL: 0.71 (historical CASL literature; Alsop cites 0.68-0.80
+      depending on hardware)
     - pCASL: 0.85
     """
     if measured_efficiency is not None:

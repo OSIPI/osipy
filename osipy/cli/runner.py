@@ -15,8 +15,6 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from osipy.common.backend.array_module import get_array_module, to_gpu
-
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
@@ -134,7 +132,12 @@ def _load_nifti_array(
 
 
 def _load_data(config: PipelineConfig, data_path: Path, modality: str) -> Any:
-    """Load data using the universal loader, respecting config format.
+    """Load data using the appropriate loader for *data_path*.
+
+    Dispatches directly to :func:`load_nifti`, :func:`load_bids`, or the
+    new :func:`discover_dicom` + :func:`load_dicom_series` stack. Picks
+    the best-matching series when discovery returns more than one
+    candidate (prefers the first ``dynamic`` or ``dynamic_frame`` group).
 
     Parameters
     ----------
@@ -145,23 +148,96 @@ def _load_data(config: PipelineConfig, data_path: Path, modality: str) -> Any:
         Path to input data (file or directory).
     modality : str
         Modality string (``"DCE"``, ``"DSC"``, ``"ASL"``, ``"IVIM"``).
-
-    Returns
-    -------
-    PerfusionDataset
-        Loaded dataset.
     """
-    from osipy.common.io.load import load_perfusion
+    from osipy.common.types import Modality
 
-    fmt = config.data.format  # "auto", "nifti", "dicom", "bids"
-    return load_perfusion(
-        path=data_path,
-        modality=modality,
-        format=fmt,
-        subject=config.data.subject,
-        session=config.data.session,
-        interactive=False,
+    fmt = config.data.format
+    if fmt == "auto":
+        fmt = _detect_format(data_path)
+
+    modality_enum = (
+        Modality(modality.lower()) if isinstance(modality, str) else modality
     )
+
+    if fmt == "nifti":
+        from osipy.common.io.nifti import load_nifti
+
+        return load_nifti(data_path, modality=modality_enum)
+
+    if fmt == "bids":
+        from osipy.common.io.bids import load_bids
+
+        if config.data.subject is None:
+            msg = "subject is required for BIDS format"
+            raise ValueError(msg)
+        return load_bids(
+            data_path,
+            subject=config.data.subject,
+            session=config.data.session,
+            modality=modality_enum,
+            interactive=False,
+        )
+
+    if fmt == "dicom":
+        from osipy.common.io.discovery import discover_dicom, load_dicom_series
+
+        series_list = discover_dicom(data_path)
+        chosen = _select_dataset_series(series_list)
+        return load_dicom_series(chosen, modality=modality_enum)
+
+    msg = f"Unknown data format: {fmt}"
+    raise ValueError(msg)
+
+
+def _detect_format(path: Path) -> str:
+    """Detect whether *path* points at NIfTI, DICOM, or BIDS data."""
+    if path.is_file():
+        if path.name.endswith((".nii", ".nii.gz")):
+            return "nifti"
+        return "dicom"
+    if (path / "dataset_description.json").exists():
+        return "bids"
+    if any(p.name.endswith((".nii", ".nii.gz")) for p in path.iterdir() if p.is_file()):
+        return "nifti"
+    return "dicom"
+
+
+def _select_dataset_series(series_list: list[Any]) -> Any:
+    """Pick the series (or group) to load from a discovery result.
+
+    Preference order:
+        * largest ``dynamic_frame`` group (stacked as 4D multi-series)
+        * first ``dynamic`` series
+        * first ``t1_look_locker`` series
+        * single imaged series if nothing better matches
+    """
+    from collections import defaultdict
+
+    if not series_list:
+        msg = "discover_dicom returned no series"
+        raise ValueError(msg)
+
+    groups: dict[str, list[Any]] = defaultdict(list)
+    for s in series_list:
+        if s.role_hint == "dynamic_frame" and s.group_key:
+            groups[s.group_key].append(s)
+    if groups:
+        # Biggest cluster wins.
+        best = max(groups.values(), key=len)
+        return best
+
+    for s in series_list:
+        if s.role_hint == "dynamic":
+            return s
+
+    for s in series_list:
+        if s.role_hint == "t1_look_locker":
+            return s
+
+    imaged = [s for s in series_list if s.role_hint != "unknown"]
+    if imaged:
+        return imaged[0]
+    return series_list[0]
 
 
 # ---------------------------------------------------------------------------
@@ -221,230 +297,67 @@ def _log_parameter_stats(
 # ---------------------------------------------------------------------------
 
 
-def _discover_dce_dicom_series(
-    data_path: Path,
-) -> tuple[list[Path], Path] | None:
-    """Discover VFA and perfusion series in a DCE DICOM directory tree.
+def _discover_dce_dicom(data_path: Path) -> tuple[list[Any], Any] | None:
+    """Discover VFA + dynamic series for DCE pipelines.
 
-    Handles multi-level layouts like:
-    ``visit_dir / study_dir / series_dir / *.dcm``
+    Runs :func:`discover_dicom`, then extracts:
 
-    Parameters
-    ----------
-    data_path : Path
-        Visit-level (or study-level) directory.
+    * the list of VFA single-flip series (role ``vfa``), sorted by FA;
+    * the dynamic dataset — either a single ``dynamic`` series (all
+      timepoints in one ``SeriesInstanceUID``) or a ``dynamic_frame``
+      cluster (one 3D series per timepoint, accumulated into a list).
 
-    Returns
-    -------
-    tuple[list[Path], Path] | None
-        ``(vfa_dirs_sorted_by_flip_angle, perfusion_dir)`` or None
-        if the layout is not a recognizable DCE DICOM structure.
+    Returns ``None`` when the discovery result does not contain both a
+    VFA group and a dynamic series, so the caller can fall through to
+    the generic loader (which handles NIfTI / single-series DICOM).
     """
-    import re
+    from collections import defaultdict
 
-    vfa_dirs: list[Path] = []
-    perfusion_dir: Path | None = None
+    from osipy.common.io.discovery import discover_dicom
 
-    # Walk up to 3 levels to find series directories with DICOM files
-    for series_dir in _iter_series_dirs(data_path):
-        name_lower = series_dir.name.lower()
-        if re.search(r"ax\s+\d+\s+flip", name_lower):
-            vfa_dirs.append(series_dir)
-        elif "perfusion" in name_lower:
-            perfusion_dir = series_dir
-
-    if not vfa_dirs or perfusion_dir is None:
+    if not data_path.is_dir():
         return None
 
-    # Sort VFA dirs by flip angle extracted from directory name
-    def _flip_angle_key(d: Path) -> int:
-        m = re.search(r"ax\s+(\d+)\s+flip", d.name.lower())
-        return int(m.group(1)) if m else 0
-
-    vfa_dirs.sort(key=_flip_angle_key)
-    return vfa_dirs, perfusion_dir
-
-
-def _iter_series_dirs(root: Path) -> list[Path]:
-    """Yield leaf directories that contain DICOM files.
-
-    Searches up to 3 levels deep under *root*.
-    """
-    results: list[Path] = []
-
-    def _has_dcm(d: Path) -> bool:
-        return any(f.suffix.lower() == ".dcm" for f in d.iterdir() if f.is_file())
-
-    for child in root.iterdir():
-        if not child.is_dir():
-            continue
-        if _has_dcm(child):
-            results.append(child)
-            continue
-        # One level deeper (study → series)
-        for grandchild in child.iterdir():
-            if not grandchild.is_dir():
-                continue
-            if _has_dcm(grandchild):
-                results.append(grandchild)
-
-    return results
-
-
-def _load_dicom_volume(series_dir: Path) -> tuple[np.ndarray, Any]:
-    """Load a single DICOM series as a 3D volume.
-
-    Returns (volume, first_dcm) where volume has shape
-    ``(cols, rows, slices)`` following NIfTI transposed convention.
-    """
-    import pydicom
-
-    dcm_files = sorted(series_dir.glob("*.dcm"))
-    if not dcm_files:
-        msg = f"No DICOM files in {series_dir}"
-        raise FileNotFoundError(msg)
-
-    slices: list[tuple[float, Any]] = []
-    for f in dcm_files:
-        dcm = pydicom.dcmread(f)
-        loc = float(getattr(dcm, "SliceLocation", 0))
-        slices.append((loc, dcm))
-
-    slices.sort(key=lambda x: x[0])
-    first_dcm = slices[0][1]
-    rows, cols = first_dcm.Rows, first_dcm.Columns
-    volume = np.zeros((cols, rows, len(slices)), dtype=np.float32)
-
-    for i, (_, dcm) in enumerate(slices):
-        volume[:, :, i] = dcm.pixel_array.astype(np.float32).T
-
-    return volume, first_dcm
-
-
-def _load_perfusion_dicom(
-    perfusion_dir: Path,
-) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
-    """Load 4D DCE perfusion data from a single DICOM series directory.
-
-    Groups files by AcquisitionNumber (temporal position) and computes
-    the time vector from AcquisitionTime DICOM tags.
-
-    Returns ``(signal_4d, time_seconds, metadata)`` where signal_4d
-    has shape ``(cols, rows, slices, timepoints)``.
-    """
-    import pydicom
-
-    dcm_files = sorted(perfusion_dir.glob("*.dcm"))
-    if not dcm_files:
-        msg = f"No DICOM files in {perfusion_dir}"
-        raise FileNotFoundError(msg)
-
-    # Group files by temporal position
-    temporal_data: dict[int, list[tuple[float, Any]]] = {}
-    acquisition_times: dict[int, str] = {}
-
-    for f in dcm_files:
-        dcm = pydicom.dcmread(f)
-        t_idx = int(dcm.AcquisitionNumber)
-        loc = float(getattr(dcm, "SliceLocation", 0))
-
-        if t_idx not in temporal_data:
-            temporal_data[t_idx] = []
-            if hasattr(dcm, "AcquisitionTime"):
-                acquisition_times[t_idx] = str(dcm.AcquisitionTime)
-
-        temporal_data[t_idx].append((loc, dcm))
-
-    min_t = min(temporal_data)
-    first_dcm = temporal_data[min_t][0][1]
-    rows, cols = first_dcm.Rows, first_dcm.Columns
-    n_slices = len(temporal_data[min_t])
-    n_timepoints = len(temporal_data)
-
-    signal_4d = np.zeros((cols, rows, n_slices, n_timepoints), dtype=np.float32)
-
-    sorted_t = sorted(temporal_data)
-    for t_out, t_idx in enumerate(sorted_t):
-        slices = temporal_data[t_idx]
-        slices.sort(key=lambda x: x[0])
-        for z_idx, (_, dcm) in enumerate(slices):
-            signal_4d[:, :, z_idx, t_out] = dcm.pixel_array.astype(np.float32).T
-
-    # Build time vector from AcquisitionTime
-    def _parse_dicom_time(t: str) -> float:
-        h, m, s = int(t[:2]), int(t[2:4]), float(t[4:])
-        return h * 3600 + m * 60 + s
-
-    if acquisition_times:
-        times_sec = [_parse_dicom_time(acquisition_times[t]) for t in sorted_t]
-        time_seconds = np.array([t - times_sec[0] for t in times_sec])
-        temporal_resolution = float(np.mean(np.diff(time_seconds)))
-    else:
-        tr_ms = float(first_dcm.RepetitionTime)
-        temporal_resolution = tr_ms * n_slices / 1000.0
-        time_seconds = np.arange(n_timepoints) * temporal_resolution
-
-    from osipy.common.io.dicom import build_affine_from_dicom
-
-    slice_thickness = float(getattr(first_dcm, "SliceThickness", 1.0))
-    affine = build_affine_from_dicom(first_dcm, slice_thickness, transpose_slices=True)
-
-    metadata = {
-        "tr": float(first_dcm.RepetitionTime),
-        "te": float(first_dcm.EchoTime),
-        "flip_angle": float(first_dcm.FlipAngle),
-        "field_strength": float(getattr(first_dcm, "MagneticFieldStrength", 1.5)),
-        "temporal_resolution": temporal_resolution,
-        "affine": affine,
-    }
-    return signal_4d, time_seconds, metadata
-
-
-def _build_roi_mask(
-    spatial_shape: tuple[int, ...],
-    roi_cfg: Any,
-) -> NDArray[np.bool_] | None:
-    """Build a spherical ROI mask from pipeline ROI configuration.
-
-    Parameters
-    ----------
-    spatial_shape : tuple
-        (x, y, z) shape of the volume.
-    roi_cfg : ROIConfig
-        ROI configuration from YAML (has .enabled, .center, .radius).
-
-    Returns
-    -------
-    NDArray[np.bool_] | None
-        Boolean mask or None if ROI is disabled.
-    """
-    if not roi_cfg.enabled:
+    series_list = discover_dicom(data_path)
+    if not series_list:
         return None
 
-    radius = roi_cfg.radius
-    if roi_cfg.center is not None:
-        cx, cy, cz = roi_cfg.center
+    dce_series: Any | None = None
+    for s in series_list:
+        if s.role_hint == "dynamic":
+            dce_series = s
+            break
+    if dce_series is None:
+        groups: dict[str, list[Any]] = defaultdict(list)
+        for s in series_list:
+            if s.role_hint == "dynamic_frame" and s.group_key:
+                groups[s.group_key].append(s)
+        if groups:
+            dce_series = max(groups.values(), key=len)
+
+    if dce_series is None:
+        return None
+
+    # Discovery already restricts ``role_hint == "vfa"`` to coherent
+    # same-shape clusters with distinct flip angles, so no further
+    # filtering is needed here.
+    vfa = sorted(
+        (s for s in series_list if s.role_hint == "vfa"),
+        key=lambda s: s.flip_angle if s.flip_angle is not None else 0.0,
+    )
+
+    if not vfa:
+        return None
+
+    vfa_desc = ", ".join(f"{s.flip_angle:.0f}°" for s in vfa)
+    if isinstance(dce_series, list):
+        dyn_label = f"{len(dce_series)} frames @ {dce_series[0].description!r}"
     else:
-        # Default to volume center
-        cx = spatial_shape[0] // 2
-        cy = spatial_shape[1] // 2
-        cz = spatial_shape[2] // 2
-
-    logger.info("Using ROI: center=(%d, %d, %d), radius=%d", cx, cy, cz, radius)
-
-    # Build coordinate grids within the bounding box
-    x0 = max(cx - radius, 0)
-    x1 = min(cx + radius + 1, spatial_shape[0])
-    y0 = max(cy - radius, 0)
-    y1 = min(cy + radius + 1, spatial_shape[1])
-    z0 = max(cz - radius, 0)
-    z1 = min(cz + radius + 1, spatial_shape[2])
-
-    mask = np.zeros(spatial_shape, dtype=bool)
-    zz, yy, xx = np.ogrid[z0:z1, y0:y1, x0:x1]
-    dist_sq = (xx - cx) ** 2 + (yy - cy) ** 2 + (zz - cz) ** 2
-    mask[x0:x1, y0:y1, z0:z1] = dist_sq.transpose(2, 1, 0) <= radius**2
-    return mask
+        dyn_label = (
+            f"{dce_series.n_temporal_positions} TPIs @ {dce_series.description!r}"
+        )
+    logger.info("DCE discovery: VFA (%s) + dynamic (%s)", vfa_desc, dyn_label)
+    return vfa, dce_series
 
 
 def _run_dce(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
@@ -454,8 +367,9 @@ def _run_dce(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
     mc = config.get_modality_config()  # DCEPipelineYAML
     base_dir = data_path if data_path.is_dir() else data_path.parent
 
-    # Try DCE-specific DICOM discovery first (visit-level directory)
-    discovered = _discover_dce_dicom_series(data_path)
+    # Try VFA-aware DCE discovery first. Falls through for NIfTI inputs or
+    # DICOM directories with no VFA companion.
+    discovered = _discover_dce_dicom(data_path)
 
     if discovered is not None:
         _run_dce_from_dicom(config, mc, discovered, data_path, output_dir)
@@ -535,6 +449,7 @@ def _run_dce(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
         max_iterations=fitting.max_iterations,
         tolerance=fitting.tolerance,
         r2_threshold=fitting.r2_threshold,
+        fit_delay=fitting.fit_delay,
     )
 
     # Construct time vector
@@ -542,14 +457,6 @@ def _run_dce(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
     if time_array is None:
         tr_sec = (acq.tr / 1000.0) if acq.tr is not None else 1.0
         time_array = np.arange(dataset.data.shape[-1]) * tr_sec
-
-    # ROI mask
-    roi_mask = _build_roi_mask(
-        dataset.data.shape[:3],
-        mc.roi,  # type: ignore[attr-defined]
-    )
-    if roi_mask is not None:
-        mask = roi_mask if mask is None else (mask & roi_mask)
 
     # Run
     pipeline = DCEPipeline(pipeline_cfg)
@@ -579,202 +486,125 @@ def _run_dce(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
 def _run_dce_from_dicom(
     config: PipelineConfig,
     mc: Any,
-    discovered: tuple[list[Path], Path],
+    discovered: tuple[list[Any], Any],
     data_path: Path,
     output_dir: Path,
 ) -> None:
-    """Run DCE pipeline from discovered DICOM VFA + perfusion series."""
-    from osipy.common.io.dicom import build_affine_from_dicom
-    from osipy.common.parameter_map import ParameterMap
-    from osipy.common.types import DCEAcquisitionParams
-    from osipy.dce import compute_t1_vfa, signal_to_concentration
-    from osipy.dce.fitting import fit_model
+    """Run DCE pipeline from discovered DICOM VFA + perfusion series.
 
-    vfa_dirs, perfusion_dir = discovered
+    ``discovered`` is ``(vfa_series_sorted_by_flip_angle, dce_series)``
+    where ``dce_series`` is either a single :class:`SeriesInfo` whose
+    ``SeriesInstanceUID`` already contains every timepoint, or a list
+    of per-timepoint :class:`SeriesInfo` objects — one 3D series per
+    dynamic frame — which ``load_dicom_series`` stacks into 4D. The
+    function loads both, then delegates fitting to :class:`DCEPipeline`
+    so that the DICOM entry shares one code path with the NIfTI/YAML
+    entry.
+    """
+    from osipy.common.io.discovery import load_dicom_series
+    from osipy.common.types import DCEAcquisitionParams, Modality
+    from osipy.pipeline.dce_pipeline import DCEPipeline, DCEPipelineConfig
+
+    vfa_series, dce_series = discovered
     acq = mc.acquisition  # type: ignore[attr-defined]
 
-    # ---- Step 1: Load VFA data ----
-    logger.info("[Step 1] Loading VFA data (%d flip angles)...", len(vfa_dirs))
-    vfa_volumes: list[np.ndarray] = []
-    flip_angles: list[float] = []
-    vfa_meta: dict[str, Any] | None = None
-
-    for vfa_dir in vfa_dirs:
-        vol, dcm = _load_dicom_volume(vfa_dir)
-        vfa_volumes.append(vol)
-        flip_angles.append(float(dcm.FlipAngle))
-        if vfa_meta is None:
-            slice_thickness = float(getattr(dcm, "SliceThickness", 1.0))
-            vfa_meta = {
-                "tr": float(dcm.RepetitionTime),
-                "affine": build_affine_from_dicom(
-                    dcm, slice_thickness, transpose_slices=True
-                ),
-            }
-
-    vfa_volume = np.stack(vfa_volumes, axis=-1)
+    # ---- Step 1: Load VFA stack ----
+    logger.info("[Step 1] Loading VFA data (%d flip angles)...", len(vfa_series))
+    vfa_dataset = load_dicom_series(vfa_series, modality=Modality.DCE)
+    vfa_flip_angles = vfa_dataset.acquisition_params.flip_angles
+    vfa_tr = vfa_dataset.acquisition_params.tr
+    if vfa_tr is None:
+        msg = "VFA series has no RepetitionTime in its acquisition params"
+        raise ValueError(msg)
     logger.info(
         "  VFA shape: %s, flip angles: %s, TR: %.1f ms",
-        vfa_volume.shape,
-        flip_angles,
-        vfa_meta["tr"],  # type: ignore[index]
+        vfa_dataset.data.shape,
+        vfa_flip_angles,
+        vfa_tr,
     )
 
     # ---- Step 2: Load perfusion data ----
     logger.info("[Step 2] Loading perfusion data...")
-    signal_4d, time_seconds, dce_meta = _load_perfusion_dicom(perfusion_dir)
+    dce_dataset = load_dicom_series(dce_series, modality=Modality.DCE)
+    time_seconds = dce_dataset.time_points
+    dce_acq = dce_dataset.acquisition_params
+    temporal_resolution = (
+        float(np.mean(np.diff(time_seconds))) if len(time_seconds) >= 2 else 1.0
+    )
     logger.info(
-        "  DCE shape: %s, time: %.1f–%.1f s (dt=%.2f s)",
-        signal_4d.shape,
+        "  DCE shape: %s, time: %.1f-%.1f s (dt=%.2f s)",
+        dce_dataset.data.shape,
         time_seconds[0],
         time_seconds[-1],
-        dce_meta["temporal_resolution"],
+        temporal_resolution,
     )
 
-    affine = dce_meta["affine"]
-    spatial_shape = signal_4d.shape[:3]
-
-    # ---- Transfer perfusion signal to GPU for pipeline compute ----
-    signal_4d = to_gpu(signal_4d)
-
-    # ---- ROI mask ----
-    roi_mask = _build_roi_mask(
-        spatial_shape,
-        mc.roi,  # type: ignore[attr-defined]
-    )
+    affine = dce_dataset.affine
     mask = _load_mask(config.data.mask, data_path.parent)
-    if roi_mask is not None:
-        mask = roi_mask if mask is None else (mask & roi_mask)
 
-    # ---- Step 3: Compute T1 map ----
-    logger.info("[Step 3] Computing T1 map (VFA)...")
-    t1_result = compute_t1_vfa(
-        signal=vfa_volume,
-        flip_angles=flip_angles,
-        tr=vfa_meta["tr"],  # type: ignore[index]
-        method="linear",
-    )
-
-    t1_map = ParameterMap(
-        name="T1",
-        symbol="T1",
-        units="ms",
-        values=t1_result.t1_map.values,
-        affine=vfa_meta["affine"],  # type: ignore[index]
-        quality_mask=t1_result.quality_mask,
-    )
-
-    valid = (
-        int(np.sum(t1_result.quality_mask)) if t1_result.quality_mask is not None else 0
-    )
-    total = int(np.prod(vfa_volume.shape[:3]))
-    logger.info("  Valid voxels: %d/%d (%.1f%%)", valid, total, 100 * valid / total)
-
-    # ---- Step 4: Signal to concentration ----
-    logger.info("[Step 4] Converting signal to concentration...")
-    relaxivity = acq.relaxivity
-    baseline_frames = acq.baseline_frames
-
+    # ---- Build pipeline config and run ----
     dce_acq_params = DCEAcquisitionParams(
-        tr=dce_meta["tr"],
-        te=dce_meta["te"],
-        flip_angles=[dce_meta["flip_angle"]],
-        temporal_resolution=dce_meta["temporal_resolution"],
-        relaxivity=relaxivity,
-        field_strength=dce_meta["field_strength"],
-        baseline_frames=baseline_frames,
+        tr=dce_acq.tr,
+        te=dce_acq.te,
+        flip_angles=[dce_acq.flip_angle] if dce_acq.flip_angle is not None else [],
+        temporal_resolution=temporal_resolution,
+        relaxivity=acq.relaxivity,
+        field_strength=dce_acq.field_strength
+        if dce_acq.field_strength is not None
+        else 1.5,
+        baseline_frames=acq.baseline_frames,
     )
-
-    concentration = signal_to_concentration(
-        signal=signal_4d,
-        t1_map=t1_map,
-        acquisition_params=dce_acq_params,
-    )
-    logger.info("  Concentration shape: %s", concentration.shape)
-
-    # ---- Step 5: Generate AIF ----
-    aif_source = mc.aif_source  # type: ignore[attr-defined]
-    logger.info("[Step 5] Generating AIF (source=%s)...", aif_source)
-
-    if aif_source == "population":
-        from osipy.common.aif import get_population_aif
-
-        aif_model = get_population_aif(mc.population_aif)  # type: ignore[attr-defined]
-        aif = aif_model(time_seconds)
-        logger.info(
-            "  AIF peak: %.2f mM at t=%.1f s",
-            aif.concentration.max(),
-            time_seconds[int(np.argmax(aif.concentration))],
-        )
-    else:
-        from osipy.common.aif import detect_aif
-        from osipy.common.dataset import PerfusionDataset
-        from osipy.common.types import Modality
-
-        conc_dataset = PerfusionDataset(
-            data=concentration,
-            affine=affine,
-            modality=Modality.DCE,
-            time_points=time_seconds,
-        )
-        aif_result = detect_aif(conc_dataset, roi_mask=mask)
-        aif = aif_result.aif
-
-    # ---- Step 6: Build fit mask and fit model ----
-    logger.info("[Step 6] Fitting %s model...", mc.model)  # type: ignore[attr-defined]
-
-    # Combine quality masks for fitting
-    # concentration may be on GPU, so transfer all masks to same device
-    xp = get_array_module(concentration)
-    t1_quality = xp.asarray(
-        t1_result.quality_mask
-        if t1_result.quality_mask is not None
-        else np.ones(spatial_shape, dtype=bool)
-    )
-    t1_bounds = xp.asarray(t1_map.values > 100) & xp.asarray(t1_map.values < 5000)
-    has_enhancement = xp.any(concentration > 0.01, axis=-1)
-    fit_mask = t1_quality & t1_bounds & has_enhancement
-    if mask is not None:
-        fit_mask = fit_mask & xp.asarray(mask)
-
-    n_fit = int(fit_mask.sum())
-    logger.info("  Fitting %d voxels...", n_fit)
 
     fitting = mc.fitting  # type: ignore[attr-defined]  # DCEFittingConfig
     dicom_bounds_override = (
         {k: tuple(v) for k, v in fitting.bounds.items()} if fitting.bounds else None
     )
 
-    t_fit = time.perf_counter()
-    fit_result = fit_model(
-        model_name=mc.model,  # type: ignore[attr-defined]
-        concentration=concentration,
-        aif=aif,
-        time=time_seconds,
-        mask=fit_mask,
+    pipeline_cfg = DCEPipelineConfig(
+        model=mc.model,  # type: ignore[attr-defined]
+        t1_mapping_method="vfa",
+        aif_source=mc.aif_source,  # type: ignore[attr-defined]
+        population_aif=mc.population_aif,  # type: ignore[attr-defined]
+        acquisition_params=dce_acq_params,
+        save_intermediate=mc.save_intermediate,  # type: ignore[attr-defined]
         fitter=fitting.fitter,
         bounds_override=dicom_bounds_override,
+        initial_guess_override=fitting.initial_guess,
+        max_iterations=fitting.max_iterations,
+        tolerance=fitting.tolerance,
+        r2_threshold=fitting.r2_threshold,
+        fit_delay=fitting.fit_delay,
+    )
+
+    logger.info("[Step 3-6] Running DCE pipeline (%s model)...", mc.model)  # type: ignore[attr-defined]
+    pipeline = DCEPipeline(pipeline_cfg)
+    t_fit = time.perf_counter()
+    result = pipeline.run(
+        dce_data=dce_dataset,
+        time=time_seconds,
+        t1_data=vfa_dataset,
+        flip_angles=np.asarray(vfa_flip_angles, dtype=float),
+        tr=vfa_tr,
+        mask=mask,
     )
     elapsed_fit = time.perf_counter() - t_fit
 
-    fitted = int(fit_result.quality_mask.sum())
+    fitted = int(result.fit_result.quality_mask.sum())
+    total = int(np.prod(dce_dataset.data.shape[:3]))
     logger.info(
-        "  Fitted: %d/%d voxels (%.1f%%)",
-        fitted,
-        n_fit,
-        100 * fitted / max(n_fit, 1),
+        "  Fitted: %d/%d voxels (%.1f%%)", fitted, total, 100 * fitted / max(total, 1)
     )
 
     # ---- Step 7: Stats and save ----
     _log_parameter_stats(
-        fit_result.parameter_maps,
-        fit_result.quality_mask,
+        result.fit_result.parameter_maps,
+        result.fit_result.quality_mask,
         elapsed_fit,
     )
     logger.info("Saving results...")
     _save_results(
-        fit_result.parameter_maps,
-        fit_result.quality_mask,
+        result.fit_result.parameter_maps,
+        result.fit_result.quality_mask,
         output_dir,
         affine,
     )
@@ -1012,6 +842,6 @@ def _save_metadata(
     if elapsed_seconds is not None:
         metadata["elapsed_seconds"] = round(elapsed_seconds, 2)
     meta_path = output_dir / "osipy_run.json"
-    with meta_path.open("w") as f:
+    with meta_path.open("w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, default=str)
     logger.info("  Saved metadata -> %s", meta_path)

@@ -31,7 +31,6 @@ from osipy.cli.config import (
     LoggingConfig,
     OutputConfig,
     PipelineConfig,
-    ROIConfig,
 )
 
 # ---------------------------------------------------------------------------
@@ -253,7 +252,6 @@ def generate() -> str:
         *_SHARED_HEADINGS,
         (DCEPipelineYAML, "`pipeline:` (DCEPipelineYAML)"),
         (DCEAcquisitionYAML, "`pipeline.acquisition:` (DCEAcquisitionYAML)"),
-        (ROIConfig, "`pipeline.roi:` (ROIConfig)"),
         (DCEFittingConfig, "`pipeline.fitting:` (DCEFittingConfig)"),
         (DSCPipelineYAML, "`pipeline:` (DSCPipelineYAML)"),
         (ASLPipelineYAML, "`pipeline:` (ASLPipelineYAML)"),
@@ -311,13 +309,6 @@ def generate() -> str:
         _render_table(
             DCEAcquisitionYAML,
             heading="`pipeline.acquisition:` (DCEAcquisitionYAML)",
-            heading_level=4,
-        )
-    )
-    doc.extend(
-        _render_table(
-            ROIConfig,
-            heading="`pipeline.roi:` (ROIConfig)",
             heading_level=4,
         )
     )

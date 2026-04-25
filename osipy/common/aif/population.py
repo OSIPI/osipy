@@ -24,7 +24,7 @@ References
    intravenous injection into healthy volunteers. Physiological Chemistry
    and Physics and Medical NMR 16(2):167-172.
 .. [5] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [6] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [6] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 from dataclasses import dataclass
@@ -89,11 +89,20 @@ class ParkerAIF(BaseAIF):
     It consists of two Gaussian components (bolus arrival and recirculation)
     and a modified exponential tail.
 
+    **Derivation context (Parker 2006, PMID 17036301):** the canonical
+    parameters were fit from 23 abdominal cancer patients at 1.5T
+    receiving gadodiamide, across 113 visits. Use with caution outside
+    that regime — 3T, brain / head-and-neck studies, or different
+    contrast agents (e.g. gadobutrol, protein-binding agents) may
+    require a different population AIF (consider ``GeorgiouAIF``,
+    OSIPI M.IC2.002) or a subject-specific measured AIF.
+
     GPU/CPU agnostic - operates on same device as input time array.
 
     References
     ----------
     .. [1] Parker GJM et al. (2006). Magn Reson Med 56(5):993-1000.
+           doi:10.1002/mrm.21066, PMID 17036301.
     .. [2] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
     """
 

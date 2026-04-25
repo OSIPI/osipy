@@ -258,7 +258,7 @@ def my_numerical_function(data, aif):
 |---------|-------------|
 | NIfTI loading | Load 3D/4D NIfTI files via nibabel |
 | DICOM loading | Load DICOM series with vendor-specific parsers (GE, Siemens, Philips) |
-| BIDS loading | Load BIDS-formatted datasets via pybids |
+| BIDS loading | Load BIDS-formatted datasets (hand-rolled parser over nibabel + JSON sidecars) |
 | BIDS export | Export parameter maps as BIDS derivatives (NIfTI + sidecar JSON + dataset_description.json) |
 
 ### DCE-MRI
@@ -377,10 +377,10 @@ def my_numerical_function(data, aif):
 | numpy | >= 2.0.0 | Array operations via xp abstraction |
 | nibabel | >= 5.2.0 | NIfTI I/O |
 | pydicom | >= 2.4.0 | DICOM I/O |
-| pybids | >= 0.16.0 | BIDS I/O |
 | matplotlib | >= 3.8.0 | Visualization |
-| pydantic | >= 2.0 | YAML config validation |
+| pydantic | >= 2.5.0 | YAML config validation |
 | pyyaml | >= 6.0 | YAML parsing |
+| dcm2niix | >= 1.0.20250506 | DICOM→NIfTI conversion (bundled binary wheel) |
 
 ### Optional Dependencies
 
@@ -438,8 +438,9 @@ to_gpu(array) / to_numpy(array)  # Transfer between CPU/GPU
 is_gpu_available() / get_backend() / set_backend()
 
 # I/O
-load_nifti(path) -> PerfusionDataset
-load_dicom(path, prompt_missing=True) -> PerfusionDataset
+load_nifti(path, modality=None, acquisition_params=None, sidecar_json=None) -> PerfusionDataset
+discover_dicom(path) -> list[SeriesInfo]
+load_dicom_series(series, modality=None) -> PerfusionDataset
 export_bids(parameter_maps, output_dir, subject_id, ...) -> Path
 
 # DCE-MRI

@@ -107,15 +107,27 @@ class GEParser(VendorParser):
         metadata : VendorMetadata
             Metadata object to populate.
         """
-        # GE stores b-value in (0043, 1039) - may be a sequence
+        # GE stores b-value in (0043, 1039). It is a multi-valued element;
+        # the b-value is in the first position and may be encoded
+        # (e.g. b + 1e6 or b + 1e9 on some GE scanners — dcm2niix issue #149).
+        # Values above 100000 s/mm^2 are non-physiological, so they are
+        # decoded by taking modulo 100000 (matches dcm2niix behaviour).
         b_value = self._safe_get_private_tag(dcm, 0x0043, 0x1039)
         if b_value is not None:
             try:
-                # GE often stores b-value as a list [b, ?, ?, ?]
                 if hasattr(b_value, "__len__") and len(b_value) > 0:
-                    metadata.b_values = np.array([float(b_value[0])])
+                    raw = float(b_value[0])
                 else:
-                    metadata.b_values = np.array([float(b_value)])
+                    raw = float(b_value)
+                decoded = raw % 100000 if raw >= 100000 else raw
+                if raw != decoded:
+                    logger.debug(
+                        "GE b-value appears encoded (raw=%s, decoded=%s); "
+                        "applying modulo 100000 per dcm2niix convention.",
+                        raw,
+                        decoded,
+                    )
+                metadata.b_values = np.array([decoded])
             except (ValueError, TypeError, IndexError):
                 pass
 

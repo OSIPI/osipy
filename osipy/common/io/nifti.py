@@ -32,6 +32,8 @@ def load_nifti(
     path: str | Path,
     modality: Modality | None = None,
     acquisition_params: AcquisitionParams | None = None,
+    sidecar_json: str | Path | None = None,
+    interactive: bool = False,
 ) -> PerfusionDataset:
     """Load NIfTI file as PerfusionDataset.
 
@@ -40,24 +42,35 @@ def load_nifti(
     path : str | Path
         Path to NIfTI file (.nii or .nii.gz).
     modality : Modality | None
-        Perfusion modality. If None, must be inferred from filename
-        or provided later.
+        Perfusion modality. Defaults to :class:`Modality.DCE` when unset.
     acquisition_params : AcquisitionParams | None
-        Acquisition parameters. If None, uses default AcquisitionParams.
+        Acquisition parameters. When provided, takes precedence over any
+        values derived from the sidecar JSON. When None and a sidecar is
+        available, parameters are mapped via ``MetadataMapper``.
+    sidecar_json : str | Path | None
+        Optional BIDS-style sidecar JSON. If None, a file sharing the
+        NIfTI's stem with a ``.json`` extension is loaded automatically
+        when present.
+    interactive : bool, default False
+        Forwarded to ``MetadataMapper`` — when True, prompts for any
+        modality-required fields missing from the sidecar.
 
     Returns
     -------
     PerfusionDataset
-        Loaded imaging data with metadata.
+        Loaded imaging data with metadata. ``time_points`` is derived
+        from ``RepetitionTimePreparation`` / ``RepetitionTime`` in the
+        sidecar when present, otherwise from the NIfTI header's temporal
+        zoom, otherwise defaults to integer frame indices.
 
     Raises
     ------
     FileNotFoundError
-        If file does not exist.
+        If the NIfTI file does not exist.
     IOError
-        If file is not valid NIfTI format.
+        If the file is not a valid NIfTI.
     DataValidationError
-        If data dimensions are invalid.
+        If the data is not 3D or 4D.
 
     Examples
     --------
@@ -67,59 +80,91 @@ def load_nifti(
     >>> print(dataset.shape)
     (64, 64, 20, 30)
 
+    Load with an explicit sidecar:
+
+    >>> dataset = load_nifti(
+    ...     "asl.nii.gz",
+    ...     modality="ASL",
+    ...     sidecar_json="asl.json",
+    ... )
     """
+    import json
+
     path = Path(path)
 
-    # Check file exists
     if not path.exists():
         msg = f"File not found: {path}"
         raise FileNotFoundError(msg)
-
-    # Check file extension
-    if not any(str(path).endswith(ext) for ext in [".nii", ".nii.gz"]):
+    if not str(path).endswith((".nii", ".nii.gz")):
         msg = f"Invalid NIfTI file extension: {path.suffix}"
         raise OsipyIOError(msg)
 
-    # Load NIfTI file
     try:
         img = nib.load(path)
     except Exception as e:
         msg = f"Failed to load NIfTI file: {e}"
         raise OsipyIOError(msg) from e
 
-    # Get data and affine
     data = np.asarray(img.dataobj, dtype=np.float64)
     affine = np.asarray(img.affine, dtype=np.float64)
 
-    # Validate dimensions
     if data.ndim not in (3, 4):
         msg = f"NIfTI data must be 3D or 4D, got {data.ndim}D"
         raise DataValidationError(msg)
 
-    # Check for NaN/Inf values
     if np.any(~np.isfinite(data)):
-        # Log warning but don't fail - handle gracefully
         logger.warning(
             "NIfTI data contains NaN or infinite values. "
             "Consider preprocessing data before analysis."
         )
 
-    # Generate time points for 4D data
+    # Resolve sidecar: explicit > auto-adjacent.
+    sidecar: dict[str, Any] = {}
+    sidecar_path: Path | None = None
+    if sidecar_json is not None:
+        candidate = Path(sidecar_json)
+        if candidate.exists():
+            sidecar_path = candidate
+    else:
+        auto = (
+            Path(str(path)[:-7] + ".json")
+            if path.name.endswith(".nii.gz")
+            else path.with_suffix(".json")
+        )
+        if auto.exists():
+            sidecar_path = auto
+    if sidecar_path is not None:
+        with sidecar_path.open(encoding="utf-8") as f:
+            sidecar = json.load(f)
+        logger.info("Loaded NIfTI sidecar: %s", sidecar_path)
+
+    # Build time vector.
     time_points = None
     if data.ndim == 4:
-        # Try to get TR from header for time calculation
-        header = img.header
-        tr = header.get_zooms()[3] if len(header.get_zooms()) > 3 else 1.0
-        n_timepoints = data.shape[3]
-        time_points = np.arange(n_timepoints) * float(tr)
+        n_volumes = data.shape[3]
+        tr = sidecar.get("RepetitionTimePreparation") or sidecar.get("RepetitionTime")
+        if tr is not None:
+            tr_sec = float(tr) if float(tr) < 100 else float(tr) / 1000.0
+            time_points = np.arange(n_volumes, dtype=np.float64) * tr_sec
+        else:
+            zooms = img.header.get_zooms()
+            if len(zooms) > 3 and zooms[3] > 0:
+                time_points = np.arange(n_volumes, dtype=np.float64) * float(zooms[3])
+            else:
+                time_points = np.arange(n_volumes, dtype=np.float64)
 
-    # Use default modality if not provided
     if modality is None:
-        modality = Modality.DCE  # Default assumption
+        modality = Modality.DCE
 
-    # Use default params if not provided
+    # Build acquisition params — explicit user override wins over sidecar.
     if acquisition_params is None:
-        acquisition_params = AcquisitionParams()
+        if sidecar:
+            from osipy.common.io.metadata.mapper import MetadataMapper
+
+            mapper = MetadataMapper(modality, interactive=interactive)
+            acquisition_params = mapper.map_to_acquisition_params(bids_sidecar=sidecar)
+        else:
+            acquisition_params = AcquisitionParams()
 
     return PerfusionDataset(
         data=data,

@@ -86,10 +86,6 @@ class TestDCEDicomPipeline:
                     "baseline_frames": 5,
                     "relaxivity": 4.5,
                 },
-                "roi": {
-                    "enabled": True,
-                    "radius": 5,
-                },
             },
         )
 

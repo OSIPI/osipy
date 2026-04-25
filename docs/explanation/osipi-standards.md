@@ -48,8 +48,8 @@ CAPLEX (Contrast Agent based Perfusion Lexicon) standardizes parameter names:
 | CAPLEX Name | Description | Units |
 |-------------|-------------|-------|
 | Ktrans | Volume transfer constant | min⁻¹ |
-| ve | EES volume fraction | mL/100mL |
-| vp | Plasma volume fraction | mL/100mL |
+| ve | EES volume fraction | fraction [0, 1] (CAPLEX: mL/100mL; numerically 100×) |
+| vp | Plasma volume fraction | fraction [0, 1] (CAPLEX: mL/100mL; numerically 100×) |
 | kep | Rate constant (EES to plasma) | min⁻¹ |
 | Fp | Plasma flow | mL/min/100mL |
 | PS | Permeability-surface area | mL/min/100mL |

@@ -12,7 +12,7 @@ References
 .. [1] Parker GJM et al. (2006). Experimentally-derived functional form
    for a population-averaged AIF. Magn Reson Med 56(5):993-1000.
 .. [2] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 from abc import abstractmethod

@@ -276,10 +276,15 @@ class PhilipsParser(VendorParser):
         if sense is not None:
             metadata.extra["sense_factor"] = str(sense)
 
-        # Scale factors for proper rescaling (important for Philips)
+        # Scale factors for proper rescaling (important for Philips).
+        # Note: these values are *also* applied to pixel data during ingestion
+        # in osipy.common.io.dicom._apply_pixel_scaling. They are retained in
+        # metadata.extra for auditability.
         scale_slope = self._safe_get_private_tag(dcm, 0x2005, 0x100E)
         scale_intercept = self._safe_get_private_tag(dcm, 0x2005, 0x100D)
         if scale_slope is not None:
-            metadata.extra["philips_scale_slope"] = float(scale_slope)
+            with contextlib.suppress(ValueError, TypeError):
+                metadata.extra["philips_scale_slope"] = float(scale_slope)
         if scale_intercept is not None:
-            metadata.extra["philips_scale_intercept"] = float(scale_intercept)
+            with contextlib.suppress(ValueError, TypeError):
+                metadata.extra["philips_scale_intercept"] = float(scale_intercept)

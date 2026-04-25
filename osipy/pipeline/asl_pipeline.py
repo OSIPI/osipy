@@ -34,18 +34,25 @@ if TYPE_CHECKING:
 class ASLPipelineConfig:
     """Configuration for ASL pipeline.
 
+    Defaults match the ISMRM ASL consensus paper (Alsop et al.,
+    MRM 2015;73:102, PMC4190138) for **healthy adults under 70 years**.
+    For older adults or clinical-population studies, Alsop Table 1
+    recommends PLD=2000 ms; override ``pld`` accordingly.
+
     Attributes
     ----------
     labeling_scheme : LabelingScheme
         ASL labeling scheme.
     pld : float
-        Post-labeling delay in milliseconds.
+        Post-labeling delay in milliseconds. Default 1800 ms
+        (Alsop 2015 healthy-adult value; use 2000 for clinical adults).
     label_duration : float
         Labeling duration in milliseconds (for pCASL/CASL).
+        Default 1800 ms (Alsop 2015 recommendation).
     t1_blood : float
-        Blood T1 in milliseconds.
+        Blood T1 in milliseconds. Default 1650 ms (Alsop 2015 at 3T).
     labeling_efficiency : float
-        Labeling efficiency.
+        Labeling efficiency. Default 0.85 for PCASL (Alsop 2015).
     m0_method : str
         M0 calibration method: 'single', 'voxelwise', or 'reference_region'.
     output_dir : Path | None

@@ -28,7 +28,7 @@ References
    estimating flow in MR perfusion-weighted imaging using singular value
    decomposition with a block-circulant deconvolution matrix.
    Magn Reson Med 50(1):164-174.
-.. [4] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [4] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 from dataclasses import dataclass

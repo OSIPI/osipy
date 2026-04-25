@@ -37,35 +37,29 @@ dependencies = [
     "numpy>=2.0.0",
     "nibabel>=5.2.0",
     "pydicom>=2.4.0",
-    "pybids>=0.16.0",
     "matplotlib>=3.8.0",
     "pydantic>=2.5.0",
     "pyyaml>=6.0",
-    "idc-index>=0.11.7",
-    # interactive
-    "plotly>=5.18.0",
-    # dev / testing / linting
-    "pytest>=9.0.2",
-    "pytest-cov>=4.1.0",
-    "hypothesis>=6.92.0",
-    "mypy>=1.8.0",
-    "ruff>=0.1.9",
-    "sphinx>=7.2.0",
-    "numpydoc>=1.6.0",
-    "licensecheck>=2025.1.0",
-    "pip-licenses>=5.5.1",
-    # docs
-    "mkdocs>=1.6.0",
-    "mkdocs-material>=9.5.0",
-    "mkdocstrings[python]>=0.24.0",
-    "mkdocs-gen-files>=0.5.0",
-    "mkdocs-literate-nav>=0.6.0",
-    "pre-commit>=4.5.1",
+    "dcm2niix>=1.0.20250506",
 ]
 
 [project.optional-dependencies]
 gpu = [
     "cupy-cuda12x>=13.0.0",  # GPU acceleration via CuPy (CUDA 12.x)
+]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=4.1.0",
+    "mypy>=1.8.0",
+    "ruff>=0.1.9",
+    "pre-commit>=4.5.1",
+]
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-literate-nav>=0.6.0",
 ]
 
 [project.urls]
@@ -82,7 +76,7 @@ path = "osipy/_version.py"
 [tool.hatch.build.targets.wheel]
 packages = ["osipy"]
 
-# T003: pytest, pytest-cov, and hypothesis configuration
+# T003: pytest / pytest-cov configuration
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
@@ -141,11 +135,8 @@ warn_unreachable = true
 module = [
     "nibabel.*",
     "pydicom.*",
-    "bids.*",
     # scipy.* removed - scipy is BANNED for numerical operations
     "matplotlib.*",
-    "numba.*",
-    "plotly.*",
     "cupy.*",  # CuPy for GPU acceleration
     "cupyx.*",  # CuPy scipy-compatible interfaces (if ever needed)
 ]

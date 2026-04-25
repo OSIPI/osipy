@@ -1,4 +1,4 @@
-"""Two-Compartment Uptake Model (2CUM).
+"""Two-Compartment Uptake Model (2CUM) (OSIPI: M.IC1.007).
 
 This module implements the Two-Compartment Uptake Model for DCE-MRI,
 a simplification of 2CXM with unidirectional uptake (no backflux from EES).
@@ -10,7 +10,7 @@ NO scipy dependency - uses xp.linalg operations.
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 .. [3] Sourbron SP, Buckley DL. MRM 2011;66(3):735-745.
 """
 
@@ -37,7 +37,7 @@ class TwoCompartmentUptakeParams(ModelParameters):
     ps : float
         Permeability-surface area product (OSIPI: Q.PH1.004) in mL/min/100mL.
     vp : float
-        Plasma volume fraction (OSIPI: Q.PH1.001), mL/100mL.
+        Plasma volume fraction (OSIPI: Q.PH1.001), unitless fraction [0, 1].
     """
 
     fp: float = 15.0  # ml/100ml/min
@@ -47,7 +47,7 @@ class TwoCompartmentUptakeParams(ModelParameters):
 
 @register_model("2cum")
 class TwoCompartmentUptakeModel(BasePerfusionModel[TwoCompartmentUptakeParams]):
-    """Two-Compartment Uptake Model (2CUM).
+    """Two-Compartment Uptake Model (2CUM) (OSIPI: M.IC1.007).
 
     Implements the 2CUM with unidirectional uptake from plasma to EES
     (no backflux). This is a simplification of the 2CXM with 3 parameters
@@ -60,7 +60,7 @@ class TwoCompartmentUptakeModel(BasePerfusionModel[TwoCompartmentUptakeParams]):
     PS : float
         Permeability-surface area product (OSIPI: Q.PH1.004), mL/min/100mL.
     vp : float
-        Plasma volume fraction (OSIPI: Q.PH1.001), mL/100mL.
+        Plasma volume fraction (OSIPI: Q.PH1.001), unitless fraction [0, 1].
 
     Notes
     -----
@@ -81,7 +81,7 @@ class TwoCompartmentUptakeModel(BasePerfusionModel[TwoCompartmentUptakeParams]):
     References
     ----------
     .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
     .. [3] Sourbron SP, Buckley DL. MRM 2011;66(3):735-745.
     """
 
@@ -106,7 +106,7 @@ class TwoCompartmentUptakeModel(BasePerfusionModel[TwoCompartmentUptakeParams]):
         return {
             "Fp": "mL/min/100mL",
             "PS": "mL/min/100mL",
-            "vp": "mL/100mL",
+            "vp": "fraction",
         }
 
     @property

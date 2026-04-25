@@ -45,25 +45,26 @@ def create_parameter_maps(
     shape : tuple[int, int, int]
         Output volume shape ``(nx, ny, nz)``.
     r2_threshold : float
-        Minimum R-squared for quality mask.
+        Deprecated, ignored. Kept for signature compatibility; quality mask
+        no longer applies an R² cutoff.
     fitting_method : str
         Name of fitting method for metadata.
 
     Returns
     -------
     dict[str, ParameterMap]
-        Parameter maps including ``"r_squared"``.
+        Parameter maps including ``"r_squared"``. The attached
+        ``quality_mask`` simply marks voxels that were fit — callers are
+        expected to filter on r² or parameter values downstream.
     """
     param_names = model.parameters
     param_units = model.parameter_units
 
     result: dict[str, ParameterMap] = {}
 
-    # Create quality mask
+    # Quality mask marks which voxels were fit; no r²/convergence cutoff.
     quality_mask = np.zeros(shape, dtype=bool)
-    quality_mask[voxel_indices[:, 0], voxel_indices[:, 1], voxel_indices[:, 2]] = (
-        converged & (r2_values >= r2_threshold)
-    )
+    quality_mask[voxel_indices[:, 0], voxel_indices[:, 1], voxel_indices[:, 2]] = True
 
     affine = np.eye(4)
 

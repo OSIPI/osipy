@@ -119,10 +119,17 @@ osipy --help-me-pls
 ### Data Loading
 
 ```python
-from osipy.common.io import load_perfusion
+from osipy.common.io import discover_dicom, load_dicom_series, load_nifti
 
-# Auto-detects format (NIfTI, DICOM, BIDS)
-dataset = load_perfusion("/path/to/data", modality="dce")
+# NIfTI (auto-reads an adjacent BIDS sidecar when present)
+dataset = load_nifti("/path/to/dce.nii.gz", modality="dce")
+
+# DICOM: observe first, then load.
+series = discover_dicom("/path/to/dicom_dir")
+dataset = load_dicom_series(
+    next(s for s in series if s.role_hint == "dynamic"),
+    modality="dce",
+)
 ```
 
 ## Extending osipy

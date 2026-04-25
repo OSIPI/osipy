@@ -17,7 +17,7 @@ References
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
 .. [2] Ostergaard L et al. (1996). High resolution measurement of cerebral blood
    flow using intravascular tracer bolus passages. Magn Reson Med 36(5):715-725.
-.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 # Signal to concentration

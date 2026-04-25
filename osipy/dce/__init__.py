@@ -12,8 +12,8 @@ Available models:
 
 Key quantities:
     - Ktrans: Volume transfer constant (OSIPI: Q.PH1.008), 1/min
-    - ve: Extravascular extracellular volume fraction (OSIPI: Q.PH1.001), mL/100mL
-    - vp: Plasma volume fraction (OSIPI: Q.PH1.001), mL/100mL
+    - ve: Extravascular extracellular volume fraction (OSIPI: Q.PH1.001), unitless fraction [0, 1]
+    - vp: Plasma volume fraction (OSIPI: Q.PH1.001), unitless fraction [0, 1]
     - Fp: Plasma flow (OSIPI: Q.PH1.002), mL/min/100mL
     - PS: Permeability-surface area product (OSIPI: Q.PH1.004), mL/min/100mL
 
@@ -35,7 +35,7 @@ fit_model
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 .. [3] Tofts PS et al. J Magn Reson Imaging 1999;10(3):223-232.
 """
 

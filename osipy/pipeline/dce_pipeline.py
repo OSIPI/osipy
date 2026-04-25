@@ -11,7 +11,7 @@ CAPLEX model registry (M.IC2.001 Parker, M.IC2.002 Georgiou).
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 from __future__ import annotations
@@ -19,11 +19,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from osipy.common.aif import (
     ArterialInputFunction,
     detect_aif,
     get_population_aif,
 )
+from osipy.common.backend.array_module import get_array_module
 from osipy.common.dataset import PerfusionDataset
 from osipy.common.exceptions import DataValidationError
 from osipy.common.types import Modality
@@ -39,7 +42,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    import numpy as np
     from numpy.typing import NDArray
 
     from osipy.common.parameter_map import ParameterMap
@@ -81,6 +83,9 @@ class DCEPipelineConfig:
         Convergence tolerance for fitting.
     r2_threshold : float | None
         R-squared threshold for valid fitting results.
+    fit_delay : bool
+        If True, jointly fit an arterial delay parameter with the DCE model
+        (adds one parameter per voxel). Defaults to False.
     """
 
     t1_mapping_method: str = "vfa"
@@ -98,6 +103,7 @@ class DCEPipelineConfig:
     max_iterations: int | None = None
     tolerance: float | None = None
     r2_threshold: float | None = None
+    fit_delay: bool = False
 
 
 @dataclass
@@ -239,17 +245,20 @@ class DCEPipeline:
         if progress_callback:
             progress_callback("Model Fitting", 0.0)
 
+        fit_mask = self._build_fit_mask(concentration, t1_map, mask)
+
         fit_result = fit_model(
             model_name=self.config.model,
             concentration=concentration,
             aif=aif,
             time=time,
-            mask=mask,
+            mask=fit_mask,
             fitter=self.config.fitter,
             bounds_override=self.config.bounds_override,
-            progress_callback=lambda p: progress_callback("Model Fitting", p)
-            if progress_callback
-            else None,
+            fit_delay=self.config.fit_delay,
+            progress_callback=lambda p: (
+                progress_callback("Model Fitting", p) if progress_callback else None
+            ),
         )
 
         if progress_callback:
@@ -265,33 +274,72 @@ class DCEPipeline:
             config=self.config,
         )
 
+    def _build_fit_mask(
+        self,
+        concentration: NDArray[np.floating[Any]],
+        t1_map: ParameterMap | None,
+        user_mask: NDArray[np.bool_] | None,
+    ) -> NDArray[np.bool_] | None:
+        """Pass through the caller's mask unchanged.
+
+        The pipeline does not add R² or T1-quality filters here — callers
+        filter on r² or parameter values themselves after inspecting the
+        returned maps.
+        """
+        if user_mask is None:
+            return None
+        spatial_shape = concentration.shape[:-1]
+        xp = get_array_module(concentration)
+        return xp.broadcast_to(xp.asarray(user_mask), spatial_shape).copy()
+
     def _compute_t1_map(
         self,
         t1_data: PerfusionDataset | NDArray[np.floating[Any]],
         flip_angles: NDArray[np.floating[Any]] | None,
         tr: float | None,
     ) -> ParameterMap:
-        """Compute T1 map from input data."""
-        if isinstance(t1_data, PerfusionDataset):
-            dataset = t1_data
-        else:
-            dataset = PerfusionDataset(
-                data=t1_data,
-                modality=Modality.DCE,
-            )
+        """Compute T1 map from input data.
+
+        Returns a ``ParameterMap`` whose ``quality_mask`` carries the T1-fit
+        quality info the downstream fit mask filter needs.
+        """
+        from osipy.common.parameter_map import ParameterMap
+        from osipy.dce.t1_mapping import compute_t1_vfa
+
+        signal = t1_data.data if isinstance(t1_data, PerfusionDataset) else t1_data
+        affine = t1_data.affine if isinstance(t1_data, PerfusionDataset) else np.eye(4)
 
         if self.config.t1_mapping_method == "vfa":
             if flip_angles is None or tr is None:
                 msg = "flip_angles and tr required for VFA T1 mapping"
                 raise DataValidationError(msg)
-            return compute_t1_map(
-                dataset,
-                method="vfa",
+            t1_result = compute_t1_vfa(
+                signal=signal,
                 flip_angles=flip_angles,
                 tr=tr,
+                method="linear",
             )
-        else:
-            return compute_t1_map(dataset, method="look_locker")
+            return ParameterMap(
+                name="T1",
+                symbol="T1",
+                units="ms",
+                values=t1_result.t1_map.values,
+                affine=affine,
+                quality_mask=t1_result.quality_mask,
+            )
+
+        # Look-Locker branch
+        if not isinstance(t1_data, PerfusionDataset):
+            t1_data = PerfusionDataset(data=signal, modality=Modality.DCE)
+        ll_result = compute_t1_map(t1_data, method="look_locker")
+        return ParameterMap(
+            name="T1",
+            symbol="T1",
+            units="ms",
+            values=ll_result.t1_map.values,
+            affine=affine,
+            quality_mask=ll_result.quality_mask,
+        )
 
     def _get_aif(
         self,

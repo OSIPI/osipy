@@ -184,7 +184,7 @@ osipy uses:
 
 - **Time**: seconds (input), minutes (internal model)
 - **Ktrans**: min⁻¹
-- **ve, vp**: volume fractions in mL/100mL
+- **ve, vp**: unitless volume fractions [0, 1] (CAPLEX lists mL/100mL; osipy uses the equivalent fraction form, numerically 100× smaller)
 - **Concentration**: mM (millimolar)
 
 The time conversion happens automatically:

@@ -17,7 +17,7 @@ References
    Magn Reson Med 14(2):249-265.
 .. [3] Ostergaard L et al. (1996). High resolution measurement of cerebral blood
    flow using intravascular tracer bolus passages. Magn Reson Med 36(5):715-725.
-.. [4] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [4] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 """
 
 from dataclasses import dataclass

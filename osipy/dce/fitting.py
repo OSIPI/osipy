@@ -6,8 +6,8 @@ quantification, and quality assessment.
 
 Fits OSIPI CAPLEX quantities including:
     - Ktrans (OSIPI: Q.PH1.008): Volume transfer constant, 1/min
-    - ve (OSIPI: Q.PH1.001): Extravascular extracellular volume fraction, mL/100mL
-    - vp (OSIPI: Q.PH1.001): Plasma volume fraction, mL/100mL
+    - ve (OSIPI: Q.PH1.001): Extravascular extracellular volume fraction, unitless fraction [0, 1]
+    - vp (OSIPI: Q.PH1.001): Plasma volume fraction, unitless fraction [0, 1]
     - Fp (OSIPI: Q.PH1.002): Plasma flow, mL/min/100mL
     - PS (OSIPI: Q.PH1.004): Permeability-surface area product, mL/min/100mL
 
@@ -272,21 +272,28 @@ def _fit_model_impl(
         msg = f"Fitting failed: {e}"
         raise FittingError(msg) from e
 
-    # Build quality mask (voxels with valid fits)
-    # Standardized to > 0 for all models
-    first_param_name = next(iter(param_maps.keys()))
+    # Quality mask just marks which voxels were fit — no r²/positivity gate.
+    # Callers filter on r_squared_map or parameter values themselves.
+    first_param_name = next(name for name in param_maps if name != "r_squared")
     first_map = param_maps[first_param_name]
-    first_values = xp.asarray(first_map.values)
-    quality_mask = xp.isfinite(first_values) & (first_values > 0)
-
-    # Compute R-squared map (vectorized)
-    r_squared_map = _compute_r_squared_vectorized(
-        ct_4d,
-        bound_model,
-        param_maps,
-        quality_mask,
-        xp,
+    quality_mask = (
+        xp.asarray(first_map.quality_mask)
+        if first_map.quality_mask is not None
+        else xp.zeros(spatial_shape, dtype=bool)
     )
+
+    # R² already computed per-voxel by the fitter; prefer that over recompute.
+    if "r_squared" in param_maps:
+        r_squared_map = xp.asarray(param_maps["r_squared"].values)
+        param_maps.pop("r_squared")
+    else:
+        r_squared_map = _compute_r_squared_vectorized(
+            ct_4d,
+            bound_model,
+            param_maps,
+            quality_mask,
+            xp,
+        )
 
     # Reshape outputs if needed
     if ndim == 1:
@@ -469,6 +476,14 @@ def _compute_fitting_stats(
 
 class _DelayAwareModel:
     """Internal wrapper that adds arterial delay fitting to any model.
+
+    The emitted parameter key ``"delay"`` corresponds to CAPLEX
+    ``Q.PH1.007`` (symbol ``T_a``, arterial arrival time, units seconds)
+    per Dickie et al. MRM 2024. The DSC pipeline uses the canonical
+    ``Ta`` symbol in its parameter-map metadata
+    (``osipy/dsc/parameters/maps.py``); DCE retains the legacy key
+    ``"delay"`` for API stability. A future PR will add a non-breaking
+    ``"Ta"`` alias alongside ``"delay"``.
 
     Not exported, not registered. Private to fitting.py.
     """

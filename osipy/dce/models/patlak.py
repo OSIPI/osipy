@@ -9,7 +9,7 @@ NO scipy dependency - uses xp.linalg operations.
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 .. [3] Patlak CS et al. J Cereb Blood Flow Metab 1983;3(1):1-7.
 """
 
@@ -36,7 +36,7 @@ class PatlakParams(ModelParameters):
         Volume transfer constant (OSIPI: Q.PH1.008) in 1/min.
         Represents unidirectional influx rate.
     vp : float
-        Plasma volume fraction (OSIPI: Q.PH1.001), mL/100mL.
+        Plasma volume fraction (OSIPI: Q.PH1.001), unitless fraction [0, 1].
     """
 
     ktrans: float = 0.1
@@ -89,7 +89,7 @@ class PatlakModel(BasePerfusionModel[PatlakParams]):
     Ktrans : float
         Volume transfer constant (OSIPI: Q.PH1.008), 1/min.
     vp : float
-        Plasma volume fraction (OSIPI: Q.PH1.001), mL/100mL.
+        Plasma volume fraction (OSIPI: Q.PH1.001), unitless fraction [0, 1].
 
     Notes
     -----
@@ -106,7 +106,7 @@ class PatlakModel(BasePerfusionModel[PatlakParams]):
     References
     ----------
     .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
     .. [3] Patlak CS et al. J Cereb Blood Flow Metab 1983;3(1):1-7.
     """
 
@@ -128,7 +128,7 @@ class PatlakModel(BasePerfusionModel[PatlakParams]):
     @property
     def parameter_units(self) -> dict[str, str]:
         """Return parameter units."""
-        return {"Ktrans": "1/min", "vp": "mL/100mL"}
+        return {"Ktrans": "1/min", "vp": "fraction"}
 
     @property
     def reference(self) -> str:

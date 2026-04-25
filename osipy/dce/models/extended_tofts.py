@@ -7,7 +7,7 @@ a vascular plasma compartment.
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 .. [3] Tofts PS et al. J Magn Reson Imaging 1999;10(3):223-232.
 """
 
@@ -34,9 +34,9 @@ class ExtendedToftsParams(ModelParameters):
         Volume transfer constant (OSIPI: Q.PH1.008) in 1/min.
     ve : float
         Extravascular extracellular volume fraction (OSIPI: Q.PH1.001),
-        mL/100mL.
+        unitless fraction [0, 1].
     vp : float
-        Plasma volume fraction (OSIPI: Q.PH1.001), mL/100mL.
+        Plasma volume fraction (OSIPI: Q.PH1.001), unitless fraction [0, 1].
     """
 
     ktrans: float = 0.1
@@ -65,9 +65,9 @@ class ExtendedToftsModel(BasePerfusionModel[ExtendedToftsParams]):
         Volume transfer constant (OSIPI: Q.PH1.008), 1/min.
     ve : float
         Extravascular extracellular volume fraction (OSIPI: Q.PH1.001),
-        mL/100mL.
+        unitless fraction [0, 1].
     vp : float
-        Plasma volume fraction (OSIPI: Q.PH1.001), mL/100mL.
+        Plasma volume fraction (OSIPI: Q.PH1.001), unitless fraction [0, 1].
 
     Notes
     -----
@@ -89,7 +89,7 @@ class ExtendedToftsModel(BasePerfusionModel[ExtendedToftsParams]):
     References
     ----------
     .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
     .. [3] Tofts PS et al. J Magn Reson Imaging 1999;10(3):223-232.
     """
 
@@ -111,7 +111,7 @@ class ExtendedToftsModel(BasePerfusionModel[ExtendedToftsParams]):
     @property
     def parameter_units(self) -> dict[str, str]:
         """Return parameter units."""
-        return {"Ktrans": "1/min", "ve": "mL/100mL", "vp": "mL/100mL"}
+        return {"Ktrans": "1/min", "ve": "fraction", "vp": "fraction"}
 
     @property
     def reference(self) -> str:

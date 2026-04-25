@@ -110,7 +110,7 @@ def export_bids(
                 }
             ],
         }
-        with dataset_desc_path.open("w") as f:
+        with dataset_desc_path.open("w", encoding="utf-8") as f:
             json.dump(dataset_description, f, indent=2)
 
     # Build subject directory path
@@ -179,7 +179,7 @@ def export_bids(
 
     # Write sidecar JSON
     sidecar_path = perf_dir / f"{prefix}_perf.json"
-    with sidecar_path.open("w") as f:
+    with sidecar_path.open("w", encoding="utf-8") as f:
         json.dump(sidecar, f, indent=2)
 
     logger.info(f"Exported {len(parameter_maps)} parameter maps to {perf_dir}")
@@ -287,7 +287,7 @@ def load_bids(
     # Load sidecar JSON
     sidecar: dict[str, Any] = {}
     if sidecar_file and sidecar_file.exists():
-        with sidecar_file.open() as f:
+        with sidecar_file.open(encoding="utf-8") as f:
             sidecar = json.load(f)
     else:
         logger.warning(f"No sidecar JSON found for {nifti_file}")
@@ -655,7 +655,7 @@ def _parse_asl_context(context_file: Path) -> list[str]:
     """
     context: list[str] = []
 
-    with context_file.open(newline="") as f:
+    with context_file.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter="\t")
         for row in reader:
             volume_type = row.get("volume_type", "").lower()

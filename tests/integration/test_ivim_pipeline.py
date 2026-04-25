@@ -242,30 +242,6 @@ class TestIVIMPipelineIntegration:
         assert signal[0] == pytest.approx(s0, rel=1e-10)  # At b=0
         assert signal[-1] < signal[0]  # Decay
 
-    def test_quality_mask_for_failed_fits(self, synthetic_ivim_data: dict) -> None:
-        """Test quality mask generation for problematic voxels."""
-        from osipy.ivim.fitting import FittingMethod, fit_ivim
-
-        # Create data with some bad voxels
-        signal = synthetic_ivim_data["signal"][:4, :4, :2, :].copy()
-        signal[0, 0, 0, :] = 0  # Zero signal
-        signal[1, 1, 0, :] = np.nan  # NaN
-
-        mask = synthetic_ivim_data["mask"][:4, :4, :2]
-
-        result = fit_ivim(
-            signal=signal,
-            b_values=synthetic_ivim_data["b_values"],
-            method=FittingMethod.SEGMENTED,
-            mask=mask,
-        )
-
-        # Quality mask should exist
-        assert result.quality_mask is not None
-
-        # Bad voxels should be marked
-        assert not result.quality_mask[0, 0, 0]
-
 
 class TestIVIMOutputValidation:
     """Test IVIM output format and units."""

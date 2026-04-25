@@ -8,7 +8,7 @@ References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
 .. [2] OSIPI ASL Lexicon, https://osipi.github.io/ASL-Lexicon/
-.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.30101
+.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
 .. [4] Suzuki Y et al. MRM 2024;91(4):1411-1421.
 """
 
@@ -143,20 +143,30 @@ class DCEAcquisitionParams(AcquisitionParams):
     temporal_resolution : float
         Time between dynamic acquisitions in seconds.
     relaxivity : float
-        Contrast agent relaxivity in mM⁻¹s⁻¹. Default is 4.5 for
-        gadolinium-based agents at 3T.
+        Contrast agent relaxivity in mM⁻¹s⁻¹. Default is 4.5, matching
+        Gd-DTPA r1 in water at 3T (Noebauer-Huhmann et al.,
+        Magn Reson Med Sci 2005;4(3):145, PMID 16462135: R1_3T_water=4.50).
+        In vivo (plasma) r1 at 3T is lower (Pintaske et al.,
+        Invest Radiol 2006;41:213, PMID 16481903 — direction only, no
+        absolute value in abstract; Rohrer et al., Invest Radiol
+        2005;40:715, PMID 16230904). For agent-specific accuracy on
+        in-vivo DCE, override with a plasma- and agent-specific value.
     t1_assumed : float | None
         Assumed pre-contrast T1 value in milliseconds when T1 mapping
         data is unavailable. If None, a measured T1 map is required for
-        signal-to-concentration conversion. Typical values at 3T:
+        signal-to-concentration conversion. Typical values at 3T
+        (Wansapura et al., JMRI 1999;9:531, PMID 10232510 for brain;
+        Lu et al., MRM 2004;52:679, PMID 15334591 for blood):
         - Breast tissue: ~1400 ms
-        - Brain white matter: ~800 ms
-        - Brain gray matter: ~1200 ms
-        - Blood: ~1600 ms
+        - Brain white matter: ~832 ms
+        - Brain gray matter: ~1331 ms
+        - Blood: ~1664 ms arterial (Hct 0.42); ISMRM ASL consensus
+          1650 ms (Alsop et al., MRM 2015;73:102, PMC4190138)
 
     References
     ----------
     Tofts PS (1997). Modeling tracer kinetics in DCE-MRI. JMRI.
+    Dickie BR et al. MRM 2024;91(5):1761. doi:10.1002/mrm.29840 (CAPLEX).
     """
 
     flip_angles: list[float] = field(default_factory=list)

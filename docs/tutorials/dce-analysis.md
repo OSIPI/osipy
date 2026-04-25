@@ -26,6 +26,11 @@ Key parameters include:
 | EES volume fraction | ve | fraction | Extravascular extracellular space volume |
 | Plasma volume fraction | vp | fraction | Blood plasma volume in tissue |
 
+Symbols and units follow the OSIPI CAPLEX consensus lexicon (Dickie BR
+et al. MRM 2024;91(5):1761-1773, [doi:10.1002/mrm.29840](https://doi.org/10.1002/mrm.29840),
+PMID 37831600). CAPLEX lists ve/vp in mL/100mL; osipy uses the
+numerically-equivalent fraction convention.
+
 For more theory, see [Understanding Pharmacokinetic Models](../explanation/pharmacokinetic-models.md).
 
 ## Step 1: Load Your Data
@@ -86,10 +91,11 @@ print(f"T1 range: {t1_values[t1_quality > 0].min():.0f} - {t1_values[t1_quality 
 
     Typical tissue T1 values at 3T:
 
-    - White matter: ~800-900 ms
-    - Gray matter: ~1200-1400 ms
-    - Blood: ~1600-1900 ms
-    - CSF: ~4000+ ms
+    - White matter: ~832 ms (Wansapura 1999, PMID 10232510)
+    - Gray matter: ~1331 ms (Wansapura 1999, PMID 10232510)
+    - Blood: ~1664 ms arterial at Hct 0.42 (Lu 2004, PMID 15334591);
+      ISMRM ASL consensus uses 1650 ms (Alsop 2015, PMC4190138)
+    - CSF: ~4000+ ms (Rooney et al., MRM 2007;57:308, PMID 17260370)
 
     If your values are outside these ranges, check your flip angles and TR.
 
@@ -121,7 +127,10 @@ acq_params = DCEAcquisitionParams(
     te=2.0,            # ms
     flip_angles=[15],  # degrees (DCE flip angle)
     baseline_frames=5,
-    relaxivity=4.5,    # mM^-1 s^-1 (typical for Gd-DTPA at 3T)
+    relaxivity=4.5,    # mM^-1 s^-1 — Gd-DTPA in water at 3T
+                       # (Noebauer-Huhmann 2005, PMID 16462135: R1_3T_water=4.50).
+                       # In vivo plasma r1 at 3T is lower; override for
+                       # agent-specific in-vivo accuracy.
 )
 
 # Convert signal to concentration
@@ -155,6 +164,10 @@ The AIF describes contrast agent concentration in blood plasma. You have several
 
 ```python
 # Parker AIF - widely used population average
+# Derived from 23 abdominal cancer patients at 1.5T receiving gadodiamide
+# (Parker 2006, PMID 17036301). Use with caution at 3T, in brain/head-and-neck,
+# or with different contrast agents — consider a measured or study-matched AIF
+# when those conditions differ.
 aif = osipy.ParkerAIF()(time)
 
 # Alternative: Georgiou AIF (different shape)
@@ -344,49 +357,133 @@ derivatives/osipy/
 
 ## Complete Example
 
+### Pipeline
+
 ```python
+from pathlib import Path
+
 import numpy as np
+
 import osipy
+from osipy.common.io import save_nifti
 from osipy.dce import DCEAcquisitionParams
 
-# 1. Load data (returns PerfusionDataset objects)
-dce_dataset = osipy.load_nifti("dce_4d.nii.gz")
-vfa_data = osipy.load_nifti("vfa_images.nii.gz")
+DATA_DIR = Path("/path/to/dce_dicom_dir")
+OUT = Path("osipy_output")
 
-# 2. Acquisition parameters
-acq_params = DCEAcquisitionParams(
-    tr=5.0, te=2.0, flip_angles=[2, 5, 10, 15],
-    baseline_frames=5, relaxivity=4.5,
+series = osipy.discover_dicom(DATA_DIR)
+perf = osipy.load_dicom_series(
+    next(s for s in series if s.role_hint == "dynamic"),
+    modality=osipy.Modality.DCE,
 )
-temporal_resolution = 3.5
-
-# 3. Time array
-n_timepoints = dce_dataset.shape[-1]
-time = np.arange(n_timepoints) * temporal_resolution
-
-# 4. T1 mapping (requires DCEAcquisitionParams on the dataset)
-vfa_data.acquisition_params = DCEAcquisitionParams(
-    tr=acq_params.tr, flip_angles=acq_params.flip_angles,
-)
-t1_result = osipy.compute_t1_map(vfa_data, method="vfa")
-
-# 5. Create mask
-mean_signal = dce_dataset.data.mean(axis=-1)
-mask = (mean_signal > mean_signal.max() * 0.1) & (t1_result.quality_mask > 0)
-
-# 6. Signal to concentration
-concentration = osipy.dce_signal_to_concentration(
-    dce_dataset.data, t1_result.t1_map, acq_params
+vfa = osipy.load_dicom_series(
+    [s for s in series if s.role_hint == "vfa"],
+    modality=osipy.Modality.DCE,
 )
 
-# 7. AIF
-aif = osipy.ParkerAIF()(time)
+config = osipy.DCEPipelineConfig(
+    acquisition_params=DCEAcquisitionParams(
+        tr=perf.acquisition_params.tr,
+        te=perf.acquisition_params.te,
+        flip_angles=[perf.acquisition_params.flip_angle],
+        baseline_frames=5,
+        relaxivity=4.5,
+    ),
+)
+result = osipy.DCEPipeline(config).run(
+    perf,
+    time=perf.time_points,
+    t1_data=vfa,
+    flip_angles=vfa.acquisition_params.flip_angles,
+    tr=vfa.acquisition_params.tr,
+)
 
-# 8. Fit model
-result = osipy.fit_model("extended_tofts", concentration, aif, time, mask=mask)
+OUT.mkdir(exist_ok=True)
+for name, pmap in result.fit_result.parameter_maps.items():
+    save_nifti(
+        pmap, OUT / f"{name.lower().replace('*', '_star')}.nii.gz", affine=perf.affine
+    )
+save_nifti(
+    result.fit_result.quality_mask.astype(np.uint8),
+    OUT / "quality_mask.nii.gz",
+    affine=perf.affine,
+)
+```
 
-# 9. Export (expects dict[str, ParameterMap])
-osipy.export_bids(result.parameter_maps, "derivatives/osipy", "01", "01")
+### Stepwise
+
+```python
+from pathlib import Path
+
+import numpy as np
+
+import osipy
+from osipy.common.io import save_nifti
+from osipy.dce import DCEAcquisitionParams
+from osipy.dce.concentration import signal_to_concentration
+from osipy.dce.t1_mapping import compute_t1_vfa
+
+DATA_DIR = Path("/path/to/dce_dicom_dir")
+OUT = Path("osipy_output_stepwise")
+
+# 1. Load dynamic + VFA series.
+series = osipy.discover_dicom(DATA_DIR)
+perf = osipy.load_dicom_series(
+    next(s for s in series if s.role_hint == "dynamic"),
+    modality=osipy.Modality.DCE,
+)
+vfa = osipy.load_dicom_series(
+    [s for s in series if s.role_hint == "vfa"],
+    modality=osipy.Modality.DCE,
+)
+
+# 2. VFA T1 mapping (linear SPGR solve).
+t1_result = compute_t1_vfa(
+    signal=vfa.data,
+    flip_angles=vfa.acquisition_params.flip_angles,
+    tr=vfa.acquisition_params.tr,
+    method="linear",
+)
+t1_map = t1_result.t1_map
+
+# 3. Signal → concentration (SPGR equation).
+acq = DCEAcquisitionParams(
+    tr=perf.acquisition_params.tr,
+    te=perf.acquisition_params.te,
+    flip_angles=[perf.acquisition_params.flip_angle],
+    baseline_frames=5,
+    relaxivity=4.5,
+)
+concentration = signal_to_concentration(
+    signal=perf.data,
+    t1_map=t1_map,
+    acquisition_params=acq,
+    method="spgr",
+)
+
+# 4. Population AIF: build the model, then sample it at the timepoints.
+aif_model = osipy.ParkerAIF()
+aif = aif_model(perf.time_points)
+
+# 5. Extended Tofts fit.
+fit_result = osipy.fit_model(
+    model_name="extended_tofts",
+    concentration=concentration,
+    aif=aif,
+    time=perf.time_points,
+)
+
+# 6. Save.
+OUT.mkdir(exist_ok=True)
+for name, pmap in fit_result.parameter_maps.items():
+    save_nifti(
+        pmap, OUT / f"{name.lower().replace('*', '_star')}.nii.gz", affine=perf.affine
+    )
+save_nifti(
+    fit_result.quality_mask.astype(np.uint8),
+    OUT / "quality_mask.nii.gz",
+    affine=perf.affine,
+)
 ```
 
 ## Next Steps

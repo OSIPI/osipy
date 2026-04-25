@@ -39,7 +39,7 @@ class MyModel(BasePerfusionModel[MyModelParams]):
 
     @property
     def parameter_units(self) -> dict[str, str]:
-        return {"Ktrans": "1/min", "ve": "mL/100mL"}
+        return {"Ktrans": "1/min", "ve": "fraction"}
 
     @property
     def reference(self) -> str:

@@ -62,15 +62,37 @@ class Dcm2niixConverter:
     def __init__(self, dcm2niix_path: str | None = None):
         """Initialize the converter.
 
+        Resolution order for the dcm2niix binary:
+
+        1. Explicit ``dcm2niix_path`` argument.
+        2. The ``dcm2niix`` PyPI wheel (``dcm2niix.bin``), which vendors a
+           prebuilt binary and is installed as a regular ``pip`` dependency
+           — this is the default on all platforms.
+        3. A system-installed executable resolved via ``shutil.which``.
+
         Parameters
         ----------
         dcm2niix_path : str | None
-            Path to dcm2niix executable. If None, searches PATH.
+            Path to dcm2niix executable. If None, auto-detects via the
+            ordering above.
         """
         if dcm2niix_path:
             self.dcm2niix_path = dcm2niix_path
-        else:
-            self.dcm2niix_path = shutil.which("dcm2niix")
+            return
+
+        # Prefer the PyPI wheel's bundled binary when available.
+        try:
+            import dcm2niix as _dcm2niix_pkg
+
+            wheel_bin = getattr(_dcm2niix_pkg, "bin", None)
+            if wheel_bin:
+                self.dcm2niix_path = str(wheel_bin)
+                return
+        except ImportError:
+            pass
+
+        # Final fallback: whatever is on PATH.
+        self.dcm2niix_path = shutil.which("dcm2niix")
 
     def is_available(self) -> bool:
         """Check if dcm2niix is available.
@@ -140,8 +162,10 @@ class Dcm2niixConverter:
         """
         if not self.is_available():
             msg = (
-                "dcm2niix is not installed or not found in PATH. "
-                "Install from: https://github.com/rordenlab/dcm2niix#install"
+                "dcm2niix is not installed or not found. "
+                "Install the PyPI wheel with `pip install dcm2niix` (this ships "
+                "a bundled binary), or install from upstream: "
+                "https://github.com/rordenlab/dcm2niix#install"
             )
             raise Dcm2niixError(msg)
 
@@ -218,7 +242,7 @@ class Dcm2niixConverter:
 
             sidecar: dict[str, Any] = {}
             if sidecar_path.exists():
-                with sidecar_path.open() as f:
+                with sidecar_path.open(encoding="utf-8") as f:
                     sidecar = json.load(f)
             else:
                 logger.warning(f"No sidecar JSON generated: {sidecar_path}")

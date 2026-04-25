@@ -80,7 +80,13 @@ if TYPE_CHECKING:
         to_numpy,
     )
     from osipy.common.dataset import PerfusionDataset
-    from osipy.common.io import export_bids, load_dicom, load_nifti, load_perfusion
+    from osipy.common.io import (
+        SeriesInfo,
+        discover_dicom,
+        export_bids,
+        load_dicom_series,
+        load_nifti,
+    )
     from osipy.common.parameter_map import ParameterMap
     from osipy.common.types import AIFType, FittingMethod, LabelingType, Modality
     from osipy.dce import (
@@ -111,6 +117,7 @@ if TYPE_CHECKING:
     from osipy.pipeline import (
         ASLPipeline,
         DCEPipeline,
+        DCEPipelineConfig,
         DSCPipeline,
         IVIMPipeline,
         run_analysis,
@@ -124,6 +131,7 @@ __all__ = [
     "ArterialInputFunction",
     # Pipelines
     "DCEPipeline",
+    "DCEPipelineConfig",
     "DSCPipeline",
     "ExtendedToftsModel",
     "FittingMethod",
@@ -142,6 +150,7 @@ __all__ = [
     "PatlakModel",
     # Common types
     "PerfusionDataset",
+    "SeriesInfo",
     "ToftsModel",
     "TwoCompartmentModel",
     # Version
@@ -154,6 +163,8 @@ __all__ = [
     "correct_leakage",
     "dce_signal_to_concentration",
     "detect_aif",
+    # DICOM discovery + I/O
+    "discover_dicom",
     "export_bids",
     # IVIM
     "fit_ivim",
@@ -167,10 +178,9 @@ __all__ = [
     "is_gpu_available",
     "list_deconvolvers",
     "list_models",
-    "load_dicom",
+    "load_dicom_series",
     # I/O
     "load_nifti",
-    "load_perfusion",
     # ASL
     "quantify_cbf",
     "quantify_multi_pld",
@@ -209,10 +219,11 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Dataset
     "PerfusionDataset": ("osipy.common.dataset", "PerfusionDataset"),
     # I/O
+    "SeriesInfo": ("osipy.common.io", "SeriesInfo"),
+    "discover_dicom": ("osipy.common.io", "discover_dicom"),
     "export_bids": ("osipy.common.io", "export_bids"),
-    "load_dicom": ("osipy.common.io", "load_dicom"),
+    "load_dicom_series": ("osipy.common.io", "load_dicom_series"),
     "load_nifti": ("osipy.common.io", "load_nifti"),
-    "load_perfusion": ("osipy.common.io", "load_perfusion"),
     # Parameter map
     "ParameterMap": ("osipy.common.parameter_map", "ParameterMap"),
     # Types
@@ -243,6 +254,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Pipelines
     "ASLPipeline": ("osipy.pipeline", "ASLPipeline"),
     "DCEPipeline": ("osipy.pipeline", "DCEPipeline"),
+    "DCEPipelineConfig": ("osipy.pipeline", "DCEPipelineConfig"),
     "DSCPipeline": ("osipy.pipeline", "DSCPipeline"),
     "IVIMPipeline": ("osipy.pipeline", "IVIMPipeline"),
     "run_analysis": ("osipy.pipeline", "run_analysis"),

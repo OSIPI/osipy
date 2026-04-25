@@ -10,7 +10,7 @@ References
 .. [1] OSIPI ASL Lexicon, https://osipi.github.io/ASL-Lexicon/
 .. [2] Alsop DC et al. (2015). Recommended implementation of arterial
    spin-labeled perfusion MRI for clinical applications.
-   Magn Reson Med 73(1):102-116.
+   Magn Reson Med 73(1):102-116. doi:10.1002/mrm.25197. PMC4190138.
 .. [3] Buxton RB et al. (1998). A general kinetic model for quantitative
    perfusion imaging with arterial spin labeling.
    Magn Reson Med 40(3):383-396.

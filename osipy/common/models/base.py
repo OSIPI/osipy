@@ -64,7 +64,7 @@ class BaseSignalModel(BaseComponent):
         Returns
         -------
         dict[str, str]
-            Parameter units (e.g., {'Ktrans': '1/min', 've': 'mL/100mL'}).
+            Parameter units (e.g., {'Ktrans': '1/min', 've': 'fraction'}).
         """
         ...
 
