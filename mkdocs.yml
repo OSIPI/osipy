@@ -58,6 +58,11 @@ extra_css:
 
 plugins:
   - search
+  - mkdocs-jupyter:
+      execute: false
+      include_source: true
+      ignore_h1_titles: true
+      include: ["*.ipynb"]
   - gen-files:
       scripts:
         - docs/gen_ref_pages.py
@@ -129,6 +134,8 @@ nav:
     - ASL CBF Quantification: tutorials/asl-analysis.md
     - IVIM Analysis: tutorials/ivim-analysis.md
     - DSC-MRI Analysis: tutorials/dsc-analysis.md
+    - Jupyter Notebook Tutorials:
+      - "ISMRM 2026 — DCE-MRI Walkthrough": tutorials/notebooks/ismrm2026-dce-tutorial.ipynb
   - How-To Guides:
     - how-to/index.md
     - Data Loading:
