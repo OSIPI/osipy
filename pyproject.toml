@@ -40,7 +40,7 @@ dependencies = [
     "matplotlib>=3.8.0",
     "pydantic>=2.5.0",
     "pyyaml>=6.0",
-    "dcm2niix>=1.0.20250506",
+    "dcm2niix>=1.0.20260416",
 ]
 
 [project.optional-dependencies]
