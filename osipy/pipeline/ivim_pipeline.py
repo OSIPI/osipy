@@ -9,7 +9,10 @@ References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
 .. [2] Le Bihan D et al. (1988). Radiology 168(2):497-505.
-.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+.. [3] Dickie BR et al. A community-endorsed open-source lexicon for contrast
+       agent-based perfusion MRI: A consensus guidelines report from the ISMRM
+       Open Science Initiative for Perfusion Imaging (OSIPI). MRM
+       2024;91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
 from __future__ import annotations

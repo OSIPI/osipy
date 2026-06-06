@@ -8,8 +8,11 @@ References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
 .. [2] OSIPI ASL Lexicon, https://osipi.github.io/ASL-Lexicon/
-.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
-.. [4] Suzuki Y et al. MRM 2024;91(4):1411-1421.
+.. [3] Dickie BR et al. A community-endorsed open-source lexicon for contrast
+   agent-based perfusion MRI: A consensus guidelines report from the ISMRM Open
+   Science Initiative for Perfusion Imaging (OSIPI). MRM 2024;91(5):1761-1773.
+   doi:10.1002/mrm.29840
+.. [4] Suzuki Y et al. MRM 2024;91(5):1743-1760. doi:10.1002/mrm.29815
 """
 
 from dataclasses import dataclass, field
@@ -144,7 +147,7 @@ class DCEAcquisitionParams(AcquisitionParams):
         Time between dynamic acquisitions in seconds.
     relaxivity : float
         Contrast agent relaxivity in mM⁻¹s⁻¹. Default is 4.5, matching
-        Gd-DTPA r1 in water at 3T (Noebauer-Huhmann et al.,
+        Gd-DTPA r1 in water at 3T (Sasaki et al.,
         Magn Reson Med Sci 2005;4(3):145, PMID 16462135: R1_3T_water=4.50).
         In vivo (plasma) r1 at 3T is lower (Pintaske et al.,
         Invest Radiol 2006;41:213, PMID 16481903 — direction only, no
@@ -165,7 +168,8 @@ class DCEAcquisitionParams(AcquisitionParams):
 
     References
     ----------
-    Tofts PS (1997). Modeling tracer kinetics in DCE-MRI. JMRI.
+    Tofts PS (1997). Modeling tracer kinetics in dynamic Gd-DTPA MR imaging.
+    JMRI 7(1):91-101. doi:10.1002/jmri.1880070113
     Dickie BR et al. MRM 2024;91(5):1761. doi:10.1002/mrm.29840 (CAPLEX).
     """
 
@@ -191,7 +195,10 @@ class DSCAcquisitionParams(AcquisitionParams):
 
     References
     ----------
-    Ostergaard L et al. (1996). High resolution CBF measurement. MRM.
+    Ostergaard L, Weisskoff RM, Chesler DA, Gyldensted C, Rosen BR. (1996).
+    High resolution measurement of cerebral blood flow using intravascular
+    tracer bolus passages. Part I: Mathematical approach and statistical
+    analysis. Magn Reson Med 36(5):715-725. doi:10.1002/mrm.1910360510
     """
 
     baseline_frames: int = 10
@@ -250,7 +257,10 @@ class IVIMAcquisitionParams(AcquisitionParams):
 
     References
     ----------
-    Le Bihan D et al. (1988). IVIM MR imaging. Radiology.
+    Le Bihan D, Breton E, Lallemand D, Aubin ML, Vignaud J, Laval-Jeantet M
+    (1988). Separation of diffusion and perfusion in intravoxel incoherent
+    motion MR imaging. Radiology 168(2):497-505.
+    doi:10.1148/radiology.168.2.3393671
     """
 
     b_values: "NDArray[np.floating[Any]]" = field(

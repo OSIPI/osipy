@@ -1,14 +1,16 @@
 """Two-stage Bayesian IVIM fitting with empirical priors.
 
-Implements the Barbieri et al. (MRM 2020) approach:
+Implements the Barbieri et al. (MRM 2016) approach:
 1. Stage 1: Least-squares fit on all voxels
 2. Build empirical per-parameter priors from the population of Stage 1 fits
 3. Stage 2: MAP fitting with empirical priors and per-voxel initial guesses
 
 References
 ----------
-.. [1] Barbieri S et al. MRM 2020;83(6):2160-2172.
-       doi:10.1002/mrm.28060
+.. [1] Barbieri S, Donati OF, Froehlich JM, Thoeny HC. Impact of the
+       calculation algorithm on biexponential fitting of diffusion-weighted
+       MRI in upper abdominal organs. Magn Reson Med 2016;75(5):2175-2184.
+       doi:10.1002/mrm.25765
 """
 
 from __future__ import annotations

@@ -10,8 +10,8 @@ simultaneously (e.g., convolving a single AIF with many IRFs).
 References
 ----------
     - scipy.signal.fftconvolve documentation
-    - Sourbron & Buckley (2013). Tracer kinetic modelling in MRI.
-      NMR in Biomedicine, 26(8), 1034-1048.
+    - Sourbron & Buckley (2013). Classic models for dynamic contrast-enhanced MRI.
+      NMR in Biomedicine, 26(8), 1004-1027.
 """
 
 from __future__ import annotations

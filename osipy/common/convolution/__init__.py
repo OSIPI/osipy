@@ -17,11 +17,12 @@ Key functions:
 
 References
 ----------
-.. [1] Flouri D, Lesnic D, Mayrovitz HN (2016). Numerical solution of the
-   convolution integral equations in pharmacokinetics. Comput Methods
-   Biomech Biomed Engin. 19(13):1359-1367.
-.. [2] Sourbron & Buckley (2013). Tracer kinetic modelling in MRI.
-   NMR Biomed. 26(8):1034-1048.
+.. [1] Flouri D, Lesnic D, Sourbron SP (2016). Fitting the two-compartment
+   model in DCE-MRI by linear inversion. Magn Reson Med. 76(3):998-1006.
+   doi:10.1002/mrm.25991
+.. [2] Sourbron & Buckley (2013). Classic models for dynamic
+   contrast-enhanced MRI. NMR Biomed. 26(8):1004-1027.
+   doi:10.1002/nbm.2940
 .. [3] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
 """
 

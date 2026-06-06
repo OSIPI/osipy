@@ -13,8 +13,8 @@ References
 .. [2] Alsop DC et al. (2015). Recommended implementation of arterial
    spin-labeled perfusion MRI for clinical applications.
    Magn Reson Med 73(1):102-116.
-.. [3] Chappell MA et al. (2009). Separation of macrovascular signal in
-   multi-inversion time arterial spin labeling MRI.
+.. [3] Chappell MA et al. (2010). Separation of macrovascular signal in
+   multi-inversion time arterial spin labelling MRI.
    Magn Reson Med 63(5):1357-1365.
 """
 

@@ -17,7 +17,10 @@ References
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
 .. [2] Ostergaard L et al. (1996). High resolution measurement of cerebral blood
    flow using intravascular tracer bolus passages. Magn Reson Med 36(5):715-725.
-.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+.. [3] Dickie BR et al. A community-endorsed open-source lexicon for contrast
+   agent-based perfusion MRI: A consensus guidelines report from the ISMRM Open
+   Science Initiative for Perfusion Imaging (OSIPI). MRM 2024;91(5):1761-1773.
+   doi:10.1002/mrm.29840
 """
 
 # Signal to concentration

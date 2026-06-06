@@ -5,7 +5,10 @@ This module implements the Standard Tofts model for DCE-MRI analysis.
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+.. [2] Dickie BR et al. A community-endorsed open-source lexicon for
+       contrast agent-based perfusion MRI: A consensus guidelines report
+       from the ISMRM Open Science Initiative for Perfusion Imaging
+       (OSIPI). MRM 2024;91(5):1761-1773. doi:10.1002/mrm.29840
 .. [3] Tofts PS, Kermode AG. MRM 1991;17(2):357-367.
 """
 
@@ -82,7 +85,10 @@ class ToftsModel(BasePerfusionModel[ToftsParams]):
     References
     ----------
     .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+    .. [2] Dickie BR et al. A community-endorsed open-source lexicon for
+           contrast agent-based perfusion MRI: A consensus guidelines report
+           from the ISMRM Open Science Initiative for Perfusion Imaging
+           (OSIPI). MRM 2024;91(5):1761-1773. doi:10.1002/mrm.29840
     .. [3] Tofts PS, Kermode AG. MRM 1991;17(2):357-367.
     """
 

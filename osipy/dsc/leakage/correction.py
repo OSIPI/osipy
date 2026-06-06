@@ -19,7 +19,10 @@ References
 .. [3] Paulson ES, Schmainda KM (2008). Comparison of dynamic susceptibility-
    weighted contrast-enhanced MR methods: recommendations for measuring
    relative cerebral blood volume in brain tumors. Radiology 249(2):601-613.
-.. [4] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+.. [4] Dickie BR et al. (2024). A community-endorsed open-source lexicon for
+   contrast agent-based perfusion MRI: A consensus guidelines report from the
+   ISMRM Open Science Initiative for Perfusion Imaging (OSIPI). Magn Reson Med
+   91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
 from dataclasses import dataclass
@@ -132,7 +135,10 @@ def correct_leakage(
     References
     ----------
     .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+    .. [2] Dickie BR et al. (2024). A community-endorsed open-source lexicon for
+       contrast agent-based perfusion MRI: A consensus guidelines report from
+       the ISMRM Open Science Initiative for Perfusion Imaging (OSIPI). Magn
+       Reson Med 91(5):1761-1773. doi:10.1002/mrm.29840
 
     Examples
     --------
@@ -394,7 +400,7 @@ class BidirectionalCorrector(BaseLeakageCorrector):
     @property
     def reference(self) -> str:
         """Return primary literature citation."""
-        return "Bjornerud A et al. JCBFM 2011;31(1):215-228."
+        return "Bjornerud A et al. JCBFM 2011;31(10):2041-2053."
 
     def correct(self, delta_r2, aif, time, mask=None, **kwargs):
         """Perform bidirectional leakage correction."""

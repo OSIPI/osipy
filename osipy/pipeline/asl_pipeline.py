@@ -7,7 +7,7 @@ the OSIPI ASL Lexicon conventions.
 References
 ----------
 .. [1] OSIPI ASL Lexicon, https://osipi.github.io/ASL-Lexicon/
-.. [2] Suzuki Y et al. MRM 2024;91(4):1411-1421.
+.. [2] Suzuki Y et al. MRM 2024;91(5):1743-1760.
 """
 
 from collections.abc import Callable

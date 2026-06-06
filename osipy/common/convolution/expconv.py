@@ -9,9 +9,9 @@ NO scipy dependency - see XP Compatibility Requirements in plan.md.
 
 References
 ----------
-Flouri D, Lesnic D, Mayrovitz HN (2016). Numerical solution of the
-convolution integral equations in pharmacokinetics. Comput Methods
-Biomech Biomed Engin. 19(13):1359-1367.
+Flouri D, Lesnic D, Sourbron SP (2016). Fitting the two-compartment
+model in DCE-MRI by linear inversion. Magn Reson Med. 76(3):998-1006.
+doi:10.1002/mrm.25991
 
 dcmri library: https://github.com/dcmri/dcmri
 """
@@ -117,8 +117,9 @@ def expconv(
 
     References
     ----------
-    .. [1] Flouri D, Lesnic D, Mayrovitz HN (2016). Comput Methods
-           Biomech Biomed Engin. 19(13):1359-1367.
+    .. [1] Flouri D, Lesnic D, Sourbron SP (2016). Fitting the
+           two-compartment model in DCE-MRI by linear inversion.
+           Magn Reson Med. 76(3):998-1006. doi:10.1002/mrm.25991
     """
     xp = get_array_module(f)
 

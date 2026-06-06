@@ -24,7 +24,9 @@ References
    spin-labeled perfusion MRI for clinical applications: A consensus of
    the ISMRM Perfusion Study Group and the European Consortium for ASL
    in Dementia. Magn Reson Med 73(1):102-116.
-.. [3] Suzuki Y et al. (2024). MRM 91(4):1411-1421.
+.. [3] Suzuki Y et al. (2024). ASL lexicon and reporting
+   recommendations: A consensus report from the ISMRM Open Science
+   Initiative for Perfusion Imaging (OSIPI). MRM 91(5):1743-1760.
 """
 
 # Labeling schemes

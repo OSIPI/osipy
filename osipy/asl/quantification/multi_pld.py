@@ -17,7 +17,9 @@ References
 .. [3] Dai W et al. (2012). Reduced resolution transit delay prescan for
    quantitative continuous arterial spin labeling perfusion imaging.
    Magn Reson Med 67(5):1252-1265.
-.. [4] Suzuki Y et al. (2024). MRM 91(4):1411-1421.
+.. [4] Suzuki Y et al. (2024). ASL lexicon and reporting recommendations: A
+   consensus report from the ISMRM Open Science Initiative for Perfusion
+   Imaging (OSIPI). MRM 91(5):1743-1760.
 """
 
 from __future__ import annotations
