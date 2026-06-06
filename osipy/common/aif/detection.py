@@ -558,7 +558,7 @@ class MultiCriteriaAIFDetector(BaseAIFDetector):
     @property
     def reference(self) -> str:
         """Literature reference for the detection algorithm."""
-        return "Peruzzo D et al. MRM 2011;66(2):461-472."
+        return "Peruzzo D et al. Comput Methods Programs Biomed 2011;104(3):e148-e157."
 
     def detect(self, dataset, params=None, roi_mask=None):
         """Detect AIF using multi-criteria approach.

@@ -661,27 +661,27 @@ Functions raise exceptions for structural errors. Individual voxel fitting failu
 ### Key Literature References
 
 **DCE-MRI**:
-- Tofts PS, Kermode AG (1991). Measurement of the blood-brain barrier permeability. *Magn Reson Med*.
-- Tofts PS et al. (1999). Estimating kinetic parameters from DCE-MRI. *JMRI*.
-- Parker GJM et al. (2006). Population-averaged AIF. *Magn Reson Med*.
-- Weinmann HJ et al. (1984). Pharmacokinetics of GdDTPA. *Physiol Chem Phys Med NMR*.
+- Tofts PS, Kermode AG (1991). Measurement of the blood-brain barrier permeability and leakage space using dynamic MR imaging. 1. Fundamental concepts. *Magn Reson Med*. 17(2):357-367.
+- Tofts PS et al. (1999). Estimating kinetic parameters from dynamic contrast-enhanced T1-weighted MRI of a diffusable tracer: standardized quantities and symbols. *J Magn Reson Imaging*. 10(3):223-232.
+- Parker GJM et al. (2006). Experimentally-derived functional form for a population-averaged high-temporal-resolution arterial input function for dynamic contrast-enhanced MRI. *Magn Reson Med*. 56(5):993-1000.
+- Weinmann HJ, Laniado M, Mützel W (1984). Pharmacokinetics of GdDTPA/dimeglumine after intravenous injection into healthy volunteers. *Physiol Chem Phys Med NMR*. 16:167-172.
 
 **DSC-MRI**:
-- Ostergaard L et al. (1996). High resolution CBF measurement. *Magn Reson Med*.
-- Boxerman JL et al. (2006). Leakage-corrected rCBV maps. *AJNR*.
-- Wu O et al. (2003). Timing-insensitive flow estimation (cSVD/oSVD). *Magn Reson Med*.
+- Ostergaard L et al. (1996). High resolution measurement of cerebral blood flow using intravascular tracer bolus passages. Part I: Mathematical approach and statistical analysis. *Magn Reson Med*. 36(5):715-725.
+- Boxerman JL, Schmainda KM, Weisskoff RM (2006). Relative cerebral blood volume maps corrected for contrast agent extravasation significantly correlate with glioma tumor grade, whereas uncorrected maps do not. *AJNR Am J Neuroradiol*. 27(4):859-867.
+- Wu O et al. (2003). Tracer arrival timing-insensitive technique for estimating flow in MR perfusion-weighted imaging using singular value decomposition with a block-circulant deconvolution matrix. *Magn Reson Med*. 50(1):164-174.
 
 **ASL**:
-- Buxton RB et al. (1998). General kinetic model for ASL. *Magn Reson Med*.
-- Alsop DC et al. (2015). Recommended ASL implementation. *Magn Reson Med*.
+- Buxton RB et al. (1998). A general kinetic model for quantitative perfusion imaging with arterial spin labeling. *Magn Reson Med*. 40(3):383-396.
+- Alsop DC et al. (2015). Recommended implementation of arterial spin-labeled perfusion MRI for clinical applications: a consensus of the ISMRM Perfusion Study Group and the European Consortium for ASL in Dementia. *Magn Reson Med*. 73(1):102-116.
 
 **IVIM**:
-- Le Bihan D et al. (1988). IVIM MR imaging. *Radiology*.
-- Federau C (2017). IVIM as perfusion measure. *NMR Biomed*.
+- Le Bihan D et al. (1988). Separation of diffusion and perfusion in intravoxel incoherent motion MR imaging. *Radiology*. 168(2):497-505.
+- Federau C (2017). Intravoxel incoherent motion MRI as a means to measure in vivo perfusion: a review of the evidence. *NMR Biomed*. 30(11):e3780.
 
 **Convolution**:
-- Flouri D, Lesnic D, Mayrovitz HN (2016). Numerical solution of convolution integral equations in pharmacokinetics. *Comput Methods Biomech Biomed Eng*.
-- Sourbron & Buckley (2013). Tracer kinetic modelling in MRI. *NMR Biomed*.
+- Flouri D, Lesnic D, Sourbron SP (2016). Fitting the two-compartment model in DCE-MRI by linear inversion. *Magn Reson Med*. 76(3):998-1006.
+- Sourbron & Buckley (2013). Classic models for dynamic contrast-enhanced MRI. *NMR Biomed*. 26(8):1004-1027.
 
 ### Key Conventions
 

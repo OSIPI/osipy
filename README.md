@@ -187,5 +187,5 @@ MIT License
 ## References
 
 - [OSIPI (Open Science Initiative for Perfusion Imaging)](https://www.osipi.org/)
-- Dickie BR et al. CAPLEX: a standardized reporting framework for perfusion MRI. *MRM* 2024;91(5):1761-1773. [doi:10.1002/mrm.29840](https://doi.org/10.1002/mrm.29840)
+- Dickie BR et al. A community-endorsed open-source lexicon for contrast agent-based perfusion MRI: A consensus guidelines report from the ISMRM Open Science Initiative for Perfusion Imaging (OSIPI). *MRM* 2024;91(5):1761-1773. [doi:10.1002/mrm.29840](https://doi.org/10.1002/mrm.29840)
 - Suzuki Y et al. OSIPI ASL Lexicon. *MRM* 2024;91(5):1743-1760. [doi:10.1002/mrm.29815](https://doi.org/10.1002/mrm.29815)

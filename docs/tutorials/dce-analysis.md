@@ -128,7 +128,7 @@ acq_params = DCEAcquisitionParams(
     flip_angles=[15],  # degrees (DCE flip angle)
     baseline_frames=5,
     relaxivity=4.5,    # mM^-1 s^-1 — Gd-DTPA in water at 3T
-                       # (Noebauer-Huhmann 2005, PMID 16462135: R1_3T_water=4.50).
+                       # (Sasaki 2005, PMID 16462135: R1_3T_water=4.50).
                        # In vivo plasma r1 at 3T is lower; override for
                        # agent-specific in-vivo accuracy.
 )

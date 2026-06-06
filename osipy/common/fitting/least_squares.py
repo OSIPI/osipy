@@ -11,7 +11,8 @@ operations. Works identically on CPU (NumPy) and GPU (CuPy).
 References
 ----------
 Marquardt (1963). An Algorithm for Least-Squares Estimation of
-Nonlinear Parameters. SIAM Journal on Applied Mathematics.
+Nonlinear Parameters. Journal of the Society for Industrial and
+Applied Mathematics, 11(2), 431-441.
 """
 
 from __future__ import annotations

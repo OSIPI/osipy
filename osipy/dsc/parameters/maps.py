@@ -17,9 +17,13 @@ References
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
 .. [2] Ostergaard L et al. (1996). High resolution measurement of cerebral blood
    flow using intravascular tracer bolus passages. Magn Reson Med 36(5):715-725.
-.. [3] Calamante F et al. (2010). Measuring cerebral blood flow using magnetic
+.. [3] Calamante F et al. (1999). Measuring cerebral blood flow using magnetic
    resonance imaging techniques. J Cereb Blood Flow Metab 19(7):701-735.
-.. [4] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+   doi:10.1097/00004647-199907000-00001
+.. [4] Dickie BR et al. (2024). A community-endorsed open-source lexicon for
+   contrast agent-based perfusion MRI: A consensus guidelines report from the
+   ISMRM Open Science Initiative for Perfusion Imaging (OSIPI). Magn Reson Med
+   91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
 from dataclasses import dataclass
@@ -113,7 +117,10 @@ def compute_perfusion_maps(
     References
     ----------
     .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-    .. [2] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+    .. [2] Dickie BR et al. (2024). A community-endorsed open-source lexicon for
+       contrast agent-based perfusion MRI: A consensus guidelines report from the
+       ISMRM Open Science Initiative for Perfusion Imaging (OSIPI). Magn Reson Med
+       91(5):1761-1773. doi:10.1002/mrm.29840
 
     Examples
     --------

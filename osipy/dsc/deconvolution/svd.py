@@ -28,7 +28,10 @@ References
    estimating flow in MR perfusion-weighted imaging using singular value
    decomposition with a block-circulant deconvolution matrix.
    Magn Reson Med 50(1):164-174.
-.. [4] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+.. [4] Dickie BR et al. (2024). A community-endorsed open-source lexicon for
+   contrast agent-based perfusion MRI: A consensus guidelines report from the
+   ISMRM Open Science Initiative for Perfusion Imaging (OSIPI). Magn Reson Med
+   91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
 from dataclasses import dataclass

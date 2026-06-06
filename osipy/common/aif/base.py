@@ -12,7 +12,10 @@ References
 .. [1] Parker GJM et al. (2006). Experimentally-derived functional form
    for a population-averaged AIF. Magn Reson Med 56(5):993-1000.
 .. [2] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+.. [3] Dickie BR et al. A community-endorsed open-source lexicon for
+   contrast agent-based perfusion MRI: A consensus guidelines report from
+   the ISMRM Open Science Initiative for Perfusion Imaging (OSIPI).
+   MRM 2024;91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
 from abc import abstractmethod

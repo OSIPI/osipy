@@ -342,7 +342,10 @@ class TikhonovFitter(BaseFitter):
 
     References
     ----------
-    .. [1] Calamante F et al. MRM 2003;50(4):813-825.
+    .. [1] Calamante F, Gadian DG, Connelly A. Quantification of
+       bolus-tracking MRI: improved characterization of the tissue
+       residue function using Tikhonov regularization. MRM
+       2003;50(6):1237-1247.
     """
 
     fitting_method_name = "tikhonov"

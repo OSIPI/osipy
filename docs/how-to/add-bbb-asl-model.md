@@ -101,7 +101,7 @@ Extend `ASLQuantificationParams` with multi-echo and exchange parameters.
         References
         ----------
         .. [1] OSIPI ASL Lexicon, https://osipi.github.io/ASL-Lexicon/
-        .. [2] St. Lawrence KS et al. JCBFM 2012;32:874-887.
+        .. [2] St. Lawrence KS, Owen D, Wang DJJ. MRM 2012;67(5):1275-1284. doi:10.1002/mrm.23104
         """
 
         echo_times: list[float] = field(default_factory=lambda: [10.0, 30.0, 50.0])
@@ -138,8 +138,8 @@ optional `quantify()` method.
         References
         ----------
         .. [1] OSIPI ASL Lexicon, https://osipi.github.io/ASL-Lexicon/
-        .. [2] St. Lawrence KS et al. JCBFM 2012;32:874-887.
-        .. [3] Wengler K et al. NeuroImage 2020;220:117101.
+        .. [2] St. Lawrence KS, Owen D, Wang DJJ. MRM 2012;67(5):1275-1284. doi:10.1002/mrm.23104
+        .. [3] Wengler K et al. NeuroImage 2019;189:401-414.
         """
 
         @property
@@ -156,7 +156,7 @@ optional `quantify()` method.
 
         @property
         def reference(self) -> str:
-            return "St. Lawrence KS et al. JCBFM 2012;32:874-887."
+            return "St. Lawrence KS, Owen D, Wang DJJ. MRM 2012;67(5):1275-1284. doi:10.1002/mrm.23104"
 
         @property
         def labeling_type(self) -> str:
@@ -262,7 +262,7 @@ This model inherits from `BaseASLModel` and provides a forward prediction via it
         ----------
         .. [1] OSIPI ASL Lexicon, https://osipi.github.io/ASL-Lexicon/
         .. [2] Buxton RB et al. MRM 1998;40(3):383-396.
-        .. [3] St. Lawrence KS et al. JCBFM 2012;32:874-887.
+        .. [3] St. Lawrence KS, Owen D, Wang DJJ. MRM 2012;67(5):1275-1284. doi:10.1002/mrm.23104
         """
 
         @property
@@ -279,7 +279,7 @@ This model inherits from `BaseASLModel` and provides a forward prediction via it
 
         @property
         def reference(self) -> str:
-            return "St. Lawrence KS et al. JCBFM 2012;32:874-887."
+            return "St. Lawrence KS, Owen D, Wang DJJ. MRM 2012;67(5):1275-1284. doi:10.1002/mrm.23104"
 
         @property
         def labeling_type(self) -> str:
@@ -517,7 +517,7 @@ By using the `BaseASLModel` hierarchy, your BBB ASL model automatically gets:
 ## References
 
 1. St. Lawrence KS, Owen D, Wang DJJ. A two-stage approach for measuring vascular water exchange and arterial transit time by diffusion-weighted perfusion MRI. *Magn Reson Med*. 2012;67(5):1275-1284.
-2. Wengler K, Bangiyev L, Engel T, et al. 3D MRI of whole-brain water permeability with intrinsic diffusivity encoding of arterial labeled spin (IDEALS). *NeuroImage*. 2020;220:117101.
+2. Wengler K, Bangiyev L, Canli T, et al. 3D MRI of whole-brain water permeability with intrinsic diffusivity encoding of arterial labeled spin (IDEALS). *NeuroImage*. 2019;189:401-414.
 3. Shao X, Ma SJ, Casey M, et al. Mapping water exchange across the blood-brain barrier using 3D diffusion-prepared arterial spin labeled perfusion MRI. *Magn Reson Med*. 2019;81(5):3065-3079.
 4. OSIPI ASL Lexicon, https://osipi.github.io/ASL-Lexicon/
 5. Suzuki Y et al. *MRM* 2024;91(5):1743-1760. doi:10.1002/mrm.29815

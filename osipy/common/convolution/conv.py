@@ -8,8 +8,8 @@ when time sampling is non-uniform.
 References
 ----------
     - dcmri (https://github.com/dcmri/dcmri) utils.conv()
-    - Sourbron & Buckley (2013). Tracer kinetic modelling in MRI.
-      NMR Biomed. 26(8):1034-1048.
+    - Sourbron & Buckley (2013). Classic models for dynamic
+      contrast-enhanced MRI. NMR Biomed. 26(8):1004-1027.
 """
 
 from __future__ import annotations

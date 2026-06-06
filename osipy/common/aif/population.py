@@ -15,16 +15,20 @@ References
 .. [1] Parker GJM et al. (2006). Experimentally-derived functional form for a
    population-averaged high-temporal-resolution arterial input function for
    dynamic contrast-enhanced MRI. Magn Reson Med 56(5):993-1000.
-.. [2] Georgiou L et al. (2014). A functional form for a representative
-   individual arterial input function. Magn Reson Med 73(3):1241-1249.
-.. [3] Fritz-Hansen T et al. (1996). Capillary transfer constant of Gd-DTPA
+.. [2] Georgiou L et al. (2019). A functional form for a representative
+   individual arterial input function measured from a population using high
+   temporal resolution DCE MRI. Magn Reson Med 81(3):1955-1963.
+.. [3] Fritz-Hansen T et al. (1998). Capillary transfer constant of Gd-DTPA
    in the myocardium at rest and during vasodilation assessed by MRI.
-   Magn Reson Med 35(2):139-144.
+   Magn Reson Med 40(6):922-929. doi:10.1002/mrm.1910400619
 .. [4] Weinmann HJ et al. (1984). Pharmacokinetics of GdDTPA/dimeglumine after
    intravenous injection into healthy volunteers. Physiological Chemistry
    and Physics and Medical NMR 16(2):167-172.
 .. [5] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [6] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+.. [6] Dickie BR et al. A community-endorsed open-source lexicon for contrast
+   agent-based perfusion MRI: A consensus guidelines report from the ISMRM Open
+   Science Initiative for Perfusion Imaging (OSIPI). MRM 2024;91(5):1761-1773.
+   doi:10.1002/mrm.29840
 """
 
 from dataclasses import dataclass
@@ -223,7 +227,7 @@ class GeorgiouAIFParams:
     The Georgiou AIF extends the Parker model with improved individual
     variability handling.
 
-    Default values are from Georgiou et al. (2014).
+    Default values are from Georgiou et al. (2019).
     """
 
     # First Gaussian
@@ -252,7 +256,7 @@ class GeorgiouAIF(BaseAIF):
 
     References
     ----------
-    .. [1] Georgiou L et al. (2014). Magn Reson Med 73(3):1241-1249.
+    .. [1] Georgiou L et al. (2019). Magn Reson Med 81(3):1955-1963.
     .. [2] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
     """
 
@@ -274,7 +278,7 @@ class GeorgiouAIF(BaseAIF):
     @property
     def reference(self) -> str:
         """Return literature citation."""
-        return "Georgiou L et al. (2014). Magn Reson Med 73(3):1241-1249."
+        return "Georgiou L et al. (2019). Magn Reson Med 81(3):1955-1963."
 
     def get_parameters(self) -> dict[str, float]:
         """Return current AIF model parameters."""
@@ -386,7 +390,10 @@ class FritzHansenAIF(BaseAIF):
 
     References
     ----------
-    Fritz-Hansen T et al. (1996). Magn Reson Med 35(2):139-144.
+    Fritz-Hansen T, Rostrup E, Larsson HB, Søndergaard L, Ring P, Henriksen O
+    (1996). Measurement of the arterial concentration of Gd-DTPA using MRI: a
+    step toward quantitative perfusion imaging. Magn Reson Med 36(2):225-231.
+    doi:10.1002/mrm.1910360209
     """
 
     def __init__(self, params: FritzHansenAIFParams | None = None) -> None:
@@ -407,7 +414,7 @@ class FritzHansenAIF(BaseAIF):
     @property
     def reference(self) -> str:
         """Return literature citation."""
-        return "Fritz-Hansen T et al. (1996). Magn Reson Med 35(2):139-144."
+        return "Fritz-Hansen T et al. (1996). Magn Reson Med 36(2):225-231."
 
     def get_parameters(self) -> dict[str, float]:
         """Return current AIF model parameters."""

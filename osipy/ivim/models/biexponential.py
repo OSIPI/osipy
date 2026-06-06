@@ -21,12 +21,15 @@ References
 .. [2] Lemke A et al. (2010). An in vivo verification of the intravoxel
    incoherent motion effect in diffusion-weighted imaging of the abdomen.
    Magn Reson Med 64(6):1580-1585.
-.. [3] Federau C et al. (2014). IVIM perfusion imaging in acute stroke:
-   initial clinical experience. AJNR 35:256-262.
+.. [3] Federau C et al. (2014). Perfusion measurement in brain gliomas
+   with intravoxel incoherent motion MRI. AJNR 35:256-262.
    doi:10.3174/ajnr.A3686. PMID 23928134. Source for typical f, D, D*
    ranges in brain tissue.
 .. [4] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
-.. [5] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+.. [5] Dickie BR et al. A community-endorsed open-source lexicon for
+   contrast agent-based perfusion MRI: A consensus guidelines report from
+   the ISMRM Open Science Initiative for Perfusion Imaging (OSIPI).
+   MRM 2024;91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
 from abc import ABC, abstractmethod

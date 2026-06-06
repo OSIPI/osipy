@@ -11,7 +11,10 @@ References
 .. [2] Boxerman JL et al. (2006). Relative cerebral blood volume maps corrected
    for contrast agent extravasation significantly correlate with glioma tumor
    grade, whereas uncorrected maps do not. AJNR 27(4):859-867.
-.. [3] Dickie BR et al. MRM 2024. doi:10.1002/mrm.29840
+.. [3] Dickie BR et al. (2024). A community-endorsed open-source lexicon for
+   contrast agent-based perfusion MRI: A consensus guidelines report from the
+   ISMRM Open Science Initiative for Perfusion Imaging (OSIPI). MRM
+   91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
 from __future__ import annotations
@@ -150,7 +153,9 @@ def normalize_to_white_matter(
     References
     ----------
     Wetzel SG et al. (2002). Relative cerebral blood volume measurements
-    in intracranial mass lesions. Radiology 224(2):334-341.
+    in intracranial mass lesions: interobserver and intraobserver
+    reproducibility study. Radiology 224(3):797-803.
+    doi:10.1148/radiol.2243011014.
 
     Examples
     --------
