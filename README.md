@@ -182,7 +182,7 @@ mkdocs serve              # Local docs at http://127.0.0.1:8000
 
 ## License
 
-MIT License
+This project is licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for third-party attributions.
 
 ## References
 

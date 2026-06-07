@@ -24,6 +24,9 @@ References
    contrast-enhanced MRI. NMR Biomed. 26(8):1004-1027.
    doi:10.1002/nbm.2940
 .. [3] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
+
+The expconv function in this package is a derivative work adapted from dcmri
+(Apache-2.0); see the project NOTICE file for attribution.
 """
 
 from osipy.common.convolution.conv import conv, uconv

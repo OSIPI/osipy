@@ -3,7 +3,7 @@
 **Version**: 0.0.1
 **Date**: 2026-03-02
 **Status**: Active
-**License**: MIT
+**License**: Apache-2.0
 
 ---
 

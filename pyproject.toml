@@ -7,10 +7,11 @@ name = "osipy"
 dynamic = ["version"]
 description = "OSIPI-compliant MRI perfusion analysis library"
 readme = "README.md"
-license = "MIT"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.12"
 authors = [
-    { name = "osipy contributors" },
+    { name = "OSIPI and the osipy developers" },
 ]
 keywords = [
     "mri",
@@ -25,7 +26,6 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",

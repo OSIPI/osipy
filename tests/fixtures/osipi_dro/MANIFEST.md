@@ -93,4 +93,4 @@ d = np.load(ivim_dir / "d.npy")
 ## License
 
 - DCE data: Apache 2.0 (OSIPI)
-- DSC/ASL/IVIM synthetic data: MIT (osipy)
+- DSC/ASL/IVIM synthetic data: Apache 2.0 (osipy)

@@ -13,7 +13,13 @@ Flouri D, Lesnic D, Sourbron SP (2016). Fitting the two-compartment
 model in DCE-MRI by linear inversion. Magn Reson Med. 76(3):998-1006.
 doi:10.1002/mrm.25991
 
-dcmri library: https://github.com/dcmri/dcmri
+Attribution
+-----------
+``expconv`` adapts the recursive exponential-convolution algorithm from
+dcmri v0.6.20 (https://github.com/dcmri/dcmri, module ``dcmri/utils.py``),
+licensed under the Apache License, Version 2.0. Modified: ``(f, T, t)``
+signature, batched/GPU array-module path, and non-normalized output. See the
+project NOTICE file.
 """
 
 from __future__ import annotations

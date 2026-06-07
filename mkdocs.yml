@@ -3,6 +3,7 @@ site_description: OSIPI-compliant MRI perfusion analysis library
 site_url: https://osipy.readthedocs.io
 repo_url: https://github.com/OSIPI/osipy
 repo_name: OSIPI/osipy
+copyright: "Copyright 2026 OSIPI and the osipy developers — Apache-2.0"
 
 theme:
   name: material
