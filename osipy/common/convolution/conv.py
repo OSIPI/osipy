@@ -1,9 +1,9 @@
-"""Piecewise-linear convolution with analytic integration.
+"""Piecewise-linear convolution with trapezoidal integration.
 
 This module implements convolution using piecewise-linear interpolation
-with analytical integration between time points. This approach is more
-accurate than FFT-based methods for pharmacokinetic modeling, particularly
-when time sampling is non-uniform.
+and trapezoidal integration between time points, supporting non-uniform
+time sampling. (Note: this is an approximate trapezoidal scheme; it does
+not perform the exact product-of-linears integration used by dcmri.)
 
 References
 ----------

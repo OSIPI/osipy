@@ -1,0 +1,31 @@
+osipy
+Copyright 2026 OSIPI and the osipy developers
+
+This product is licensed under the Apache License, Version 2.0 (the "License").
+See the LICENSE file for the full license text. You may obtain a copy of the
+License at http://www.apache.org/licenses/LICENSE-2.0.
+
+================================================================================
+Third-party attributions
+================================================================================
+
+dcmri — https://github.com/dcmri/dcmri
+  Licensed under the Apache License, Version 2.0.
+
+  The expconv function in osipy/common/convolution/expconv.py is a derivative
+  work MODIFIED from dcmri version 0.6.20 (Apache-2.0 Section 4(b)): it adapts
+  dcmri's recursive exponential-convolution algorithm (module dcmri/utils.py).
+  Modified: an (f, T, t) signature, batched/GPU-capable execution via the
+  array-module abstraction, and non-normalized output.
+
+OSIPI TF6.2 DCE-DSC-MRI Challenges
+  https://github.com/OSIPI/TF6.2_DCE-DSC-MRI_Challenges
+  Licensed under the Apache License, Version 2.0.
+  The DCE digital reference object data under tests/fixtures/osipi_dro/dce/ is
+  redistributed from this source.
+
+OSIPI DCE-DSC-MRI CodeCollection
+  https://github.com/OSIPI/DCE-DSC-MRI_CodeCollection
+  Licensed under the Apache License, Version 2.0.
+  The reference concentration CSV data under
+  tests/fixtures/osipi_codecollection/dce/csv/ is redistributed from this source.
