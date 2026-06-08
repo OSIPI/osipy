@@ -271,18 +271,46 @@ def _collect_data_config(
     return cfg
 
 
+def _collect_method_config(
+    label: str,
+    configs: dict[str, Any],
+    default: str,
+    discriminator: str = "method",
+) -> dict[str, Any]:
+    """Prompt for a registry-derived selection plus its config model's params.
+
+    Selecting an option surfaces exactly that option's knobs (introspected
+    from its :class:`MethodConfig` fields), mirroring ``_collect_dsc_config``.
+    """
+    names = sorted(configs)
+    chosen = _prompt_choice(label, names, default=default)
+    selection: dict[str, Any] = {discriminator: chosen}
+    for fname, finfo in configs[chosen].model_fields.items():
+        if fname == discriminator:
+            continue
+        selection[fname] = _prompt_value(
+            finfo.description or fname,
+            default=finfo.default,
+            expected_type=type(finfo.default),
+        )
+    return selection
+
+
 def _collect_dce_config() -> dict[str, Any]:
     """Collect DCE pipeline settings."""
-    from osipy.common.aif.population import list_aifs
-    from osipy.dce import list_models
-    from osipy.dce.t1_mapping.registry import list_t1_methods
+    from osipy.dce.config import (
+        CONCENTRATION_CONFIGS,
+        DCE_MODEL_CONFIGS,
+        POPULATION_AIF_CONFIGS,
+        T1_METHOD_CONFIGS,
+    )
 
     print("\n--- DCE Pipeline Settings ---")
     cfg: dict[str, Any] = {}
 
-    models = list_models()
-    cfg["model"] = _prompt_choice(
-        "Pharmacokinetic model:", models, default="extended_tofts"
+    # Pharmacokinetic model (+ any params it exposes).
+    cfg["model"] = _collect_method_config(
+        "Pharmacokinetic model:", DCE_MODEL_CONFIGS, default="extended_tofts"
     )
 
     # T1 data availability determines whether we do T1 mapping or use
@@ -295,9 +323,9 @@ def _collect_dce_config() -> dict[str, Any]:
     acquisition: dict[str, Any] = {}
 
     if has_t1_data:
-        t1_methods = list_t1_methods()
-        cfg["t1_mapping_method"] = _prompt_choice(
-            "T1 mapping method:", t1_methods, default="vfa"
+        # T1 mapping method (+ its params, e.g. VFA linear/nonlinear).
+        cfg["t1_mapping_method"] = _collect_method_config(
+            "T1 mapping method:", T1_METHOD_CONFIGS, default="vfa"
         )
     else:
         # No T1 data — use an assumed value and skip T1 mapping config
@@ -305,14 +333,21 @@ def _collect_dce_config() -> dict[str, Any]:
             "Assumed T1 value (ms)", default=1400.0, expected_type=float
         )
 
+    # Signal-to-concentration model (+ its params).
+    cfg["concentration"] = _collect_method_config(
+        "Signal-to-concentration model:", CONCENTRATION_CONFIGS, default="spgr"
+    )
+
     # AIF source
     aif_sources = ["population", "detect", "manual"]
     cfg["aif_source"] = _prompt_choice("AIF source:", aif_sources, default="population")
 
     if cfg["aif_source"] == "population":
-        aifs = list_aifs()
-        cfg["population_aif"] = _prompt_choice(
-            "Population AIF:", aifs, default="parker"
+        cfg["population_aif"] = _collect_method_config(
+            "Population AIF:",
+            POPULATION_AIF_CONFIGS,
+            default="parker",
+            discriminator="name",
         )
 
     # Acquisition parameters

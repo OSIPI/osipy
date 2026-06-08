@@ -66,10 +66,16 @@ class TestLoadConfig:
         path = tmp_config("""\
             modality: dce
             pipeline:
-              model: extended_tofts
-              t1_mapping_method: vfa
+              model:
+                method: extended_tofts
+              t1_mapping_method:
+                method: vfa
+                fit_method: linear
+              concentration:
+                method: spgr
               aif_source: population
-              population_aif: parker
+              population_aif:
+                name: parker
               save_intermediate: true
               acquisition:
                 tr: 5.0
@@ -92,6 +98,30 @@ class TestLoadConfig:
         assert config.data.mask == "mask.nii.gz"
         assert config.backend.force_cpu is True
         assert config.logging.level == "DEBUG"
+
+    def test_load_dce_nested_method_configs_round_trip(self, tmp_config) -> None:
+        """Nested DCE selection-point configs round-trip through load_config."""
+        path = tmp_config("""\
+            modality: dce
+            pipeline:
+              model:
+                method: tofts
+              t1_mapping_method:
+                method: vfa
+                fit_method: nonlinear
+              concentration:
+                method: linear
+              aif_source: population
+              population_aif:
+                name: georgiou
+        """)
+        config = load_config(path)
+        mc = config.get_modality_config()
+        assert mc.model.method == "tofts"
+        assert mc.t1_mapping_method.method == "vfa"
+        assert mc.t1_mapping_method.fit_method == "nonlinear"
+        assert mc.concentration.method == "linear"
+        assert mc.population_aif.name == "georgiou"
 
     def test_load_dsc_config(self, tmp_config) -> None:
         """Valid DSC config loads successfully."""
@@ -196,23 +226,25 @@ class TestDCEPipelineYAML:
     """Tests for DCE pipeline config validation."""
 
     def test_defaults(self) -> None:
-        """Default DCE config values match expected."""
+        """Default DCE config values match expected (nested registry configs)."""
         cfg = DCEPipelineYAML()
-        assert cfg.model == "extended_tofts"
-        assert cfg.t1_mapping_method == "vfa"
+        assert cfg.model.method == "extended_tofts"
+        assert cfg.t1_mapping_method.method == "vfa"
+        assert cfg.t1_mapping_method.fit_method == "linear"
+        assert cfg.concentration.method == "spgr"
         assert cfg.aif_source == "population"
-        assert cfg.population_aif == "parker"
+        assert cfg.population_aif.name == "parker"
         assert cfg.save_intermediate is False
 
     def test_invalid_model(self) -> None:
-        """Invalid model name raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid DCE model"):
-            DCEPipelineYAML(model="nonexistent_model")
+        """Invalid model name raises ValidationError (no matching union member)."""
+        with pytest.raises(ValidationError):
+            DCEPipelineYAML(model={"method": "nonexistent_model"})
 
     def test_invalid_t1_method(self) -> None:
         """Invalid T1 mapping method raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid T1 mapping method"):
-            DCEPipelineYAML(t1_mapping_method="invalid_method")
+        with pytest.raises(ValidationError):
+            DCEPipelineYAML(t1_mapping_method={"method": "invalid_method"})
 
     def test_invalid_aif_source(self) -> None:
         """Invalid AIF source raises ValidationError."""
@@ -220,12 +252,39 @@ class TestDCEPipelineYAML:
             DCEPipelineYAML(aif_source="invalid_source")
 
     def test_valid_models(self) -> None:
-        """All registered DCE model names are accepted."""
-        from osipy.dce import list_models
+        """All registered DCE model names are accepted (nested config)."""
+        from osipy.dce.config import DCE_MODEL_CONFIGS
 
-        for name in list_models():
-            cfg = DCEPipelineYAML(model=name)
-            assert cfg.model == name
+        for name in DCE_MODEL_CONFIGS:
+            cfg = DCEPipelineYAML(model={"method": name})
+            assert cfg.model.method == name
+
+    def test_vfa_fit_method_surfaces_and_validates(self) -> None:
+        """Selecting VFA exposes its fit_method knob; cross-method keys rejected."""
+        cfg = DCEPipelineYAML(
+            t1_mapping_method={"method": "vfa", "fit_method": "nonlinear"}
+        )
+        assert cfg.t1_mapping_method.method == "vfa"
+        assert cfg.t1_mapping_method.fit_method == "nonlinear"
+        # Look-Locker has no fit_method knob (extra=forbid).
+        with pytest.raises(ValidationError):
+            DCEPipelineYAML(
+                t1_mapping_method={"method": "look_locker", "fit_method": "linear"}
+            )
+
+    def test_concentration_method_selectable(self) -> None:
+        """Both spgr and linear concentration models are selectable."""
+        for name in ("spgr", "linear"):
+            cfg = DCEPipelineYAML(concentration={"method": name})
+            assert cfg.concentration.method == name
+
+    def test_population_aif_selectable(self) -> None:
+        """All registered population AIFs are selectable via the nested config."""
+        from osipy.dce.config import POPULATION_AIF_CONFIGS
+
+        for name in POPULATION_AIF_CONFIGS:
+            cfg = DCEPipelineYAML(population_aif={"name": name})
+            assert cfg.population_aif.name == name
 
     def test_acquisition_defaults(self) -> None:
         """Acquisition sub-model has correct defaults."""
@@ -422,7 +481,8 @@ class TestDCEFittingConfig:
         path = tmp_config("""\
             modality: dce
             pipeline:
-              model: tofts
+              model:
+                method: tofts
               fitting:
                 fitter: lm
                 max_iterations: 200
@@ -437,6 +497,7 @@ class TestDCEFittingConfig:
         """)
         config = load_config(path)
         mc = config.get_modality_config()
+        assert mc.model.method == "tofts"
         assert mc.fitting.fitter == "lm"
         assert mc.fitting.max_iterations == 200
         assert mc.fitting.tolerance == 1e-8
@@ -703,6 +764,114 @@ class TestFitDelayWiring:
         )
 
         assert captured.get("fit_delay") is True
+
+
+# ---------------------------------------------------------------------------
+# TestDCERegistryConfigWiring — non-default knobs reach the components
+# ---------------------------------------------------------------------------
+
+
+class TestDCERegistryConfigWiring:
+    """A non-default selection-point knob auto-constructs the right component."""
+
+    def test_yaml_model_name_reaches_fit_model(self, tmp_config, monkeypatch) -> None:
+        """A model selected in YAML drives fit_model's model_name (auto-construct)."""
+        import numpy as np
+
+        from osipy.cli.config import load_config
+        from osipy.common.aif import ArterialInputFunction
+        from osipy.common.dataset import PerfusionDataset
+        from osipy.common.types import AIFType, Modality
+        from osipy.pipeline import dce_pipeline
+        from osipy.pipeline.dce_pipeline import DCEPipeline, DCEPipelineConfig
+
+        path = tmp_config("""\
+            modality: dce
+            pipeline:
+              model:
+                method: patlak
+        """)
+        mc = load_config(path).get_modality_config()
+
+        captured: dict[str, object] = {}
+
+        def _fake_fit_model(**kwargs):
+            captured.update(kwargs)
+
+            class _Result:
+                def __init__(self) -> None:
+                    self.parameter_maps: dict = {}
+                    self.quality_mask = np.ones((2, 2, 2), dtype=bool)
+
+            return _Result()
+
+        monkeypatch.setattr(dce_pipeline, "fit_model", _fake_fit_model)
+
+        time = np.linspace(0, 60, 10)
+        dataset = PerfusionDataset(
+            data=np.random.rand(2, 2, 2, 10),
+            affine=np.eye(4),
+            modality=Modality.DCE,
+            time_points=time,
+        )
+        # Runner passes the validated nested config straight through.
+        cfg = DCEPipelineConfig(model=mc.model)
+        DCEPipeline(cfg).run(
+            dce_data=dataset,
+            time=time,
+            t1_map=None,
+            aif=ArterialInputFunction(
+                time=time,
+                concentration=np.abs(np.random.rand(10)),
+                aif_type=AIFType.POPULATION,
+            ),
+        )
+        assert captured.get("model_name") == "patlak"
+
+    def test_nonlinear_vfa_knob_reaches_compute_t1_vfa(self, monkeypatch) -> None:
+        """vfa_fit_method=nonlinear propagates to compute_t1_vfa(method=...)."""
+        import numpy as np
+
+        from osipy.pipeline.dce_pipeline import DCEPipeline, DCEPipelineConfig
+
+        captured: dict[str, object] = {}
+
+        class _T1Result:
+            def __init__(self) -> None:
+                from osipy.common.parameter_map import ParameterMap
+
+                vals = np.full((2, 2, 1), 1200.0)
+                self.t1_map = ParameterMap(
+                    name="T1", symbol="T1", units="ms", values=vals, affine=np.eye(4)
+                )
+                self.quality_mask = np.ones((2, 2, 1), dtype=bool)
+
+        def _fake_compute_t1_vfa(**kwargs):
+            captured.update(kwargs)
+            return _T1Result()
+
+        monkeypatch.setattr("osipy.dce.t1_mapping.compute_t1_vfa", _fake_compute_t1_vfa)
+
+        cfg = DCEPipelineConfig(t1_mapping_method="vfa", vfa_fit_method="nonlinear")
+        pipeline = DCEPipeline(cfg)
+        pipeline._compute_t1_map(
+            np.random.rand(2, 2, 1, 4),
+            flip_angles=np.array([2.0, 5.0, 10.0, 15.0]),
+            tr=5.0,
+        )
+        assert captured.get("method") == "nonlinear"
+
+    def test_population_aif_knob_constructs_selected_aif(self) -> None:
+        """A non-default population AIF name builds that AIF in the pipeline."""
+        import numpy as np
+
+        from osipy.pipeline.dce_pipeline import DCEPipeline, DCEPipelineConfig
+
+        cfg = DCEPipelineConfig(aif_source="population", population_aif="georgiou")
+        pipeline = DCEPipeline(cfg)
+        time = np.linspace(0, 60, 20)
+        aif = pipeline._get_aif(np.zeros((2, 2, 1, 20)), time, mask=None)
+        assert aif.population_model == "Georgiou"
 
 
 # ---------------------------------------------------------------------------

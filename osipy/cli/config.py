@@ -15,6 +15,15 @@ import yaml
 from pydantic import BaseModel, Field, field_validator
 
 from osipy.common.config import method_union
+from osipy.dce.config import (
+    CONCENTRATION_CONFIGS,
+    DCE_MODEL_CONFIGS,
+    POPULATION_AIF_CONFIGS,
+    T1_METHOD_CONFIGS,
+    ExtendedToftsConfig,
+    SPGRConcentrationConfig,
+    VFAConfig,
+)
 from osipy.dsc.deconvolution.config import DECONVOLVER_CONFIGS, OSVDConfig
 
 logger = logging.getLogger(__name__)
@@ -257,46 +266,50 @@ class DCEAcquisitionYAML(BaseModel):
     )
 
 
+# Discriminated unions of DCE selection-point configs, generated from the
+# registries: selecting a method/name pulls in exactly that option's params.
+_DCEModelConfig = method_union(DCE_MODEL_CONFIGS)
+_T1MethodConfig = method_union(T1_METHOD_CONFIGS)
+_ConcentrationConfig = method_union(CONCENTRATION_CONFIGS)
+_PopulationAIFConfig = method_union(POPULATION_AIF_CONFIGS, discriminator="name")
+
+
+def _default_population_aif() -> Any:
+    """Default population AIF config (Parker), from the registry."""
+    return POPULATION_AIF_CONFIGS["parker"]()
+
+
 class DCEPipelineYAML(BaseModel):
     """DCE pipeline settings from YAML."""
 
-    model: str = Field(
-        default="extended_tofts",
-        description="tofts | extended_tofts | patlak | 2cxm | 2cum",
+    model: _DCEModelConfig = Field(
+        default_factory=ExtendedToftsConfig,
+        description=(
+            "pharmacokinetic model + parameters "
+            "(method: tofts | extended_tofts | patlak | 2cxm | 2cum)"
+        ),
     )
-    t1_mapping_method: str = Field(default="vfa", description="vfa | look_locker")
+    t1_mapping_method: _T1MethodConfig = Field(
+        default_factory=VFAConfig,
+        description="T1 mapping method + parameters (method: vfa | look_locker)",
+    )
+    concentration: _ConcentrationConfig = Field(
+        default_factory=SPGRConcentrationConfig,
+        description="signal-to-concentration model (method: spgr | linear)",
+    )
     aif_source: str = Field(
         default="population", description="population | detect | manual"
     )
-    population_aif: str = Field(
-        default="parker",
-        description="parker | georgiou | fritz_hansen | weinmann | mcgrath",
+    population_aif: _PopulationAIFConfig = Field(
+        default_factory=_default_population_aif,
+        description=(
+            "population AIF (name: parker | georgiou | fritz_hansen | "
+            "weinmann | mcgrath); used when aif_source: population"
+        ),
     )
     save_intermediate: bool = Field(default=False)
     acquisition: DCEAcquisitionYAML = DCEAcquisitionYAML()
     fitting: DCEFittingConfig = DCEFittingConfig()
-
-    @field_validator("model")
-    @classmethod
-    def validate_model(cls, v: str) -> str:
-        """Validate DCE model name against registry."""
-        from osipy.dce import list_models
-
-        valid = list_models()
-        if v not in valid:
-            msg = f"Invalid DCE model '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
-
-    @field_validator("t1_mapping_method")
-    @classmethod
-    def validate_t1_method(cls, v: str) -> str:
-        """Validate T1 mapping method."""
-        valid = ["vfa", "look_locker"]
-        if v not in valid:
-            msg = f"Invalid T1 mapping method '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
 
     @field_validator("aif_source")
     @classmethod

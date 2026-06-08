@@ -437,8 +437,9 @@ def _run_dce(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
     )
 
     pipeline_cfg = DCEPipelineConfig(
-        model=mc.model,  # type: ignore[attr-defined]
+        model=mc.model,  # type: ignore[attr-defined]  # validated MethodConfig
         t1_mapping_method=mc.t1_mapping_method,  # type: ignore[attr-defined]
+        concentration_method=mc.concentration,  # type: ignore[attr-defined]
         aif_source=mc.aif_source,  # type: ignore[attr-defined]
         population_aif=mc.population_aif,  # type: ignore[attr-defined]
         acquisition_params=acq_params,
@@ -560,9 +561,18 @@ def _run_dce_from_dicom(
         {k: tuple(v) for k, v in fitting.bounds.items()} if fitting.bounds else None
     )
 
+    # DICOM VFA stacks are always VFA T1 mapping; honor the configured VFA
+    # fit_method (linear/nonlinear) when the user selected VFA, else default.
+    t1_cfg = mc.t1_mapping_method  # type: ignore[attr-defined]  # validated MethodConfig
+    if t1_cfg.method != "vfa":
+        from osipy.dce.config import VFAConfig
+
+        t1_cfg = VFAConfig()
+
     pipeline_cfg = DCEPipelineConfig(
-        model=mc.model,  # type: ignore[attr-defined]
-        t1_mapping_method="vfa",
+        model=mc.model,  # type: ignore[attr-defined]  # validated MethodConfig
+        t1_mapping_method=t1_cfg,
+        concentration_method=mc.concentration,  # type: ignore[attr-defined]
         aif_source=mc.aif_source,  # type: ignore[attr-defined]
         population_aif=mc.population_aif,  # type: ignore[attr-defined]
         acquisition_params=dce_acq_params,
@@ -576,7 +586,10 @@ def _run_dce_from_dicom(
         fit_delay=fitting.fit_delay,
     )
 
-    logger.info("[Step 3-6] Running DCE pipeline (%s model)...", mc.model)  # type: ignore[attr-defined]
+    logger.info(
+        "[Step 3-6] Running DCE pipeline (%s model)...",
+        mc.model.method,  # type: ignore[attr-defined]
+    )
     pipeline = DCEPipeline(pipeline_cfg)
     t_fit = time.perf_counter()
     result = pipeline.run(

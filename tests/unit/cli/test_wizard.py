@@ -321,9 +321,9 @@ class TestValidateConfig:
         yaml_str = _generate_yaml(
             "dce",
             {
-                "model": "extended_tofts",
+                "model": {"method": "extended_tofts"},
                 "aif_source": "population",
-                "population_aif": "parker",
+                "population_aif": {"name": "parker"},
                 "acquisition": {
                     "t1_assumed": 1400.0,
                     "baseline_frames": 5,
@@ -340,7 +340,7 @@ class TestValidateConfig:
 
         yaml_str = _generate_yaml(
             "dce",
-            {"model": "nonexistent_model"},
+            {"model": {"method": "nonexistent_model"}},
             {"format": "auto"},
         )
         with pytest.raises(ValidationError):
@@ -460,12 +460,16 @@ class TestCollectDCEConfig:
     """Tests for _collect_dce_config()."""
 
     def test_defaults_with_t1_data(self) -> None:
-        """Defaults with T1 data: model, has_t1=yes, t1_method, aif, pop_aif, baseline, relaxivity."""
+        """Defaults with T1 data: model, has_t1, t1_method (+ fit_method),
+        concentration, aif, pop_aif, baseline, relaxivity. Selection points are
+        now nested registry configs."""
         inputs = _make_input_fn(
             [
                 "",  # model: extended_tofts
                 "",  # has T1 data: yes (default)
                 "",  # T1 method: vfa
+                "",  # VFA fit_method: linear
+                "",  # concentration model: spgr
                 "",  # AIF source: population
                 "",  # population AIF: parker
                 "",  # baseline frames: 5
@@ -474,10 +478,11 @@ class TestCollectDCEConfig:
         )
         with patch("builtins.input", side_effect=inputs):
             cfg = _collect_dce_config()
-        assert cfg["model"] == "extended_tofts"
-        assert cfg["t1_mapping_method"] == "vfa"
+        assert cfg["model"] == {"method": "extended_tofts"}
+        assert cfg["t1_mapping_method"] == {"method": "vfa", "fit_method": "linear"}
+        assert cfg["concentration"] == {"method": "spgr"}
         assert cfg["aif_source"] == "population"
-        assert cfg["population_aif"] == "parker"
+        assert cfg["population_aif"] == {"name": "parker"}
         assert cfg["acquisition"]["baseline_frames"] == 5
         assert cfg["acquisition"]["relaxivity"] == 4.5
         assert "t1_assumed" not in cfg["acquisition"]
@@ -489,6 +494,7 @@ class TestCollectDCEConfig:
                 "",  # model: extended_tofts
                 "n",  # has T1 data: no
                 "",  # t1_assumed: 1400.0
+                "",  # concentration model: spgr
                 "",  # AIF source: population
                 "",  # population AIF: parker
                 "",  # baseline frames: 5
@@ -507,6 +513,8 @@ class TestCollectDCEConfig:
                 "",  # model
                 "",  # has T1 data: yes
                 "",  # T1 method
+                "",  # VFA fit_method: linear
+                "",  # concentration model: spgr
                 "detect",  # AIF source
                 "",  # baseline frames
                 "",  # relaxivity
@@ -516,6 +524,27 @@ class TestCollectDCEConfig:
             cfg = _collect_dce_config()
         assert cfg["aif_source"] == "detect"
         assert "population_aif" not in cfg
+
+    def test_nonlinear_vfa_selectable(self) -> None:
+        """The VFA nonlinear fit_method is collectable as a knob."""
+        inputs = _make_input_fn(
+            [
+                "",  # model: extended_tofts
+                "",  # has T1 data: yes
+                "vfa",  # T1 method
+                "nonlinear",  # VFA fit_method
+                "linear",  # concentration model
+                "",  # AIF source: population
+                "georgiou",  # population AIF
+                "",  # baseline frames
+                "",  # relaxivity
+            ]
+        )
+        with patch("builtins.input", side_effect=inputs):
+            cfg = _collect_dce_config()
+        assert cfg["t1_mapping_method"] == {"method": "vfa", "fit_method": "nonlinear"}
+        assert cfg["concentration"] == {"method": "linear"}
+        assert cfg["population_aif"] == {"name": "georgiou"}
 
 
 class TestCollectDSCConfig:
@@ -577,10 +606,11 @@ class TestAllModalitiesValidation:
         # Map of default pipeline configs matching what defaults produce
         defaults = {
             "dce": {
-                "model": "extended_tofts",
-                "t1_mapping_method": "vfa",
+                "model": {"method": "extended_tofts"},
+                "t1_mapping_method": {"method": "vfa", "fit_method": "linear"},
+                "concentration": {"method": "spgr"},
                 "aif_source": "population",
-                "population_aif": "parker",
+                "population_aif": {"name": "parker"},
                 "acquisition": {"baseline_frames": 5, "relaxivity": 4.5},
             },
             "dsc": {
@@ -660,6 +690,8 @@ class TestRunWizard:
                 "",  # model: extended_tofts
                 "",  # has T1 data: yes
                 "",  # T1 method: vfa
+                "",  # VFA fit_method: linear
+                "",  # concentration model: spgr
                 "",  # AIF source: population
                 "",  # population AIF: parker
                 "",  # baseline frames: 5
@@ -682,7 +714,7 @@ class TestRunWizard:
         assert out_file.exists()
         parsed = yaml.safe_load(out_file.read_text())
         assert parsed["modality"] == "dce"
-        assert parsed["pipeline"]["model"] == "extended_tofts"
+        assert parsed["pipeline"]["model"]["method"] == "extended_tofts"
         assert parsed["pipeline"]["acquisition"]["baseline_frames"] == 5
 
     def test_full_ivim_wizard(self, tmp_path: Path) -> None:
