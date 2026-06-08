@@ -14,6 +14,9 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
+from osipy.common.config import method_union
+from osipy.dsc.deconvolution.config import DECONVOLVER_CONFIGS, OSVDConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -311,33 +314,26 @@ class DCEPipelineYAML(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# Discriminated union of DSC deconvolution method configs, generated from the
+# registry: selecting ``method`` pulls in that method's parameters.
+_DeconvolverConfig = method_union(DECONVOLVER_CONFIGS)
+
+
 class DSCPipelineYAML(BaseModel):
     """DSC pipeline settings from YAML."""
 
     te: float = Field(default=30.0, description="ms, echo time")
-    deconvolution_method: str = Field(default="oSVD", description="oSVD | cSVD | sSVD")
-    apply_leakage_correction: bool = Field(default=True)
-    svd_threshold: float = Field(
-        default=0.2, description="truncation threshold for SVD"
-    )
     baseline_frames: int = Field(
         default=10, description="number of pre-bolus frames for baseline"
     )
     hematocrit_ratio: float = Field(
         default=0.73, description="large-to-small vessel hematocrit ratio"
     )
-
-    @field_validator("deconvolution_method")
-    @classmethod
-    def validate_deconv(cls, v: str) -> str:
-        """Validate deconvolution method against registry."""
-        from osipy.dsc import list_deconvolvers
-
-        valid = list_deconvolvers()
-        if v not in valid:
-            msg = f"Invalid deconvolution method '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
+    apply_leakage_correction: bool = Field(default=True)
+    deconvolution: _DeconvolverConfig = Field(
+        default_factory=OSVDConfig,
+        description="deconvolution method + parameters (method: oSVD | cSVD | sSVD)",
+    )
 
 
 # ---------------------------------------------------------------------------

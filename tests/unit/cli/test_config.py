@@ -249,24 +249,33 @@ class TestDSCPipelineYAML:
         """Default DSC config values match expected."""
         cfg = DSCPipelineYAML()
         assert cfg.te == 30.0
-        assert cfg.deconvolution_method == "oSVD"
+        assert cfg.deconvolution.method == "oSVD"
+        assert cfg.deconvolution.oscillation_index == 0.035
         assert cfg.apply_leakage_correction is True
-        assert cfg.svd_threshold == 0.2
         assert cfg.baseline_frames == 10
         assert cfg.hematocrit_ratio == 0.73
 
     def test_invalid_deconvolution_method(self) -> None:
         """Invalid deconvolution method raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid deconvolution method"):
-            DSCPipelineYAML(deconvolution_method="invalid_method")
+        with pytest.raises(ValidationError):
+            DSCPipelineYAML(deconvolution={"method": "invalid_method"})
 
     def test_valid_deconvolution_methods(self) -> None:
-        """All registered deconvolution methods are accepted."""
-        from osipy.dsc import list_deconvolvers
+        """All registered deconvolution methods are accepted (nested config)."""
+        from osipy.dsc.deconvolution.config import DECONVOLVER_CONFIGS
 
-        for name in list_deconvolvers():
-            cfg = DSCPipelineYAML(deconvolution_method=name)
-            assert cfg.deconvolution_method == name
+        for name in DECONVOLVER_CONFIGS:
+            cfg = DSCPipelineYAML(deconvolution={"method": name})
+            assert cfg.deconvolution.method == name
+
+    def test_method_params_surface_and_validate(self) -> None:
+        """Selecting a method exposes its params; unknown keys are rejected."""
+        cfg = DSCPipelineYAML(deconvolution={"method": "cSVD", "threshold": 0.35})
+        assert cfg.deconvolution.method == "cSVD"
+        assert cfg.deconvolution.threshold == 0.35
+        # A knob from a different method must not be accepted (extra=forbid).
+        with pytest.raises(ValidationError):
+            DSCPipelineYAML(deconvolution={"method": "cSVD", "oscillation_index": 0.05})
 
 
 # ---------------------------------------------------------------------------

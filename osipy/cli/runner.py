@@ -622,9 +622,10 @@ def _run_dsc(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
 
     pipeline_cfg = DSCPipelineConfig(
         te=mc.te,  # type: ignore[attr-defined]
-        deconvolution_method=mc.deconvolution_method,  # type: ignore[attr-defined]
+        baseline_frames=mc.baseline_frames,  # type: ignore[attr-defined]
+        hematocrit_ratio=mc.hematocrit_ratio,  # type: ignore[attr-defined]
         apply_leakage_correction=mc.apply_leakage_correction,  # type: ignore[attr-defined]
-        svd_threshold=mc.svd_threshold,  # type: ignore[attr-defined]
+        deconvolution=mc.deconvolution,  # type: ignore[attr-defined]
     )
 
     time_array = dataset.time_points

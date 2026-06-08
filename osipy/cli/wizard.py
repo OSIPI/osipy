@@ -332,29 +332,36 @@ def _collect_dce_config() -> dict[str, Any]:
 
 def _collect_dsc_config() -> dict[str, Any]:
     """Collect DSC pipeline settings."""
-    from osipy.dsc import list_deconvolvers
+    from osipy.dsc.deconvolution.config import DECONVOLVER_CONFIGS
 
     print("\n--- DSC Pipeline Settings ---")
     cfg: dict[str, Any] = {}
 
-    methods = list_deconvolvers()
-    cfg["deconvolution_method"] = _prompt_choice(
-        "Deconvolution method:", methods, default="oSVD"
-    )
-
     cfg["te"] = _prompt_value("Echo time TE (ms)", default=30.0, expected_type=float)
-    cfg["apply_leakage_correction"] = _prompt_yes_no(
-        "Apply leakage correction?", default=True
-    )
-    cfg["svd_threshold"] = _prompt_value(
-        "SVD truncation threshold", default=0.2, expected_type=float
-    )
     cfg["baseline_frames"] = _prompt_value(
         "Number of baseline frames", default=10, expected_type=int
     )
     cfg["hematocrit_ratio"] = _prompt_value(
         "Hematocrit ratio", default=0.73, expected_type=float
     )
+    cfg["apply_leakage_correction"] = _prompt_yes_no(
+        "Apply leakage correction?", default=True
+    )
+
+    # Deconvolution method + its parameters, derived from the registry config
+    # models (selecting a method surfaces exactly that method's knobs).
+    methods = sorted(DECONVOLVER_CONFIGS)
+    method = _prompt_choice("Deconvolution method:", methods, default="oSVD")
+    deconvolution: dict[str, Any] = {"method": method}
+    for fname, finfo in DECONVOLVER_CONFIGS[method].model_fields.items():
+        if fname == "method":
+            continue
+        deconvolution[fname] = _prompt_value(
+            finfo.description or fname,
+            default=finfo.default,
+            expected_type=type(finfo.default),
+        )
+    cfg["deconvolution"] = deconvolution
 
     return cfg
 

@@ -18,11 +18,12 @@ References
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from osipy.common.config import MethodConfig, construct_from_config
 from osipy.common.dataset import PerfusionDataset
 from osipy.dsc import (
     DSCPerfusionMaps,
@@ -30,6 +31,7 @@ from osipy.dsc import (
     correct_leakage,
     signal_to_delta_r2,
 )
+from osipy.dsc.deconvolution.config import DECONVOLVER_REGISTRY, OSVDConfig
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -46,20 +48,24 @@ class DSCPipelineConfig:
     ----------
     te : float
         Echo time in milliseconds.
-    deconvolution_method : str
-        Deconvolution method: 'oSVD', 'cSVD', or 'sSVD'.
+    baseline_frames : int
+        Number of pre-bolus baseline frames for signal-to-ΔR2* conversion.
+    hematocrit_ratio : float
+        Large-to-small-vessel hematocrit ratio for CBV correction.
     apply_leakage_correction : bool
         Whether to apply leakage correction.
-    svd_threshold : float
-        SVD truncation threshold.
+    deconvolution : MethodConfig
+        Deconvolution method config (discriminated by ``method``:
+        ``sSVD``/``cSVD``/``oSVD``), carrying that method's parameters.
     output_dir : Path | None
         Output directory for results.
     """
 
     te: float = 30.0
-    deconvolution_method: str = "oSVD"
+    baseline_frames: int = 10
+    hematocrit_ratio: float = 0.73
     apply_leakage_correction: bool = True
-    svd_threshold: float = 0.2
+    deconvolution: MethodConfig = field(default_factory=OSVDConfig)
     output_dir: Path | None = None
 
 
@@ -154,7 +160,9 @@ class DSCPipeline:
         if progress_callback:
             progress_callback("Signal Conversion", 0.0)
 
-        delta_r2 = signal_to_delta_r2(signal, self.config.te)
+        delta_r2 = signal_to_delta_r2(
+            signal, self.config.te, baseline_frames=self.config.baseline_frames
+        )
 
         if progress_callback:
             progress_callback("Signal Conversion", 1.0)
@@ -164,7 +172,9 @@ class DSCPipeline:
             progress_callback("AIF Processing", 0.0)
 
         if aif_signal is not None:
-            aif = signal_to_delta_r2(aif_signal, self.config.te)
+            aif = signal_to_delta_r2(
+                aif_signal, self.config.te, baseline_frames=self.config.baseline_frames
+            )
         elif aif_voxels is not None:
             # Extract AIF from specified voxels
             aif = np.mean(delta_r2[aif_voxels], axis=0)
@@ -204,14 +214,18 @@ class DSCPipeline:
         if progress_callback:
             progress_callback("Perfusion Computation", 0.0)
 
+        deconvolver = construct_from_config(
+            DECONVOLVER_REGISTRY, self.config.deconvolution
+        )
         perfusion_maps = compute_perfusion_maps(
             delta_r2=delta_r2_corrected,
             aif=aif,
             time=time,
             mask=mask,
             deconvolve=True,
-            deconvolution_method=self.config.deconvolution_method,
-            svd_threshold=self.config.svd_threshold,
+            deconvolution_method=self.config.deconvolution.method,
+            fitter=deconvolver,
+            hematocrit_ratio=self.config.hematocrit_ratio,
         )
 
         if progress_callback:

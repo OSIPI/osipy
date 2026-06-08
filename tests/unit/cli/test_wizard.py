@@ -523,12 +523,16 @@ class TestCollectDSCConfig:
 
     def test_defaults(self) -> None:
         """Pressing Enter for all prompts returns defaults."""
-        inputs = _make_input_fn(["", "", "", "", "", ""])
+        # Prompts: te, baseline_frames, hematocrit_ratio, leakage, method,
+        # then oSVD's two params (oscillation_index, default_threshold).
+        inputs = _make_input_fn([""] * 7)
         with patch("builtins.input", side_effect=inputs):
             cfg = _collect_dsc_config()
-        assert cfg["deconvolution_method"] == "oSVD"
         assert cfg["te"] == 30.0
         assert cfg["apply_leakage_correction"] is True
+        assert cfg["deconvolution"]["method"] == "oSVD"
+        assert cfg["deconvolution"]["oscillation_index"] == 0.035
+        assert cfg["deconvolution"]["default_threshold"] == 0.2
 
 
 class TestCollectASLConfig:
