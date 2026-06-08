@@ -305,6 +305,138 @@ class TestASLPipelineIntegration:
         assert result.att_map is not None, "ATT estimation failed"
 
 
+class TestASLPipelineRegistryConfig:
+    """Tests for the registry-driven ASLPipelineConfig wiring."""
+
+    @staticmethod
+    def _make_label_control(seed: int = 0):
+        """Build averaged label/control 4D stacks from a known pCASL forward model."""
+        rng = np.random.default_rng(seed)
+        nx, ny, nz = 6, 6, 2
+        m0 = rng.uniform(900, 1100, (nx, ny, nz))
+        cbf_true = rng.uniform(40, 80, (nx, ny, nz))
+        t1b, tau, pld = 1.65, 1.8, 1.8
+        dm = (
+            2
+            * m0
+            * cbf_true
+            * t1b
+            * 0.85
+            * (1 - np.exp(-tau / t1b))
+            * np.exp(-pld / t1b)
+            / 0.9
+            / 6000.0
+        )
+        control = np.repeat((m0 + dm)[..., None], 4, axis=-1)
+        label = np.repeat(m0[..., None], 4, axis=-1)
+        return label, control, m0
+
+    def test_partition_coefficient_scales_cbf(self) -> None:
+        """Doubling the partition coefficient ~doubles CBF (config flows to params)."""
+        from osipy.asl import LabelingScheme
+        from osipy.pipeline.asl_pipeline import ASLPipeline, ASLPipelineConfig
+
+        label, control, m0 = self._make_label_control()
+
+        cfg_a = ASLPipelineConfig(
+            labeling_scheme=LabelingScheme.PCASL,
+            pld=1800.0,
+            label_duration=1800.0,
+            partition_coefficient=0.9,
+        )
+        res_a = ASLPipeline(cfg_a).run(label, control, m0)
+        mask_a = res_a.cbf_result.quality_mask
+        cbf_a = float(np.mean(res_a.cbf_result.cbf_map.values[mask_a]))
+
+        cfg_b = ASLPipelineConfig(
+            labeling_scheme=LabelingScheme.PCASL,
+            pld=1800.0,
+            label_duration=1800.0,
+            partition_coefficient=1.8,
+        )
+        res_b = ASLPipeline(cfg_b).run(label, control, m0)
+        mask_b = res_b.cbf_result.quality_mask
+        cbf_b = float(np.mean(res_b.cbf_result.cbf_map.values[mask_b]))
+
+        assert cbf_a > 0
+        assert cbf_b == pytest.approx(2.0 * cbf_a, rel=1e-3)
+        assert res_a.att_map is None
+
+    def test_difference_method_routes_through_registry(self) -> None:
+        """The configured difference method dispatches via the difference registry."""
+        from unittest.mock import patch
+
+        import osipy.asl.quantification.cbf as cbf_module
+        from osipy.asl import LabelingScheme
+        from osipy.asl.config import SurroundDifferenceConfig
+        from osipy.pipeline.asl_pipeline import ASLPipeline, ASLPipelineConfig
+
+        label, control, m0 = self._make_label_control(seed=1)
+        cfg = ASLPipelineConfig(
+            labeling_scheme=LabelingScheme.PCASL,
+            difference=SurroundDifferenceConfig(),
+        )
+
+        original = cbf_module.get_difference_method
+        seen: dict[str, str] = {}
+
+        def spy(name: str):
+            seen["name"] = name
+            return original(name)
+
+        with patch.object(cbf_module, "get_difference_method", spy):
+            ASLPipeline(cfg).run(label, control, m0)
+
+        assert seen.get("name") == "surround"
+
+    def test_multi_pld_mode_produces_cbf_and_att(self) -> None:
+        """Selecting multi_pld routes to Buxton fitting, yielding CBF + ATT maps."""
+        from osipy.asl import LabelingScheme
+        from osipy.asl.config import MultiPLDConfig
+        from osipy.pipeline.asl_pipeline import ASLPipeline, ASLPipelineConfig
+
+        rng = np.random.default_rng(42)
+        nx, ny, nz = 4, 4, 2
+        m0 = rng.uniform(900, 1100, (nx, ny, nz))
+        cbf_true = rng.uniform(40, 80, (nx, ny, nz))
+        att_true = rng.uniform(800, 1500, (nx, ny, nz))
+        plds = [500.0, 1000.0, 1500.0, 2000.0, 2500.0]
+        t1b, tau = 1.65, 1.8
+
+        # Interleave control/label per PLD: [control, label] * n_plds.
+        alt = np.zeros((nx, ny, nz, 2 * len(plds)))
+        for i, p in enumerate(plds):
+            ps = p / 1000.0
+            dm = (
+                2
+                * m0
+                * cbf_true
+                * t1b
+                * 0.85
+                * (1 - np.exp(-tau / t1b))
+                * np.exp(-ps / t1b)
+                / 0.9
+                / 6000.0
+            )
+            att_factor = np.clip((p - att_true) / 500.0, 0, 1)
+            alt[..., 2 * i] = m0 + dm * att_factor  # control
+            alt[..., 2 * i + 1] = m0  # label
+
+        cfg = ASLPipelineConfig(
+            labeling_scheme=LabelingScheme.PCASL,
+            label_duration=1800.0,
+            quantification=MultiPLDConfig(plds=plds, att_model="buxton"),
+        )
+        result = ASLPipeline(cfg).run_from_alternating(
+            alt, m0, label_control_order="control_first"
+        )
+
+        assert result.cbf_result.cbf_map is not None
+        assert result.cbf_result.cbf_map.units == "mL/100g/min"
+        assert result.att_map is not None
+        assert "ms" in result.att_map.units.lower()
+
+
 class TestASLOutputValidation:
     """Test ASL output format and physiological validity."""
 

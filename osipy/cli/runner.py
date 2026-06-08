@@ -686,13 +686,19 @@ def _run_asl(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
     }
     labeling_scheme = scheme_map[mc.labeling_scheme]  # type: ignore[attr-defined]
 
+    # Pass the validated nested configs straight through (no per-knob mapping):
+    # m0 / difference / quantification carry their own method+params.
     pipeline_cfg = ASLPipelineConfig(
         labeling_scheme=labeling_scheme,
         pld=mc.pld,  # type: ignore[attr-defined]
         label_duration=mc.label_duration,  # type: ignore[attr-defined]
         t1_blood=mc.t1_blood,  # type: ignore[attr-defined]
+        t1_tissue=mc.t1_tissue,  # type: ignore[attr-defined]
         labeling_efficiency=mc.labeling_efficiency,  # type: ignore[attr-defined]
-        m0_method=mc.m0_method,  # type: ignore[attr-defined]
+        partition_coefficient=mc.partition_coefficient,  # type: ignore[attr-defined]
+        m0=mc.m0,  # type: ignore[attr-defined]
+        difference=mc.difference,  # type: ignore[attr-defined]
+        quantification=mc.quantification,  # type: ignore[attr-defined]
     )
 
     # Load M0 calibration data
@@ -719,6 +725,8 @@ def _run_asl(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
     elapsed_fit = time.perf_counter() - t_fit
 
     maps: dict[str, Any] = {"cbf": result.cbf_result.cbf_map}
+    if result.att_map is not None:
+        maps["att"] = result.att_map
     _log_parameter_stats(maps, result.cbf_result.quality_mask, elapsed_fit)
     _save_results(maps, result.cbf_result.quality_mask, output_dir, affine)
 

@@ -39,10 +39,15 @@ _PIPELINE_COMMENTS: dict[str, str] = {
     "label_duration": "ms, labeling duration",
     "t1_blood": "ms, longitudinal relaxation of blood",
     "labeling_efficiency": "labeling efficiency (0 to 1)",
-    "m0_method": "M0 calibration method",
+    "m0": "M0 calibration method + parameters",
+    "method": "selection (registry name)",
+    "mode": "quantification mode (single_pld | multi_pld)",
+    "plds": "ms, multi-PLD schedule",
+    "att_model": "ATT estimation model",
     "t1_tissue": "ms, longitudinal relaxation of tissue",
     "partition_coefficient": "blood-brain partition coefficient (mL/g)",
-    "difference_method": "label-control subtraction method",
+    "difference": "label-control subtraction method",
+    "quantification": "CBF quantification mode + parameters",
     "label_control_order": "label/control ordering",
     "fitting_method": "IVIM fitting method",
     "b_threshold": "s/mm^2, threshold separating D and D* regimes",
@@ -403,6 +408,12 @@ def _collect_dsc_config() -> dict[str, Any]:
 
 def _collect_asl_config() -> dict[str, Any]:
     """Collect ASL pipeline settings."""
+    from osipy.asl.config import (
+        DIFFERENCE_CONFIGS,
+        M0_CONFIGS,
+        QUANTIFICATION_CONFIGS,
+    )
+
     print("\n--- ASL Pipeline Settings ---")
     cfg: dict[str, Any] = {}
 
@@ -421,26 +432,28 @@ def _collect_asl_config() -> dict[str, Any]:
     cfg["t1_blood"] = _prompt_value(
         "T1 of blood (ms)", default=1650.0, expected_type=float
     )
-    cfg["labeling_efficiency"] = _prompt_value(
-        "Labeling efficiency (0-1)", default=0.85, expected_type=float
-    )
-
-    m0_methods = ["single", "voxelwise", "reference_region"]
-    cfg["m0_method"] = _prompt_choice(
-        "M0 calibration method:", m0_methods, default="single"
-    )
-
     cfg["t1_tissue"] = _prompt_value(
         "T1 of tissue (ms)", default=1330.0, expected_type=float
+    )
+    cfg["labeling_efficiency"] = _prompt_value(
+        "Labeling efficiency (0-1)", default=0.85, expected_type=float
     )
     cfg["partition_coefficient"] = _prompt_value(
         "Partition coefficient (mL/g)", default=0.9, expected_type=float
     )
 
-    diff_methods = ["pairwise", "surround", "mean"]
-    cfg["difference_method"] = _prompt_choice(
-        "Difference method:", diff_methods, default="pairwise"
+    # M0 calibration method + its params (e.g. tr_m0, t1_tissue, reference_region).
+    cfg["m0"] = _collect_method_config(
+        "M0 calibration method:", M0_CONFIGS, default="single"
     )
+
+    # Label/control difference method (selection only, no extra knobs).
+    cfg["difference"] = _collect_method_config(
+        "Difference method:", DIFFERENCE_CONFIGS, default="pairwise"
+    )
+
+    # Quantification mode: single-PLD vs multi-PLD (Buxton + ATT estimation).
+    cfg["quantification"] = _collect_quantification_config(QUANTIFICATION_CONFIGS)
 
     orders = ["label_first", "control_first"]
     cfg["label_control_order"] = _prompt_choice(
@@ -448,6 +461,28 @@ def _collect_asl_config() -> dict[str, Any]:
     )
 
     return cfg
+
+
+def _collect_quantification_config(configs: dict[str, Any]) -> dict[str, Any]:
+    """Prompt for the ASL quantification mode and its parameters.
+
+    Single-PLD has no extra knobs; multi-PLD prompts for the PLD schedule
+    (comma-separated) and the ATT model.
+    """
+    names = sorted(configs)
+    mode = _prompt_choice("Quantification mode:", names, default="single_pld")
+    selection: dict[str, Any] = {"mode": mode}
+    if mode == "multi_pld":
+        raw = _prompt_value(
+            "PLD schedule (comma-separated ms)",
+            default="500, 1000, 1500, 2000, 2500",
+            expected_type=str,
+        )
+        selection["plds"] = [float(x) for x in str(raw).split(",")]
+        selection["att_model"] = _prompt_value(
+            "ATT model", default="buxton", expected_type=str
+        )
+    return selection
 
 
 def _collect_ivim_config() -> dict[str, Any]:

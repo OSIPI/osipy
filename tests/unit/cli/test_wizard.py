@@ -568,15 +568,51 @@ class TestCollectASLConfig:
     """Tests for _collect_asl_config()."""
 
     def test_defaults(self) -> None:
-        """Pressing Enter for all prompts returns defaults."""
-        inputs = _make_input_fn([""] * 10)
+        """Pressing Enter for all prompts returns defaults (nested configs)."""
+        # Prompts: labeling_scheme, pld, label_duration, t1_blood, t1_tissue,
+        # labeling_efficiency, partition_coefficient (7), then m0 method +
+        # its 3 knobs (4), difference method (1), quantification mode (1),
+        # label/control order (1) = 14.
+        inputs = _make_input_fn([""] * 14)
         with patch("builtins.input", side_effect=inputs):
             cfg = _collect_asl_config()
         assert cfg["labeling_scheme"] == "pcasl"
         assert cfg["pld"] == 1800.0
-        assert cfg["m0_method"] == "single"
-        assert cfg["difference_method"] == "pairwise"
+        assert cfg["t1_tissue"] == 1330.0
+        assert cfg["partition_coefficient"] == 0.9
+        assert cfg["m0"]["method"] == "single"
+        assert cfg["m0"]["tr_m0"] == 6000.0
+        assert cfg["difference"]["method"] == "pairwise"
+        assert cfg["quantification"]["mode"] == "single_pld"
         assert cfg["label_control_order"] == "label_first"
+
+    def test_multi_pld_mode_collects_plds(self) -> None:
+        """Selecting multi_pld surfaces the PLD schedule and ATT model prompts."""
+        inputs = _make_input_fn(
+            [
+                "",  # labeling_scheme: default
+                "",  # pld
+                "",  # label_duration
+                "",  # t1_blood
+                "",  # t1_tissue
+                "",  # labeling_efficiency
+                "",  # partition_coefficient
+                "single",  # m0 method
+                "",  # m0 t1_tissue
+                "",  # m0 tr_m0
+                "",  # m0 te_m0
+                "pairwise",  # difference method
+                "multi_pld",  # quantification mode
+                "500, 1000, 1500",  # plds
+                "buxton",  # att_model
+                "",  # label/control order
+            ]
+        )
+        with patch("builtins.input", side_effect=inputs):
+            cfg = _collect_asl_config()
+        assert cfg["quantification"]["mode"] == "multi_pld"
+        assert cfg["quantification"]["plds"] == [500.0, 1000.0, 1500.0]
+        assert cfg["quantification"]["att_model"] == "buxton"
 
 
 class TestCollectIVIMConfig:
@@ -626,11 +662,12 @@ class TestAllModalitiesValidation:
                 "pld": 1800.0,
                 "label_duration": 1800.0,
                 "t1_blood": 1650.0,
-                "labeling_efficiency": 0.85,
-                "m0_method": "single",
                 "t1_tissue": 1330.0,
+                "labeling_efficiency": 0.85,
                 "partition_coefficient": 0.9,
-                "difference_method": "pairwise",
+                "m0": {"method": "single"},
+                "difference": {"method": "pairwise"},
+                "quantification": {"mode": "single_pld"},
                 "label_control_order": "label_first",
             },
             "ivim": {
@@ -758,11 +795,15 @@ class TestRunWizard:
                 "",  # pld: default
                 "",  # label duration: default
                 "",  # t1 blood: default
-                "",  # labeling efficiency: default
-                "",  # m0 method: default
                 "",  # t1 tissue: default
+                "",  # labeling efficiency: default
                 "",  # partition coeff: default
+                "",  # m0 method: default
+                "",  # m0 t1_tissue: default
+                "",  # m0 tr_m0: default
+                "",  # m0 te_m0: default
                 "",  # difference method: default
+                "",  # quantification mode: default
                 "",  # label/control order: default
                 # -- data (second) --
                 "",  # data format: auto

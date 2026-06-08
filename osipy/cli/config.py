@@ -14,6 +14,15 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
+from osipy.asl.config import (
+    DIFFERENCE_CONFIGS,
+    M0_CONFIGS,
+    QUANT_DISCRIMINATOR,
+    QUANTIFICATION_CONFIGS,
+    PairwiseDifferenceConfig,
+    SingleM0Config,
+    SinglePLDConfig,
+)
 from osipy.common.config import method_union
 from osipy.dce.config import (
     CONCENTRATION_CONFIGS,
@@ -354,6 +363,15 @@ class DSCPipelineYAML(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# Discriminated unions of ASL selection-point configs, generated from the
+# registries: selecting a method/mode pulls in exactly that option's params.
+_M0Config = method_union(M0_CONFIGS)
+_DifferenceConfig = method_union(DIFFERENCE_CONFIGS)
+_QuantificationConfig = method_union(
+    QUANTIFICATION_CONFIGS, discriminator=QUANT_DISCRIMINATOR
+)
+
+
 class ASLPipelineYAML(BaseModel):
     """ASL pipeline settings from YAML."""
 
@@ -363,20 +381,32 @@ class ASLPipelineYAML(BaseModel):
     t1_blood: float = Field(
         default=1650.0, description="ms, longitudinal relaxation time of blood"
     )
-    labeling_efficiency: float = Field(
-        default=0.85, description="labeling efficiency (0 to 1)"
-    )
-    m0_method: str = Field(
-        default="single", description="single | voxelwise | reference_region"
-    )
     t1_tissue: float = Field(
         default=1330.0, description="ms, longitudinal relaxation time of tissue"
+    )
+    labeling_efficiency: float = Field(
+        default=0.85, description="labeling efficiency (0 to 1)"
     )
     partition_coefficient: float = Field(
         default=0.9, description="blood-brain partition coefficient (mL/g)"
     )
-    difference_method: str = Field(
-        default="pairwise", description="pairwise | surround | mean"
+    m0: _M0Config = Field(
+        default_factory=SingleM0Config,
+        description=(
+            "M0 calibration method + parameters "
+            "(method: single | voxelwise | reference_region)"
+        ),
+    )
+    difference: _DifferenceConfig = Field(
+        default_factory=PairwiseDifferenceConfig,
+        description="label-control subtraction method (method: pairwise | surround | mean)",
+    )
+    quantification: _QuantificationConfig = Field(
+        default_factory=SinglePLDConfig,
+        description=(
+            "CBF quantification mode + parameters "
+            "(mode: single_pld | multi_pld); multi_pld adds plds + ATT estimation"
+        ),
     )
     label_control_order: str = Field(
         default="label_first", description="label_first | control_first"
@@ -389,16 +419,6 @@ class ASLPipelineYAML(BaseModel):
         valid = ["pasl", "casl", "pcasl"]
         if v not in valid:
             msg = f"Invalid labeling scheme '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
-
-    @field_validator("m0_method")
-    @classmethod
-    def validate_m0(cls, v: str) -> str:
-        """Validate M0 calibration method."""
-        valid = ["single", "voxelwise", "reference_region"]
-        if v not in valid:
-            msg = f"Invalid M0 method '{v}'. Valid: {valid}"
             raise ValueError(msg)
         return v
 

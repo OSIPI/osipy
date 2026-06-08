@@ -145,6 +145,34 @@ class TestLoadConfig:
         config = load_config(path)
         assert config.modality == "asl"
 
+    def test_load_asl_nested_multi_pld_config(self, tmp_config) -> None:
+        """Nested ASL config (M0 knobs + multi-PLD mode) round-trips via load_config."""
+        path = tmp_config("""\
+            modality: asl
+            pipeline:
+              labeling_scheme: pcasl
+              partition_coefficient: 0.95
+              m0:
+                method: reference_region
+                reference_region: white_matter
+                tr_m0: 5000.0
+              difference:
+                method: mean
+              quantification:
+                mode: multi_pld
+                plds: [500.0, 1000.0, 1500.0, 2000.0, 2500.0]
+                att_model: buxton
+        """)
+        config = load_config(path)
+        mc = config.get_modality_config()
+        assert mc.partition_coefficient == 0.95
+        assert mc.m0.method == "reference_region"
+        assert mc.m0.reference_region == "white_matter"
+        assert mc.m0.tr_m0 == 5000.0
+        assert mc.difference.method == "mean"
+        assert mc.quantification.mode == "multi_pld"
+        assert mc.quantification.plds == [500.0, 1000.0, 1500.0, 2000.0, 2500.0]
+
     def test_load_ivim_config(self, tmp_config) -> None:
         """Valid IVIM config loads successfully."""
         path = tmp_config("""\
@@ -346,17 +374,19 @@ class TestASLPipelineYAML:
     """Tests for ASL pipeline config validation."""
 
     def test_defaults(self) -> None:
-        """Default ASL config values match expected."""
+        """Default ASL config values match expected (nested registry configs)."""
         cfg = ASLPipelineYAML()
         assert cfg.labeling_scheme == "pcasl"
         assert cfg.pld == 1800.0
         assert cfg.label_duration == 1800.0
         assert cfg.t1_blood == 1650.0
-        assert cfg.labeling_efficiency == 0.85
-        assert cfg.m0_method == "single"
         assert cfg.t1_tissue == 1330.0
+        assert cfg.labeling_efficiency == 0.85
         assert cfg.partition_coefficient == 0.9
-        assert cfg.difference_method == "pairwise"
+        assert cfg.m0.method == "single"
+        assert cfg.m0.t1_tissue == 1330.0
+        assert cfg.difference.method == "pairwise"
+        assert cfg.quantification.mode == "single_pld"
         assert cfg.label_control_order == "label_first"
 
     def test_invalid_labeling_scheme(self) -> None:
@@ -365,9 +395,9 @@ class TestASLPipelineYAML:
             ASLPipelineYAML(labeling_scheme="invalid")
 
     def test_invalid_m0_method(self) -> None:
-        """Invalid M0 method raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid M0 method"):
-            ASLPipelineYAML(m0_method="invalid")
+        """Invalid M0 method raises ValidationError (no matching union member)."""
+        with pytest.raises(ValidationError):
+            ASLPipelineYAML(m0={"method": "invalid"})
 
     def test_invalid_label_control_order(self) -> None:
         """Invalid label/control order raises ValidationError."""
@@ -379,6 +409,58 @@ class TestASLPipelineYAML:
         for scheme in ("pasl", "casl", "pcasl"):
             cfg = ASLPipelineYAML(labeling_scheme=scheme)
             assert cfg.labeling_scheme == scheme
+
+    def test_valid_m0_methods(self) -> None:
+        """All registered M0 calibration methods are accepted (nested config)."""
+        from osipy.asl.config import M0_CONFIGS
+
+        for name in M0_CONFIGS:
+            cfg = ASLPipelineYAML(m0={"method": name})
+            assert cfg.m0.method == name
+
+    def test_m0_params_surface_and_validate(self) -> None:
+        """Selecting an M0 method exposes its knobs; cross-method keys rejected."""
+        cfg = ASLPipelineYAML(
+            m0={"method": "reference_region", "reference_region": "white_matter"}
+        )
+        assert cfg.m0.method == "reference_region"
+        assert cfg.m0.reference_region == "white_matter"
+        # 'single' has no reference_region knob (extra=forbid).
+        with pytest.raises(ValidationError):
+            ASLPipelineYAML(m0={"method": "single", "reference_region": "csf"})
+
+    def test_valid_difference_methods(self) -> None:
+        """All registered difference methods are selectable via the nested config."""
+        from osipy.asl.config import DIFFERENCE_CONFIGS
+
+        for name in DIFFERENCE_CONFIGS:
+            cfg = ASLPipelineYAML(difference={"method": name})
+            assert cfg.difference.method == name
+
+    def test_difference_rejects_cross_method_keys(self) -> None:
+        """Difference selection rejects unknown/cross-method keys (extra=forbid)."""
+        with pytest.raises(ValidationError):
+            ASLPipelineYAML(difference={"method": "pairwise", "threshold": 0.2})
+
+    def test_quantification_modes_selectable(self) -> None:
+        """Both single_pld and multi_pld modes are selectable."""
+        cfg_single = ASLPipelineYAML(quantification={"mode": "single_pld"})
+        assert cfg_single.quantification.mode == "single_pld"
+        cfg_multi = ASLPipelineYAML(
+            quantification={
+                "mode": "multi_pld",
+                "plds": [500.0, 1000.0, 1500.0],
+                "att_model": "buxton",
+            }
+        )
+        assert cfg_multi.quantification.mode == "multi_pld"
+        assert cfg_multi.quantification.plds == [500.0, 1000.0, 1500.0]
+        assert cfg_multi.quantification.att_model == "buxton"
+
+    def test_single_pld_rejects_multi_pld_keys(self) -> None:
+        """single_pld mode rejects multi-PLD-only keys (extra=forbid)."""
+        with pytest.raises(ValidationError):
+            ASLPipelineYAML(quantification={"mode": "single_pld", "plds": [500.0]})
 
 
 # ---------------------------------------------------------------------------
