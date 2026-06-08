@@ -60,27 +60,6 @@ class TestConvolutionEquivalence:
 
         np.testing.assert_array_almost_equal(cpu_result, gpu_result_np, decimal=4)
 
-    def test_deconvolve_svd_equivalence(self) -> None:
-        """GPU SVD deconvolution should match CPU."""
-        cp = pytest.importorskip("cupy")
-        from osipy.common.convolution import deconvolve_svd
-
-        n = 50
-        ct = np.random.randn(n)
-        aif = np.exp(-0.1 * np.arange(n)) + 0.1
-        dt = 1.0
-        threshold = 0.1
-
-        cpu_irf, cpu_residue = deconvolve_svd(ct, aif, dt=dt, threshold=threshold)
-        gpu_irf, gpu_residue = deconvolve_svd(
-            cp.asarray(ct), cp.asarray(aif), dt=dt, threshold=threshold
-        )
-
-        np.testing.assert_array_almost_equal(cpu_irf, cp.asnumpy(gpu_irf), decimal=4)
-        np.testing.assert_array_almost_equal(
-            cpu_residue, cp.asnumpy(gpu_residue), decimal=4
-        )
-
 
 class TestModelPredictionEquivalence:
     """Test GPU model predictions match CPU."""

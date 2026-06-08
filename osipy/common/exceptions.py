@@ -69,26 +69,6 @@ class FittingError(OsipyError):
     pass
 
 
-class MetadataError(OsipyError):
-    """Raised when required metadata is missing or invalid.
-
-    This exception is raised when:
-    - Required DICOM tags are missing
-    - Acquisition parameters cannot be determined
-    - Metadata values are out of expected ranges
-    - Required sidecar JSON files are missing
-
-    Examples
-    --------
-    >>> raise MetadataError("Missing required TR value in DICOM header")
-    Traceback (most recent call last):
-        ...
-    osipy.common.exceptions.MetadataError: Missing required TR value in DICOM header
-    """
-
-    pass
-
-
 class AIFError(OsipyError):
     """Raised when AIF extraction or validation fails.
 
@@ -124,25 +104,6 @@ class IOError(OsipyError):
     Traceback (most recent call last):
         ...
     osipy.common.exceptions.IOError: Unsupported file format: .xyz
-    """
-
-    pass
-
-
-class ValidationError(OsipyError):
-    """Raised when validation against reference data fails.
-
-    This exception is raised when:
-    - Computed values exceed tolerance thresholds
-    - Reference data format is invalid
-    - Comparison dimensions don't match
-
-    Examples
-    --------
-    >>> raise ValidationError("Ktrans values exceed 5% tolerance in 15% of voxels")
-    Traceback (most recent call last):
-        ...
-    osipy.common.exceptions.ValidationError: Ktrans values exceed 5% tolerance
     """
 
     pass

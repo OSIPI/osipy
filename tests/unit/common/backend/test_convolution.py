@@ -12,11 +12,7 @@ scipy_signal = pytest.importorskip(
     "scipy.signal", reason="scipy required for reference test"
 )
 
-from osipy.common.convolution import (
-    convolve_aif,
-    deconvolve_svd,
-    deconvolve_svd_batch,
-)
+from osipy.common.convolution import convolve_aif
 from osipy.common.exceptions import DataValidationError
 
 
@@ -138,86 +134,6 @@ class TestConvolveAifBatch:
             convolve_aif(aif, irfs)
 
 
-class TestDeconvolveSvd:
-    """Tests for deconvolve_svd function."""
-
-    def test_recovers_impulse(self) -> None:
-        """Should recover impulse from convolution."""
-        n = 50
-        aif = np.exp(-0.1 * np.arange(n)) + 0.1
-        true_irf = np.zeros(n)
-        true_irf[0] = 1.0
-        dt = 1.0
-
-        ct = convolve_aif(aif, true_irf, dt=dt)
-        irf, _ = deconvolve_svd(ct, aif, dt=dt, threshold=0.01)
-
-        # First element should be close to 1, others close to 0
-        assert abs(irf[0] - 1.0) < 0.2
-        assert np.mean(np.abs(irf[1:])) < 0.2
-
-    def test_returns_tuple(self) -> None:
-        """Should return (irf, residue) tuple."""
-        n = 30
-        ct = np.random.randn(n)
-        aif = np.exp(-0.1 * np.arange(n)) + 0.1
-
-        result = deconvolve_svd(ct, aif)
-
-        assert isinstance(result, tuple)
-        assert len(result) == 2
-        irf, residue = result
-        assert irf.shape == (n,)
-        assert residue.shape == (n,)
-
-    def test_residue_is_cumulative_irf(self) -> None:
-        """Residue should be cumulative sum of IRF."""
-        n = 30
-        ct = np.random.randn(n)
-        aif = np.exp(-0.1 * np.arange(n)) + 0.1
-        dt = 0.5
-
-        irf, residue = deconvolve_svd(ct, aif, dt=dt)
-
-        expected_residue = np.cumsum(irf) * dt
-        np.testing.assert_array_almost_equal(residue, expected_residue)
-
-
-class TestDeconvolveSvdBatch:
-    """Tests for deconvolve_svd_batch function."""
-
-    def test_batch_shape(self) -> None:
-        """Should handle batch input correctly."""
-        n_time = 30
-        n_voxels = 20
-        ct = np.random.randn(n_time, n_voxels)
-        aif = np.exp(-0.1 * np.arange(n_time)) + 0.1
-
-        irf, residue = deconvolve_svd_batch(ct, aif)
-
-        assert irf.shape == (n_time, n_voxels)
-        assert residue.shape == (n_time, n_voxels)
-
-    def test_matches_loop_version(self) -> None:
-        """Batch version should match loop over individual deconvolutions."""
-        n_time = 20
-        n_voxels = 5
-        ct = np.random.randn(n_time, n_voxels)
-        aif = np.exp(-0.1 * np.arange(n_time)) + 0.1
-        dt = 0.5
-        threshold = 0.1
-
-        batch_irf, _batch_residue = deconvolve_svd_batch(
-            ct, aif, dt=dt, threshold=threshold
-        )
-
-        for v in range(n_voxels):
-            single_irf, _single_residue = deconvolve_svd(
-                ct[:, v], aif, dt=dt, threshold=threshold
-            )
-            np.testing.assert_array_almost_equal(batch_irf[:, v], single_irf, decimal=5)
-
-
 class TestGpuConvolution:
     """GPU integration tests for convolution functions."""
 
@@ -234,20 +150,4 @@ class TestGpuConvolution:
 
         np.testing.assert_array_almost_equal(
             cpu_result, cp.asnumpy(gpu_result), decimal=10
-        )
-
-    def test_gpu_deconvolve_matches_cpu(self) -> None:
-        """GPU deconvolution should match CPU result."""
-        cp = pytest.importorskip("cupy")
-
-        n = 50
-        ct = np.random.randn(n)
-        aif = np.exp(-0.1 * np.arange(n)) + 0.1
-
-        cpu_irf, cpu_residue = deconvolve_svd(ct, aif)
-        gpu_irf, gpu_residue = deconvolve_svd(cp.asarray(ct), cp.asarray(aif))
-
-        np.testing.assert_array_almost_equal(cpu_irf, cp.asnumpy(gpu_irf), decimal=8)
-        np.testing.assert_array_almost_equal(
-            cpu_residue, cp.asnumpy(gpu_residue), decimal=8
         )

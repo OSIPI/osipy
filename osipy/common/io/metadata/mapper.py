@@ -97,11 +97,6 @@ class MetadataMapper:
         -------
         AnyAcquisitionParams
             Modality-specific acquisition parameters.
-
-        Raises
-        ------
-        MetadataError
-            If required parameters are missing and interactive=False.
         """
         # Merge metadata with priority chain
         merged = self._merge_metadata(

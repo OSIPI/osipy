@@ -5,7 +5,6 @@ import pytest
 
 from osipy.common.exceptions import DataValidationError
 from osipy.dsc.concentration import (
-    DSCAcquisitionParams,
     delta_r2_to_concentration,
     signal_to_delta_r2,
 )
@@ -102,26 +101,3 @@ class TestDeltaR2ToConcentration:
 
         assert concentration.shape == shape
         assert np.all(concentration >= 0)
-
-
-class TestDSCAcquisitionParams:
-    """Tests for DSC acquisition parameters."""
-
-    def test_default_values(self) -> None:
-        """Test default parameter values."""
-        params = DSCAcquisitionParams()
-        assert params.te == 30.0
-        assert params.tr == 1500.0
-        assert params.field_strength == 1.5
-        assert params.r2_star == 32.0
-
-    def test_custom_values(self) -> None:
-        """Test custom parameter values."""
-        params = DSCAcquisitionParams(
-            te=25.0,
-            tr=1000.0,
-            field_strength=3.0,
-            r2_star=50.0,
-        )
-        assert params.te == 25.0
-        assert params.field_strength == 3.0

@@ -31,7 +31,6 @@ from osipy.dsc.arrival import (
     register_arrival_detector,
 )
 from osipy.dsc.concentration import (
-    DSCAcquisitionParams,
     delta_r2_to_concentration,
     gamma_variate_fit,
     signal_to_delta_r2,
@@ -73,7 +72,6 @@ from osipy.dsc.parameters import (
 )
 
 __all__ = [
-    "DSCAcquisitionParams",
     "DSCPerfusionMaps",
     "DeconvolutionResult",
     "LeakageCorrectionParams",
