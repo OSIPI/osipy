@@ -514,7 +514,9 @@ def _comment(choices: list[str] | None, description: str) -> str:
         parts.append(" | ".join(choices))
     if description and description not in parts:
         parts.append(description)
-    return "  # " + "  —  ".join(parts) if parts else ""
+    # ASCII-only separator: generated templates must round-trip on Windows
+    # (cp1252) as well as UTF-8.
+    return "  # " + " - ".join(parts) if parts else ""
 
 
 def _render_model_yaml(

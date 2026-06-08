@@ -813,6 +813,9 @@ class TestDumpDefaults:
         """Round-trip: dump_defaults output can be loaded and validated."""
         for modality in ("dce", "dsc", "asl", "ivim"):
             template = dump_defaults(modality)
+            # Templates must be ASCII so they round-trip on Windows (cp1252)
+            # as well as UTF-8.
+            template.encode("ascii")
             config_path = tmp_path / f"{modality}_config.yaml"
             config_path.write_text(template)
             config = load_config(config_path)
