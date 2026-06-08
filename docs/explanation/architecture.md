@@ -504,6 +504,12 @@ All extension points use the registry pattern — one file, one decorator. 17+ r
 
 All registries use `DataValidationError` for unknown names and `logging.getLogger(__name__)` with warnings for overwrites.
 
+Each selectable component also declares a pydantic `MethodConfig`, so the CLI
+config, interactive wizard, and `--dump-defaults` templates are generated
+directly from `registry × schema`. See
+[Registry-Driven Configuration](configuration.md) for how a single decorator
+plus a config model turns a component into a validated, wired CLI toggle.
+
 ### Adding a New Model
 
 1. Create class inheriting from `BasePerfusionModel`

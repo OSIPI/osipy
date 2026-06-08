@@ -100,10 +100,16 @@ With T1 mapping from VFA data:
 ```yaml
 modality: dce
 pipeline:
-  model: extended_tofts
-  t1_mapping_method: vfa
+  model:
+    method: extended_tofts
+  t1_mapping_method:
+    method: vfa
+    fit_method: linear        # linear (fast) or nonlinear (LM refinement)
+  concentration:
+    method: spgr              # spgr or linear
   aif_source: population
-  population_aif: parker
+  population_aif:
+    name: parker
   acquisition:
     tr: 5.0
     flip_angles: [2, 5, 10, 15]
@@ -115,14 +121,21 @@ output:
   format: nifti
 ```
 
+Each component selection is a nested block discriminated by a key
+(`method` for the PK model, T1 method, and concentration model; `name` for
+the population AIF). Selecting a method surfaces exactly that method's
+knobs — for example, `t1_mapping_method.fit_method` only exists for `vfa`.
+
 Without T1 data (assumed T1):
 
 ```yaml
 modality: dce
 pipeline:
-  model: extended_tofts
+  model:
+    method: extended_tofts
   aif_source: population
-  population_aif: parker
+  population_aif:
+    name: parker
   acquisition:
     t1_assumed: 1400.0
     baseline_frames: 5
@@ -139,15 +152,21 @@ output:
 modality: dsc
 pipeline:
   te: 30.0
-  deconvolution_method: oSVD
-  apply_leakage_correction: true
-  svd_threshold: 0.2
   baseline_frames: 10
+  apply_leakage_correction: true
+  deconvolution:
+    method: oSVD            # oSVD | sSVD | cSVD
+    oscillation_index: 0.035
+    default_threshold: 0.2
 data:
   mask: brain_mask.nii.gz
 output:
   format: nifti
 ```
+
+`deconvolution` is discriminated by `method`. `oSVD` exposes
+`oscillation_index` and `default_threshold`; `sSVD` and `cSVD` instead take a
+single `threshold`, e.g. `deconvolution: {method: sSVD, threshold: 0.2}`.
 
 ### ASL
 
@@ -159,7 +178,12 @@ pipeline:
   label_duration: 1800.0
   t1_blood: 1650.0
   labeling_efficiency: 0.85
-  m0_method: single
+  m0:
+    method: single          # single | voxelwise | reference_region
+  difference:
+    method: pairwise        # pairwise | surround | mean
+  quantification:
+    mode: single_pld        # single_pld | multi_pld
 data:
   mask: brain_mask.nii.gz
   m0_data: m0.nii.gz
@@ -167,13 +191,26 @@ output:
   format: nifti
 ```
 
+For multi-PLD acquisitions, switch the quantification mode to estimate both
+CBF and arterial transit time (ATT) via the Buxton general kinetic model:
+
+```yaml
+  quantification:
+    mode: multi_pld
+    plds: [500.0, 1000.0, 1500.0, 2000.0, 2500.0]  # ms, one volume per PLD
+    att_model: buxton
+```
+
 ### IVIM
 
 ```yaml
 modality: ivim
 pipeline:
-  fitting_method: segmented
-  b_threshold: 200.0
+  fitting:
+    method: segmented        # segmented | full | bayesian
+    b_threshold: 200.0       # only for segmented / bayesian
+  model:
+    model: biexponential     # biexponential | simplified
   normalize_signal: true
 data:
   mask: brain_mask.nii.gz
@@ -181,6 +218,13 @@ data:
 output:
   format: nifti
 ```
+
+`fitting` is discriminated by `method`: `segmented` and `bayesian` expose
+`b_threshold`, while `full` fits all b-values jointly (no threshold).
+`bayesian` adds `prior_scale`, `noise_std`, and `compute_uncertainty`.
+The `model` block selects the signal model — `simplified` exposes its own
+`b_threshold` above which the perfusion term is treated as negligible.
+`bounds` and `initial_guess` overrides live under `fitting`.
 
 ## See Also
 

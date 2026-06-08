@@ -20,13 +20,11 @@ from pydantic import BaseModel
 from osipy.cli.config import (
     ASLPipelineYAML,
     BackendConfig,
-    BayesianIVIMFittingConfig,
     DataConfig,
     DCEAcquisitionYAML,
     DCEFittingConfig,
     DCEPipelineYAML,
     DSCPipelineYAML,
-    IVIMFittingConfig,
     IVIMPipelineYAML,
     LoggingConfig,
     OutputConfig,
@@ -37,39 +35,26 @@ from osipy.cli.config import (
 # Valid-value mapping: (ClassName, field_name) -> callable returning list
 # ---------------------------------------------------------------------------
 
+# Only genuinely-flat string fields need an explicit valid-value list. The
+# component-selection blocks (model, t1_mapping_method, concentration,
+# population_aif, deconvolution, m0, difference, quantification, fitting,
+# IVIM model) are discriminated unions whose members are documented as nested
+# sub-tables, so their valid values are self-describing via the discriminator.
 VALID_VALUES: dict[tuple[str, str], Any] = {
     ("PipelineConfig", "modality"): lambda: ["dce", "dsc", "asl", "ivim"],
-    ("DCEPipelineYAML", "model"): lambda: _safe_registry("osipy.dce", "list_models"),
-    ("DCEPipelineYAML", "t1_mapping_method"): lambda: ["vfa", "look_locker"],
     ("DCEPipelineYAML", "aif_source"): lambda: [
         "population",
         "detect",
         "manual",
     ],
-    ("DCEPipelineYAML", "population_aif"): lambda: _safe_registry(
-        "osipy.common.aif", "list_aifs"
-    ),
-    ("DSCPipelineYAML", "deconvolution_method"): lambda: _safe_registry(
-        "osipy.dsc", "list_deconvolvers"
-    ),
     ("ASLPipelineYAML", "labeling_scheme"): lambda: [
         "pasl",
         "casl",
         "pcasl",
     ],
-    ("ASLPipelineYAML", "m0_method"): lambda: [
-        "single",
-        "voxelwise",
-        "reference_region",
-    ],
     ("ASLPipelineYAML", "label_control_order"): lambda: [
         "label_first",
         "control_first",
-    ],
-    ("IVIMPipelineYAML", "fitting_method"): lambda: [
-        "segmented",
-        "full",
-        "bayesian",
     ],
     ("DCEFittingConfig", "fitter"): lambda: _safe_registry(
         "osipy.common.fitting.registry", "list_fitters"
@@ -224,6 +209,76 @@ def _render_table(
     return lines
 
 
+def _union_members(annotation: Any) -> list[type[BaseModel]]:
+    """Return the pydantic ``MethodConfig`` members of a (possibly single) union.
+
+    Component-selection fields are typed as a discriminated union of
+    ``MethodConfig`` subclasses (or a single such class). Returns the member
+    classes in a stable, name-sorted order.
+    """
+    origin = get_origin(annotation)
+    if origin is typing.Union or isinstance(annotation, types.UnionType):
+        members = [a for a in get_args(annotation) if a is not type(None)]
+    elif isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        members = [annotation]
+    else:
+        return []
+    members = [m for m in members if isinstance(m, type) and issubclass(m, BaseModel)]
+    return sorted(members, key=lambda m: m.__name__)
+
+
+def _render_component_union(
+    annotation: Any,
+    *,
+    field_name: str,
+    discriminator: str,
+    heading_level: int,
+) -> list[str]:
+    """Render each member of a component-selection union as a sub-table.
+
+    Each member is a :class:`MethodConfig` whose ``discriminator`` literal
+    names the selectable option; selecting it surfaces exactly that member's
+    fields.
+    """
+    lines: list[str] = []
+    for member in _union_members(annotation):
+        # The discriminator literal value identifies the selectable option.
+        disc_field = member.model_fields.get(discriminator)
+        choice = ""
+        if disc_field is not None:
+            choice_args = get_args(disc_field.annotation)
+            if choice_args:
+                choice = str(choice_args[0])
+        title = (
+            f"`pipeline.{field_name}` with `{discriminator}: {choice}`"
+            if choice
+            else f"`pipeline.{field_name}` ({member.__name__})"
+        )
+        lines.extend(_render_table(member, heading=title, heading_level=heading_level))
+    return lines
+
+
+def _render_modality_components(parent: type[BaseModel]) -> list[str]:
+    """Render every component-selection sub-block for a modality pipeline model.
+
+    Each selectable component is a discriminated union; its members are rendered
+    as nested sub-tables (heading level 4) so the reference mirrors the nested
+    YAML shape.
+    """
+    lines: list[str] = []
+    for field_name, discriminator in _COMPONENT_FIELDS.get(parent, []):
+        annotation = parent.model_fields[field_name].annotation
+        lines.extend(
+            _render_component_union(
+                annotation,
+                field_name=field_name,
+                discriminator=discriminator,
+                heading_level=4,
+            )
+        )
+    return lines
+
+
 # ---------------------------------------------------------------------------
 # Main document assembly
 # ---------------------------------------------------------------------------
@@ -239,6 +294,26 @@ _SHARED_HEADINGS: list[tuple[type[BaseModel], str]] = [
     (BackendConfig, "`backend:` (BackendConfig)"),
     (LoggingConfig, "`logging:` (LoggingConfig)"),
 ]
+
+# Per-modality component-selection fields that are discriminated unions of
+# ``MethodConfig`` members. Each entry maps the parent pipeline model to a list
+# of ``(field_name, discriminator)`` pairs; each member is rendered as its own
+# sub-table so selecting a method/mode/model surfaces exactly its parameters.
+_COMPONENT_FIELDS: dict[type[BaseModel], list[tuple[str, str]]] = {
+    DCEPipelineYAML: [
+        ("model", "method"),
+        ("t1_mapping_method", "method"),
+        ("concentration", "method"),
+        ("population_aif", "name"),
+    ],
+    DSCPipelineYAML: [("deconvolution", "method")],
+    ASLPipelineYAML: [
+        ("m0", "method"),
+        ("difference", "method"),
+        ("quantification", "mode"),
+    ],
+    IVIMPipelineYAML: [("fitting", "method"), ("model", "model")],
+}
 
 
 def generate() -> str:
@@ -256,14 +331,29 @@ def generate() -> str:
         (DSCPipelineYAML, "`pipeline:` (DSCPipelineYAML)"),
         (ASLPipelineYAML, "`pipeline:` (ASLPipelineYAML)"),
         (IVIMPipelineYAML, "`pipeline:` (IVIMPipelineYAML)"),
-        (IVIMFittingConfig, "`pipeline.fitting:` (IVIMFittingConfig)"),
-        (
-            BayesianIVIMFittingConfig,
-            "`pipeline.fitting.bayesian:` (BayesianIVIMFittingConfig)",
-        ),
     ]
     for model_cls, heading in _pre_register:
         _MODEL_ANCHORS[model_cls.__name__] = _heading_to_anchor(heading)
+
+    # Pre-register anchors for every component-union member so that the
+    # ``A | B | C`` type links rendered in the parent table resolve to the
+    # sub-tables emitted later.
+    for parent, fields in _COMPONENT_FIELDS.items():
+        for field_name, discriminator in fields:
+            annotation = parent.model_fields[field_name].annotation
+            for member in _union_members(annotation):
+                disc_field = member.model_fields.get(discriminator)
+                choice = ""
+                if disc_field is not None:
+                    choice_args = get_args(disc_field.annotation)
+                    if choice_args:
+                        choice = str(choice_args[0])
+                title = (
+                    f"`pipeline.{field_name}` with `{discriminator}: {choice}`"
+                    if choice
+                    else f"`pipeline.{field_name}` ({member.__name__})"
+                )
+                _MODEL_ANCHORS[member.__name__] = _heading_to_anchor(title)
 
     doc: list[str] = []
 
@@ -319,6 +409,7 @@ def generate() -> str:
             heading_level=4,
         )
     )
+    doc.extend(_render_modality_components(DCEPipelineYAML))
 
     # -- DSC --------------------------------------------------------------
     doc.append("## DSC Pipeline")
@@ -332,6 +423,7 @@ def generate() -> str:
             heading_level=3,
         )
     )
+    doc.extend(_render_modality_components(DSCPipelineYAML))
 
     # -- ASL --------------------------------------------------------------
     doc.append("## ASL Pipeline")
@@ -345,6 +437,7 @@ def generate() -> str:
             heading_level=3,
         )
     )
+    doc.extend(_render_modality_components(ASLPipelineYAML))
 
     # -- IVIM -------------------------------------------------------------
     doc.append("## IVIM Pipeline")
@@ -358,20 +451,7 @@ def generate() -> str:
             heading_level=3,
         )
     )
-    doc.extend(
-        _render_table(
-            IVIMFittingConfig,
-            heading="`pipeline.fitting:` (IVIMFittingConfig)",
-            heading_level=4,
-        )
-    )
-    doc.extend(
-        _render_table(
-            BayesianIVIMFittingConfig,
-            heading="`pipeline.fitting.bayesian:` (BayesianIVIMFittingConfig)",
-            heading_level=5,
-        )
-    )
+    doc.extend(_render_modality_components(IVIMPipelineYAML))
 
     return "\n".join(doc)
 

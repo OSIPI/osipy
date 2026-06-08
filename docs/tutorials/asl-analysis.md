@@ -8,7 +8,7 @@ Quantify Cerebral Blood Flow (CBF) from Arterial Spin Labeling (ASL) MRI data: l
 - ASL data with known acquisition parameters
 - M0 calibration scan (recommended)
 
-**Using the CLI?** Generate a config with `osipy --dump-defaults asl > config.yaml`, edit it, then run `osipy config.yaml data.nii.gz`. See [How to Run Pipeline from YAML](../how-to/run-pipeline-cli.md). The tutorial below covers the Python API for step-by-step control.
+**Using the CLI?** Generate a config with `osipy --dump-defaults asl > config.yaml`, edit it, then run `osipy config.yaml data.nii.gz`. The M0 calibration, label/control difference, and quantification mode are each selectable config blocks — set `quantification.mode: multi_pld` to estimate both CBF and arterial transit time (ATT) from a multi-PLD acquisition. See [How to Run Pipeline from YAML](../how-to/run-pipeline-cli.md). The tutorial below covers the Python API for step-by-step control.
 
 ## Background
 

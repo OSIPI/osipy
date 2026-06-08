@@ -328,9 +328,11 @@ modality: dce
 data:
   format: auto
 pipeline:
-  model: extended_tofts
+  model:
+    method: extended_tofts
   aif_source: population
-  population_aif: parker
+  population_aif:
+    name: parker
   acquisition:
     tr: 5.0
     flip_angles: [2, 5, 10, 15]
