@@ -34,6 +34,13 @@ from osipy.dce.config import (
     VFAConfig,
 )
 from osipy.dsc.deconvolution.config import DECONVOLVER_CONFIGS, OSVDConfig
+from osipy.ivim.config import (
+    IVIM_FITTING_CONFIGS,
+    IVIM_MODEL_CONFIGS,
+    MODEL_DISCRIMINATOR,
+    BiexponentialModelConfig,
+    SegmentedFittingConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -169,62 +176,6 @@ class DCEFittingConfig(BaseModel):
             msg = f"Invalid fitter '{v}'. Valid: {valid}"
             raise ValueError(msg)
         return v
-
-    @field_validator("bounds")
-    @classmethod
-    def validate_bounds(
-        cls, v: dict[str, list[float]] | None
-    ) -> dict[str, list[float]] | None:
-        """Validate bounds are [lower, upper] pairs."""
-        if v is None:
-            return v
-        for name, pair in v.items():
-            if len(pair) != 2:
-                msg = f"Bounds for '{name}' must be [lower, upper], got {pair}"
-                raise ValueError(msg)
-            if pair[0] > pair[1]:
-                msg = f"Lower bound > upper bound for '{name}': {pair}"
-                raise ValueError(msg)
-        return v
-
-
-class BayesianIVIMFittingConfig(BaseModel):
-    """Bayesian IVIM fitting configuration from YAML."""
-
-    prior_scale: float = Field(default=1.5)
-    noise_std: float | None = Field(default=None, examples=[0.01])
-    compute_uncertainty: bool = Field(default=True)
-
-
-class IVIMFittingConfig(BaseModel):
-    """IVIM model fitting configuration from YAML."""
-
-    max_iterations: int = Field(default=500)
-    tolerance: float = Field(default=1e-6)
-    bounds: dict[str, list[float]] | None = Field(
-        default=None,
-        description="override model defaults (omit to use model defaults)",
-        json_schema_extra={
-            "yaml_example": (
-                "S0: [0.0, 1.0e+10]        # signal units\n"
-                "D: [1.0e-4, 5.0e-3]       # mm^2/s\n"
-                "D_star: [2.0e-3, 0.1]     # mm^2/s\n"
-                "f: [0.0, 0.7]             # dimensionless"
-            )
-        },
-    )
-    initial_guess: dict[str, float] | None = Field(
-        default=None,
-        description="override data-driven initial estimates",
-        json_schema_extra={
-            "yaml_example": (
-                "D: 1.0e-3                 # mm^2/s\n"
-                "D_star: 0.01              # mm^2/s\n"
-                "f: 0.1                    # dimensionless"
-            )
-        },
-    )
-    bayesian: BayesianIVIMFittingConfig = BayesianIVIMFittingConfig()
 
     @field_validator("bounds")
     @classmethod
@@ -438,30 +389,30 @@ class ASLPipelineYAML(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# Discriminated unions of IVIM selection-point configs, generated from the
+# registries: selecting a method/model pulls in exactly that option's params.
+_IVIMFittingConfig = method_union(IVIM_FITTING_CONFIGS)
+_IVIMModelConfig = method_union(IVIM_MODEL_CONFIGS, discriminator=MODEL_DISCRIMINATOR)
+
+
 class IVIMPipelineYAML(BaseModel):
     """IVIM pipeline settings from YAML."""
 
-    fitting_method: str = Field(
-        default="segmented", description="segmented | full | bayesian"
+    fitting: _IVIMFittingConfig = Field(
+        default_factory=SegmentedFittingConfig,
+        description=(
+            "fitting strategy + parameters "
+            "(method: segmented | full | bayesian); "
+            "bayesian adds prior_scale/noise_std, segmented/bayesian add b_threshold"
+        ),
     )
-    b_threshold: float = Field(
-        default=200.0,
-        description="s/mm^2, threshold separating D and D* regimes",
+    model: _IVIMModelConfig = Field(
+        default_factory=BiexponentialModelConfig,
+        description="IVIM signal model (model: biexponential | simplified)",
     )
     normalize_signal: bool = Field(
         default=True, description="normalize to S(b=0) before fitting"
     )
-    fitting: IVIMFittingConfig = IVIMFittingConfig()
-
-    @field_validator("fitting_method")
-    @classmethod
-    def validate_fitting(cls, v: str) -> str:
-        """Validate IVIM fitting method."""
-        valid = ["segmented", "full", "bayesian"]
-        if v not in valid:
-            msg = f"Invalid fitting method '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
 
 
 # ---------------------------------------------------------------------------

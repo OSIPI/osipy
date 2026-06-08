@@ -742,32 +742,39 @@ def _run_ivim(config: PipelineConfig, data_path: Path, output_dir: Path) -> None
     affine = dataset.affine
     mask = _load_mask(config.data.mask, base_dir)
 
-    # Map string to FittingMethod enum
-    method_map = {
-        "segmented": FittingMethod.SEGMENTED,
-        "full": FittingMethod.FULL,
-        "bayesian": FittingMethod.BAYESIAN,
-    }
-    fitting_method = method_map[mc.fitting_method]  # type: ignore[attr-defined]
+    # The fitting strategy is a validated discriminated union carrying its own
+    # method + per-method knobs; the signal model likewise. Pass them straight
+    # through to the pipeline config (no per-knob re-mapping).
+    fitting = mc.fitting  # type: ignore[attr-defined]  # validated MethodConfig
+    model_cfg = mc.model  # type: ignore[attr-defined]  # validated MethodConfig
 
-    fitting = mc.fitting  # type: ignore[attr-defined]  # IVIMFittingConfig
+    fitting_method = FittingMethod(fitting.method)
+
     bounds = (
         {k: tuple(v) for k, v in fitting.bounds.items()} if fitting.bounds else None
     )
 
-    # Convert Bayesian config if using Bayesian method
+    # b_threshold lives on the fitting method (segmented/bayesian) for fitting
+    # and on the simplified model for its perfusion cutoff. Prefer the model's
+    # threshold when the simplified model is selected (so they stay consistent),
+    # otherwise use the fitting method's threshold (default 200 for "full").
+    b_threshold = getattr(model_cfg, "b_threshold", None)
+    if b_threshold is None:
+        b_threshold = getattr(fitting, "b_threshold", 200.0)
+
+    # Bayesian-only knobs surface only on the bayesian config.
     bayesian_params = None
     if fitting_method == FittingMethod.BAYESIAN:
-        bc = fitting.bayesian
         bayesian_params = {
-            "prior_scale": bc.prior_scale,
-            "noise_std": bc.noise_std,
-            "compute_uncertainty": bc.compute_uncertainty,
+            "prior_scale": fitting.prior_scale,
+            "noise_std": fitting.noise_std,
+            "compute_uncertainty": fitting.compute_uncertainty,
         }
 
     pipeline_cfg = IVIMPipelineConfig(
         fitting_method=fitting_method,
-        b_threshold=mc.b_threshold,  # type: ignore[attr-defined]
+        signal_model=model_cfg.model,
+        b_threshold=b_threshold,
         normalize_signal=mc.normalize_signal,  # type: ignore[attr-defined]
         bounds=bounds,
         initial_guess=fitting.initial_guess,

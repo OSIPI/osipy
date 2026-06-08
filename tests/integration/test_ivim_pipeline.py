@@ -366,3 +366,148 @@ class TestIVIMOutputValidation:
             assert hasattr(param_map, "values")
             assert hasattr(param_map, "affine")
             assert param_map.affine.shape == (4, 4)
+
+
+class TestIVIMPipelineRegistryConfig:
+    """Tests for the registry-driven IVIM config wiring (config -> pipeline)."""
+
+    @staticmethod
+    def _synthetic_biexp(seed: int = 7):
+        """Generate a small noisy bi-exponential IVIM dataset."""
+        rng = np.random.default_rng(seed)
+        b = np.array(
+            [0, 10, 20, 30, 50, 80, 100, 150, 200, 400, 600, 800], dtype=float
+        )
+        nx, ny, nz = 4, 4, 2
+        s0 = rng.uniform(900, 1100, (nx, ny, nz))
+        d = rng.uniform(0.8e-3, 1.5e-3, (nx, ny, nz))
+        dstar = rng.uniform(8e-3, 25e-3, (nx, ny, nz))
+        f = rng.uniform(0.05, 0.25, (nx, ny, nz))
+        sig = s0[..., None] * (
+            (1 - f[..., None]) * np.exp(-b * d[..., None])
+            + f[..., None] * np.exp(-b * dstar[..., None])
+        )
+        sig = sig + rng.standard_normal(sig.shape) * 5.0
+        return sig, b
+
+    def test_load_config_to_pipeline_round_trip(self, tmp_path) -> None:
+        """A nested IVIM YAML loads and drives the pipeline end-to-end."""
+        from osipy.cli.config import load_config
+        from osipy.ivim.fitting import FittingMethod
+        from osipy.pipeline.ivim_pipeline import IVIMPipeline, IVIMPipelineConfig
+
+        sig, b = self._synthetic_biexp()
+        cfg_path = tmp_path / "ivim.yaml"
+        cfg_path.write_text(
+            "modality: ivim\n"
+            "pipeline:\n"
+            "  fitting:\n"
+            "    method: segmented\n"
+            "    b_threshold: 180.0\n"
+            "    initial_guess:\n"
+            "      D: 1.0e-3\n"
+            "      f: 0.1\n"
+            "  model:\n"
+            "    model: biexponential\n"
+            "  normalize_signal: true\n"
+        )
+        mc = load_config(cfg_path).get_modality_config()
+
+        pipeline_cfg = IVIMPipelineConfig(
+            fitting_method=FittingMethod(mc.fitting.method),
+            signal_model=mc.model.model,
+            b_threshold=mc.fitting.b_threshold,
+            normalize_signal=mc.normalize_signal,
+            initial_guess=mc.fitting.initial_guess,
+        )
+        result = IVIMPipeline(pipeline_cfg).run(sig, b)
+        assert int(result.fit_result.quality_mask.sum()) > 0
+        assert result.config.signal_model == "biexponential"
+        assert result.config.initial_guess == {"D": 1.0e-3, "f": 0.1}
+
+    def test_simplified_model_selectable_and_fits(self) -> None:
+        """The simplified model is selectable via config and produces fits."""
+        from osipy.ivim.fitting import FittingMethod
+        from osipy.pipeline.ivim_pipeline import IVIMPipeline, IVIMPipelineConfig
+
+        sig, b = self._synthetic_biexp(seed=11)
+        cfg = IVIMPipelineConfig(
+            fitting_method=FittingMethod.SEGMENTED,
+            signal_model="simplified",
+        )
+        result = IVIMPipeline(cfg).run(sig, b)
+        qmask = result.fit_result.quality_mask
+        assert int(qmask.sum()) > 0
+        d_vals = result.fit_result.d_map.values[qmask]
+        assert np.all(d_vals > 0)
+        # simplified model has no D*; the pipeline still produces a D* map
+        # (zeros) so downstream consumers see a uniform interface.
+        assert result.fit_result.d_star_map is not None
+
+    def test_all_fitting_methods_run_through_pipeline(self) -> None:
+        """segmented / full / bayesian all run via the pipeline config."""
+        from osipy.ivim.fitting import FittingMethod
+        from osipy.pipeline.ivim_pipeline import IVIMPipeline, IVIMPipelineConfig
+
+        sig, b = self._synthetic_biexp(seed=3)
+        for method in (
+            FittingMethod.SEGMENTED,
+            FittingMethod.FULL,
+            FittingMethod.BAYESIAN,
+        ):
+            cfg = IVIMPipelineConfig(fitting_method=method)
+            result = IVIMPipeline(cfg).run(sig, b)
+            assert int(result.fit_result.quality_mask.sum()) > 0
+
+    def test_initial_guess_seeds_the_fit(self) -> None:
+        """A user initial_guess reaches the optimizer (seeds the starting D/f)."""
+        from unittest.mock import patch
+
+        import osipy.ivim.models.binding as binding_module
+        from osipy.ivim.fitting import FittingMethod
+        from osipy.pipeline.ivim_pipeline import IVIMPipeline, IVIMPipelineConfig
+
+        sig, b = self._synthetic_biexp(seed=5)
+        guess = {"D": 2.0e-3, "f": 0.3}
+        cfg = IVIMPipelineConfig(
+            fitting_method=FittingMethod.SEGMENTED,
+            initial_guess=guess,
+        )
+
+        seen: dict[str, object] = {}
+        original_init = binding_module.BoundIVIMModel.__init__
+
+        def spy_init(self, *args, **kwargs):
+            seen["initial_guess"] = kwargs.get("initial_guess")
+            return original_init(self, *args, **kwargs)
+
+        with patch.object(binding_module.BoundIVIMModel, "__init__", spy_init):
+            IVIMPipeline(cfg).run(sig, b)
+
+        # The configured initial guess flows through to BoundIVIMModel.
+        assert seen.get("initial_guess") == guess
+
+    def test_initial_guess_changes_starting_point(self) -> None:
+        """get_initial_guess_batch honors the override in place of data-driven seed."""
+        from osipy.ivim.models import IVIMBiexponentialModel
+        from osipy.ivim.models.binding import BoundIVIMModel
+
+        sig, b = self._synthetic_biexp(seed=9)
+        obs = sig.reshape(-1, sig.shape[-1]).T  # (n_b, n_voxels)
+
+        model = IVIMBiexponentialModel()
+        bm_default = BoundIVIMModel(model, b, b_threshold=200.0)
+        bm_override = BoundIVIMModel(
+            model, b, b_threshold=200.0, initial_guess={"D": 2.5e-3, "f": 0.33}
+        )
+        g0 = bm_default.get_initial_guess_batch(obs, np)
+        g1 = bm_override.get_initial_guess_batch(obs, np)
+
+        free = bm_default.parameters
+        d_idx = free.index("D")
+        f_idx = free.index("f")
+        assert np.allclose(g1[d_idx, :], 2.5e-3)
+        assert np.allclose(g1[f_idx, :], 0.33)
+        # Unspecified parameters keep their data-driven guess.
+        s0_idx = free.index("S0")
+        assert np.allclose(g0[s0_idx, :], g1[s0_idx, :])

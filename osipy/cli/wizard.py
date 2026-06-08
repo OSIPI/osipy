@@ -293,6 +293,11 @@ def _collect_method_config(
     for fname, finfo in configs[chosen].model_fields.items():
         if fname == discriminator:
             continue
+        # Skip fields whose default is None or a complex container (e.g.
+        # bounds / initial_guess dicts): they have no sensible inline prompt,
+        # so leave them at the config default and let the user edit the YAML.
+        if finfo.default is None or isinstance(finfo.default, (dict, list)):
+            continue
         selection[fname] = _prompt_value(
             finfo.description or fname,
             default=finfo.default,
@@ -487,25 +492,28 @@ def _collect_quantification_config(configs: dict[str, Any]) -> dict[str, Any]:
 
 def _collect_ivim_config() -> dict[str, Any]:
     """Collect IVIM pipeline settings."""
+    from osipy.ivim.config import IVIM_FITTING_CONFIGS, IVIM_MODEL_CONFIGS
+
     print("\n--- IVIM Pipeline Settings ---")
     cfg: dict[str, Any] = {}
 
-    fitting_methods = ["segmented", "full", "bayesian"]
-    cfg["fitting_method"] = _prompt_choice(
-        "Fitting method:", fitting_methods, default="segmented"
+    # Fitting strategy + its params (selecting a method surfaces exactly that
+    # method's knobs: e.g. bayesian adds prior_scale, full has no b_threshold).
+    cfg["fitting"] = _collect_method_config(
+        "Fitting method:", IVIM_FITTING_CONFIGS, default="segmented"
     )
-    cfg["b_threshold"] = _prompt_value(
-        "B-value threshold (s/mm^2)", default=200.0, expected_type=float
+
+    # Signal model + its params (simplified exposes its b_threshold).
+    cfg["model"] = _collect_method_config(
+        "Signal model:",
+        IVIM_MODEL_CONFIGS,
+        default="biexponential",
+        discriminator="model",
     )
+
     cfg["normalize_signal"] = _prompt_yes_no(
         "Normalize signal to S(b=0)?", default=True
     )
-
-    if cfg["fitting_method"] == "bayesian":
-        print(
-            "  Note: Bayesian fitting uses default priors and MCMC settings.\n"
-            "  Edit the generated YAML to customize (fitting.bayesian section)."
-        )
 
     return cfg
 

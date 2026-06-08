@@ -38,6 +38,11 @@ class BoundIVIMModel(BaseBoundModel):
         Parameters to fix at constant values during fitting.
     b_threshold : float
         b-value threshold for segmented initial guess estimation.
+    initial_guess : dict[str, float] | None
+        Per-parameter overrides for the optimizer's starting values
+        (e.g. ``{"D": 1e-3, "f": 0.1}``). Any free parameter named here
+        seeds the fit with the given value in place of the data-driven
+        estimate; unspecified parameters keep their data-driven guess.
     """
 
     def __init__(
@@ -46,12 +51,14 @@ class BoundIVIMModel(BaseBoundModel):
         b_values: NDArray[np.floating[Any]],
         fixed: dict[str, float] | None = None,
         b_threshold: float = 200.0,
+        initial_guess: dict[str, float] | None = None,
     ) -> None:
         super().__init__(model, fixed)
         xp = get_array_module(b_values)
         self._b_values = xp.asarray(b_values, dtype=xp.float64)
         self._ivim_model: IVIMModel = model
         self._b_threshold = b_threshold
+        self._initial_guess = initial_guess or {}
 
     def ensure_device(self, xp: Any) -> None:
         """Transfer b-values array to the target device."""
@@ -196,12 +203,20 @@ class BoundIVIMModel(BaseBoundModel):
             full_guess[d_star_idx, :] = d_star_init
 
         if not self._fixed:
-            return full_guess
+            free_guess = full_guess
+        else:
+            # Filter to free params only
+            free_guess = xp.zeros((self._n_free, n_voxels), dtype=full_guess.dtype)
+            for free_idx, all_idx in enumerate(self._free_indices):
+                free_guess[free_idx, :] = full_guess[all_idx, :]
 
-        # Filter to free params only
-        free_guess = xp.zeros((self._n_free, n_voxels), dtype=full_guess.dtype)
-        for free_idx, all_idx in enumerate(self._free_indices):
-            free_guess[free_idx, :] = full_guess[all_idx, :]
+        # Apply user-supplied initial-guess overrides (keyed by free param
+        # name): seed the optimizer with the given constant in place of the
+        # data-driven estimate. Unspecified parameters are left untouched.
+        if self._initial_guess:
+            for free_idx, name in enumerate(self._free_params):
+                if name in self._initial_guess:
+                    free_guess[free_idx, :] = self._initial_guess[name]
         return free_guess
 
     def compute_jacobian_batch(
@@ -264,8 +279,15 @@ class BoundIVIMModel(BaseBoundModel):
             # dS/df = S0 * (-exp(-b*D) + exp(-b*D*))
             all_cols["f"] = s0[xp.newaxis, :] * (-exp_d + exp_ds)
         else:
-            # Simplified model: no D*, dS/df = S0 * -exp(-b*D)
-            all_cols["f"] = s0[xp.newaxis, :] * (-exp_d)
+            # Simplified model: no D*. The forward model is
+            #   b >  threshold:  S = S0 * (1-f) * exp(-b*D)
+            #   b <= threshold:  S = S0 * ((1-f) * exp(-b*D) + f)
+            # so dS/df = S0 * (-exp(-b*D))            for b >  threshold
+            #    dS/df = S0 * (-exp(-b*D) + 1)        for b <= threshold
+            threshold = getattr(self._ivim_model, "b_threshold", self._b_threshold)
+            low_b = (self._b_values <= threshold)[:, xp.newaxis]  # (n_b, 1)
+            df = -exp_d + xp.where(low_b, 1.0, 0.0)
+            all_cols["f"] = s0[xp.newaxis, :] * df
 
         # Select only free parameter columns
         return xp.stack([all_cols[p] for p in self._free_params])

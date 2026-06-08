@@ -619,13 +619,62 @@ class TestCollectIVIMConfig:
     """Tests for _collect_ivim_config()."""
 
     def test_defaults(self) -> None:
-        """Pressing Enter for all prompts returns defaults."""
-        inputs = _make_input_fn(["", "", ""])
+        """Pressing Enter for all prompts returns defaults (segmented + biexp)."""
+        inputs = _make_input_fn(
+            [
+                "",  # fitting method: segmented
+                "",  # max_iterations
+                "",  # tolerance
+                "",  # b_threshold
+                "",  # signal model: biexponential
+                "",  # normalize: yes
+            ]
+        )
         with patch("builtins.input", side_effect=inputs):
             cfg = _collect_ivim_config()
-        assert cfg["fitting_method"] == "segmented"
-        assert cfg["b_threshold"] == 200.0
+        assert cfg["fitting"]["method"] == "segmented"
+        assert cfg["fitting"]["b_threshold"] == 200.0
+        assert cfg["model"]["model"] == "biexponential"
         assert cfg["normalize_signal"] is True
+
+    def test_bayesian_surfaces_prior_scale(self) -> None:
+        """Selecting bayesian surfaces its prior_scale knob in the collected dict."""
+        # bayesian fields: max_iterations, tolerance, bounds(skip), initial_guess(skip),
+        # method, b_threshold, prior_scale, noise_std(skip None), compute_uncertainty
+        inputs = _make_input_fn(
+            [
+                "bayesian",  # fitting method
+                "",  # max_iterations
+                "",  # tolerance
+                "",  # b_threshold
+                "",  # prior_scale
+                "",  # compute_uncertainty
+                "",  # signal model: biexponential
+                "",  # normalize
+            ]
+        )
+        with patch("builtins.input", side_effect=inputs):
+            cfg = _collect_ivim_config()
+        assert cfg["fitting"]["method"] == "bayesian"
+        assert cfg["fitting"]["prior_scale"] == 1.5
+
+    def test_simplified_model_selectable(self) -> None:
+        """Selecting the simplified model surfaces its b_threshold knob."""
+        inputs = _make_input_fn(
+            [
+                "",  # fitting method: segmented
+                "",  # max_iterations
+                "",  # tolerance
+                "",  # b_threshold (fitting)
+                "simplified",  # signal model
+                "",  # model b_threshold
+                "",  # normalize
+            ]
+        )
+        with patch("builtins.input", side_effect=inputs):
+            cfg = _collect_ivim_config()
+        assert cfg["model"]["model"] == "simplified"
+        assert cfg["model"]["b_threshold"] == 200.0
 
 
 # ---------------------------------------------------------------------------
@@ -671,8 +720,8 @@ class TestAllModalitiesValidation:
                 "label_control_order": "label_first",
             },
             "ivim": {
-                "fitting_method": "segmented",
-                "b_threshold": 200.0,
+                "fitting": {"method": "segmented", "b_threshold": 200.0},
+                "model": {"model": "biexponential"},
                 "normalize_signal": True,
             },
         }
@@ -762,7 +811,10 @@ class TestRunWizard:
                 "4",  # modality: ivim
                 # -- pipeline (first) --
                 "",  # fitting method: segmented
-                "",  # b threshold: 200.0
+                "",  # max_iterations
+                "",  # tolerance
+                "",  # b_threshold (fitting)
+                "",  # signal model: biexponential
                 "",  # normalize: yes
                 # -- data (second) --
                 "",  # format: auto

@@ -15,12 +15,10 @@ if TYPE_CHECKING:
 from osipy.cli.config import (
     ASLPipelineYAML,
     BackendConfig,
-    BayesianIVIMFittingConfig,
     DataConfig,
     DCEFittingConfig,
     DCEPipelineYAML,
     DSCPipelineYAML,
-    IVIMFittingConfig,
     IVIMPipelineYAML,
     LoggingConfig,
     OutputConfig,
@@ -178,11 +176,48 @@ class TestLoadConfig:
         path = tmp_config("""\
             modality: ivim
             pipeline:
-              fitting_method: segmented
-              b_threshold: 200.0
+              fitting:
+                method: segmented
+                b_threshold: 200.0
         """)
         config = load_config(path)
         assert config.modality == "ivim"
+
+    def test_load_ivim_nested_method_configs_round_trip(self, tmp_config) -> None:
+        """Nested IVIM selection-point configs round-trip through load_config.
+
+        Selecting bayesian surfaces its prior knobs, the simplified model is
+        selectable with its own b_threshold, and per-method/shared knobs all
+        round-trip.
+        """
+        path = tmp_config("""\
+            modality: ivim
+            pipeline:
+              fitting:
+                method: bayesian
+                b_threshold: 150.0
+                prior_scale: 2.0
+                compute_uncertainty: false
+                max_iterations: 800
+                initial_guess:
+                  D: 0.9e-3
+                  f: 0.12
+              model:
+                model: simplified
+                b_threshold: 180.0
+              normalize_signal: false
+        """)
+        config = load_config(path)
+        mc = config.get_modality_config()
+        assert mc.fitting.method == "bayesian"
+        assert mc.fitting.b_threshold == 150.0
+        assert mc.fitting.prior_scale == 2.0
+        assert mc.fitting.compute_uncertainty is False
+        assert mc.fitting.max_iterations == 800
+        assert mc.fitting.initial_guess == {"D": 0.9e-3, "f": 0.12}
+        assert mc.model.model == "simplified"
+        assert mc.model.b_threshold == 180.0
+        assert mc.normalize_signal is False
 
     def test_load_nonexistent_file(self) -> None:
         """Missing config file raises FileNotFoundError."""
@@ -469,27 +504,65 @@ class TestASLPipelineYAML:
 
 
 class TestIVIMPipelineYAML:
-    """Tests for IVIM pipeline config validation."""
+    """Tests for IVIM pipeline config validation (registry-driven unions)."""
 
     def test_defaults(self) -> None:
-        """Default IVIM config values match expected."""
+        """Default IVIM config uses segmented fitting + biexponential model."""
         cfg = IVIMPipelineYAML()
-        assert cfg.fitting_method == "segmented"
-        assert cfg.b_threshold == 200.0
-        assert cfg.normalize_signal is True
+        assert cfg.fitting.method == "segmented"
+        assert cfg.fitting.b_threshold == 200.0
         assert cfg.fitting.max_iterations == 500
         assert cfg.fitting.tolerance == 1e-6
+        assert cfg.model.model == "biexponential"
+        assert cfg.normalize_signal is True
 
     def test_invalid_fitting_method(self) -> None:
         """Invalid fitting method raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid fitting method"):
-            IVIMPipelineYAML(fitting_method="invalid")
+        with pytest.raises(ValidationError):
+            IVIMPipelineYAML(fitting={"method": "invalid"})
 
     def test_valid_fitting_methods(self) -> None:
-        """All valid fitting methods are accepted."""
-        for method in ("segmented", "full", "bayesian"):
-            cfg = IVIMPipelineYAML(fitting_method=method)
-            assert cfg.fitting_method == method
+        """All registered fitting methods are accepted."""
+        from osipy.ivim.config import IVIM_FITTING_CONFIGS
+
+        for method in IVIM_FITTING_CONFIGS:
+            cfg = IVIMPipelineYAML(fitting={"method": method})
+            assert cfg.fitting.method == method
+
+    def test_bayesian_surfaces_prior_scale(self) -> None:
+        """Selecting bayesian surfaces prior_scale; segmented does not."""
+        cfg = IVIMPipelineYAML(fitting={"method": "bayesian", "prior_scale": 2.5})
+        assert cfg.fitting.method == "bayesian"
+        assert cfg.fitting.prior_scale == 2.5
+        # prior_scale is a bayesian-only knob — segmented must reject it.
+        with pytest.raises(ValidationError):
+            IVIMPipelineYAML(fitting={"method": "segmented", "prior_scale": 2.5})
+
+    def test_full_rejects_b_threshold(self) -> None:
+        """The full strategy has no b_threshold knob (cross-method key rejected)."""
+        with pytest.raises(ValidationError):
+            IVIMPipelineYAML(fitting={"method": "full", "b_threshold": 150.0})
+
+    def test_fitting_rejects_unknown_keys(self) -> None:
+        """Unknown keys on the fitting config are rejected (extra=forbid)."""
+        with pytest.raises(ValidationError):
+            IVIMPipelineYAML(fitting={"method": "segmented", "nonsense": 1})
+
+    def test_valid_signal_models(self) -> None:
+        """Both registered signal models are selectable."""
+        from osipy.ivim.config import IVIM_MODEL_CONFIGS
+
+        for name in IVIM_MODEL_CONFIGS:
+            cfg = IVIMPipelineYAML(model={"model": name})
+            assert cfg.model.model == name
+
+    def test_simplified_model_surfaces_b_threshold(self) -> None:
+        """The simplified model exposes its own b_threshold; biexp rejects it."""
+        cfg = IVIMPipelineYAML(model={"model": "simplified", "b_threshold": 175.0})
+        assert cfg.model.model == "simplified"
+        assert cfg.model.b_threshold == 175.0
+        with pytest.raises(ValidationError):
+            IVIMPipelineYAML(model={"model": "biexponential", "b_threshold": 175.0})
 
 
 # ---------------------------------------------------------------------------
@@ -594,20 +667,25 @@ class TestDCEFittingConfig:
 
 
 class TestIVIMFittingConfig:
-    """Tests for IVIM fitting configuration."""
+    """Tests for the registry-driven IVIM fitting MethodConfig models."""
 
-    def test_defaults(self) -> None:
-        """Default IVIM fitting config values match expected."""
-        cfg = IVIMFittingConfig()
+    def test_segmented_defaults(self) -> None:
+        """Default segmented fitting config values match expected."""
+        from osipy.ivim.config import SegmentedFittingConfig
+
+        cfg = SegmentedFittingConfig()
+        assert cfg.method == "segmented"
         assert cfg.max_iterations == 500
         assert cfg.tolerance == 1e-6
+        assert cfg.b_threshold == 200.0
         assert cfg.bounds is None
         assert cfg.initial_guess is None
-        assert isinstance(cfg.bayesian, BayesianIVIMFittingConfig)
 
     def test_bounds_override(self) -> None:
         """IVIM bounds override parses correctly."""
-        cfg = IVIMFittingConfig(
+        from osipy.ivim.config import SegmentedFittingConfig
+
+        cfg = SegmentedFittingConfig(
             bounds={"D": [1e-4, 3e-3], "D_star": [5e-3, 0.05], "f": [0.0, 0.5]}
         )
         assert cfg.bounds["D"] == [1e-4, 3e-3]
@@ -615,78 +693,106 @@ class TestIVIMFittingConfig:
 
     def test_bounds_validation_wrong_length(self) -> None:
         """Bounds with != 2 elements raises ValidationError."""
+        from osipy.ivim.config import SegmentedFittingConfig
+
         with pytest.raises(ValidationError, match="must be"):
-            IVIMFittingConfig(bounds={"D": [1e-4]})
+            SegmentedFittingConfig(bounds={"D": [1e-4]})
+
+    def test_bounds_validation_lower_gt_upper(self) -> None:
+        """Lower bound > upper bound raises ValidationError."""
+        from osipy.ivim.config import SegmentedFittingConfig
+
+        with pytest.raises(ValidationError, match="Lower bound > upper bound"):
+            SegmentedFittingConfig(bounds={"D": [3e-3, 1e-4]})
 
     def test_initial_guess_override(self) -> None:
         """IVIM initial guess override parses correctly."""
-        cfg = IVIMFittingConfig(initial_guess={"D": 0.8e-3, "D_star": 0.02, "f": 0.15})
+        from osipy.ivim.config import SegmentedFittingConfig
+
+        cfg = SegmentedFittingConfig(initial_guess={"D": 0.8e-3, "f": 0.15})
         assert cfg.initial_guess["D"] == 0.8e-3
 
     def test_bayesian_defaults(self) -> None:
-        """Bayesian sub-config has expected defaults."""
-        cfg = BayesianIVIMFittingConfig()
+        """Bayesian fitting config has expected prior knobs."""
+        from osipy.ivim.config import BayesianFittingConfig
+
+        cfg = BayesianFittingConfig()
+        assert cfg.method == "bayesian"
         assert cfg.prior_scale == 1.5
         assert cfg.noise_std is None
         assert cfg.compute_uncertainty is True
+        assert cfg.b_threshold == 200.0
 
     def test_bayesian_custom_priors(self) -> None:
         """Custom Bayesian parameters parse correctly."""
-        cfg = IVIMFittingConfig(
-            bayesian={"prior_scale": 2.0, "compute_uncertainty": False}
-        )
-        assert cfg.bayesian.prior_scale == 2.0
-        assert cfg.bayesian.compute_uncertainty is False
-        assert cfg.bayesian.noise_std is None  # default preserved
+        from osipy.ivim.config import BayesianFittingConfig
+
+        cfg = BayesianFittingConfig(prior_scale=2.0, compute_uncertainty=False)
+        assert cfg.prior_scale == 2.0
+        assert cfg.compute_uncertainty is False
+        assert cfg.noise_std is None  # default preserved
+
+    def test_full_has_no_b_threshold(self) -> None:
+        """The full strategy intentionally exposes no b_threshold knob."""
+        from osipy.ivim.config import FullFittingConfig
+
+        cfg = FullFittingConfig()
+        assert cfg.method == "full"
+        assert "b_threshold" not in cfg.model_fields
 
     def test_ivim_yaml_includes_fitting(self) -> None:
-        """IVIMPipelineYAML includes fitting sub-config with defaults."""
+        """IVIMPipelineYAML includes a validated fitting MethodConfig."""
+        from osipy.ivim.config import SegmentedFittingConfig
+
         cfg = IVIMPipelineYAML()
-        assert isinstance(cfg.fitting, IVIMFittingConfig)
+        assert isinstance(cfg.fitting, SegmentedFittingConfig)
         assert cfg.fitting.max_iterations == 500
 
     def test_ivim_config_from_yaml(self, tmp_config) -> None:
-        """Full IVIM config with fitting section loads from YAML."""
+        """Full IVIM config with bayesian fitting + simplified model loads."""
         path = tmp_config("""\
             modality: ivim
             pipeline:
-              fitting_method: bayesian
-              b_threshold: 150.0
               fitting:
+                method: bayesian
+                b_threshold: 150.0
                 max_iterations: 1000
                 tolerance: 1.0e-8
+                prior_scale: 2.0
+                compute_uncertainty: false
                 bounds:
                   D: [1.0e-4, 3.0e-3]
                   D_star: [5.0e-3, 0.05]
                   f: [0.0, 0.5]
                 initial_guess:
                   D: 0.8e-3
-                  D_star: 0.02
                   f: 0.15
-                bayesian:
-                  prior_scale: 2.0
-                  compute_uncertainty: false
+              model:
+                model: simplified
+                b_threshold: 180.0
         """)
         config = load_config(path)
         mc = config.get_modality_config()
-        assert mc.fitting_method == "bayesian"
+        assert mc.fitting.method == "bayesian"
         assert mc.fitting.max_iterations == 1000
         assert mc.fitting.tolerance == 1e-8
         assert mc.fitting.bounds["D"] == [1e-4, 3e-3]
         assert mc.fitting.initial_guess["D"] == 0.8e-3
-        assert mc.fitting.bayesian.prior_scale == 2.0
-        assert mc.fitting.bayesian.compute_uncertainty is False
+        assert mc.fitting.prior_scale == 2.0
+        assert mc.fitting.compute_uncertainty is False
+        assert mc.model.model == "simplified"
+        assert mc.model.b_threshold == 180.0
 
     def test_fitting_section_optional(self, tmp_config) -> None:
-        """IVIM config without fitting section uses defaults."""
+        """IVIM config without explicit fitting section uses defaults."""
         path = tmp_config("""\
             modality: ivim
             pipeline:
-              fitting_method: segmented
-              b_threshold: 200.0
+              normalize_signal: true
         """)
         config = load_config(path)
         mc = config.get_modality_config()
+        assert mc.fitting.method == "segmented"
         assert mc.fitting.max_iterations == 500
         assert mc.fitting.tolerance == 1e-6
         assert mc.fitting.bounds is None
