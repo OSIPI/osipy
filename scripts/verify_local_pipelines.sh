@@ -137,10 +137,16 @@ run_cli_pipeline() {
 cat > "$CONFIG_DIR/dce.yaml" <<'YAML'
 modality: dce
 pipeline:
-  model: extended_tofts
-  t1_mapping_method: vfa
+  model:
+    method: extended_tofts
+  t1_mapping_method:
+    method: vfa
+    fit_method: linear
+  concentration:
+    method: spgr
   aif_source: population
-  population_aif: parker
+  population_aif:
+    name: parker
   acquisition:
     tr: 5.0
     flip_angles: [5, 10, 15, 20, 25, 30]
@@ -158,8 +164,11 @@ for region in brain abdomen; do
     cat > "$CONFIG_DIR/ivim_${region}.yaml" <<YAML
 modality: ivim
 pipeline:
-  fitting_method: segmented
-  b_threshold: 200.0
+  fitting:
+    method: segmented
+    b_threshold: 200.0
+  model:
+    model: biexponential
   normalize_signal: true
 data:
   format: nifti
@@ -181,7 +190,12 @@ pipeline:
   labeling_scheme: pcasl
   pld: 2025.0
   label_duration: 1650.0
-  m0_method: single
+  m0:
+    method: single
+  difference:
+    method: pairwise
+  quantification:
+    mode: single_pld
   label_control_order: label_first
 data:
   format: bids
@@ -198,7 +212,12 @@ pipeline:
   labeling_scheme: pcasl
   pld: 2025.0
   label_duration: 1800.0
-  m0_method: single
+  m0:
+    method: single
+  difference:
+    method: pairwise
+  quantification:
+    mode: single_pld
   label_control_order: label_first
 data:
   format: bids
