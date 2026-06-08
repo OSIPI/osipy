@@ -126,9 +126,7 @@ T1_METHOD_CONFIGS: dict[str, type[MethodConfig]] = {
 class SPGRConcentrationConfig(MethodConfig):
     """Spoiled gradient-echo signal-to-concentration model (OSIPI: P.SC1.001)."""
 
-    method: Literal["spgr"] = Field(
-        "spgr", description="signal-to-concentration model: spgr | linear"
-    )
+    method: Literal["spgr"] = "spgr"
 
 
 class LinearConcentrationConfig(MethodConfig):
