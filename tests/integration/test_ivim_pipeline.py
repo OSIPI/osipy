@@ -375,9 +375,7 @@ class TestIVIMPipelineRegistryConfig:
     def _synthetic_biexp(seed: int = 7):
         """Generate a small noisy bi-exponential IVIM dataset."""
         rng = np.random.default_rng(seed)
-        b = np.array(
-            [0, 10, 20, 30, 50, 80, 100, 150, 200, 400, 600, 800], dtype=float
-        )
+        b = np.array([0, 10, 20, 30, 50, 80, 100, 150, 200, 400, 600, 800], dtype=float)
         nx, ny, nz = 4, 4, 2
         s0 = rng.uniform(900, 1100, (nx, ny, nz))
         d = rng.uniform(0.8e-3, 1.5e-3, (nx, ny, nz))
