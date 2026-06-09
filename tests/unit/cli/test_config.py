@@ -15,12 +15,10 @@ if TYPE_CHECKING:
 from osipy.cli.config import (
     ASLPipelineYAML,
     BackendConfig,
-    BayesianIVIMFittingConfig,
     DataConfig,
     DCEFittingConfig,
     DCEPipelineYAML,
     DSCPipelineYAML,
-    IVIMFittingConfig,
     IVIMPipelineYAML,
     LoggingConfig,
     OutputConfig,
@@ -66,10 +64,16 @@ class TestLoadConfig:
         path = tmp_config("""\
             modality: dce
             pipeline:
-              model: extended_tofts
-              t1_mapping_method: vfa
+              model:
+                method: extended_tofts
+              t1_mapping_method:
+                method: vfa
+                fit_method: linear
+              concentration:
+                method: spgr
               aif_source: population
-              population_aif: parker
+              population_aif:
+                name: parker
               save_intermediate: true
               acquisition:
                 tr: 5.0
@@ -93,6 +97,30 @@ class TestLoadConfig:
         assert config.backend.force_cpu is True
         assert config.logging.level == "DEBUG"
 
+    def test_load_dce_nested_method_configs_round_trip(self, tmp_config) -> None:
+        """Nested DCE selection-point configs round-trip through load_config."""
+        path = tmp_config("""\
+            modality: dce
+            pipeline:
+              model:
+                method: tofts
+              t1_mapping_method:
+                method: vfa
+                fit_method: nonlinear
+              concentration:
+                method: linear
+              aif_source: population
+              population_aif:
+                name: georgiou
+        """)
+        config = load_config(path)
+        mc = config.get_modality_config()
+        assert mc.model.method == "tofts"
+        assert mc.t1_mapping_method.method == "vfa"
+        assert mc.t1_mapping_method.fit_method == "nonlinear"
+        assert mc.concentration.method == "linear"
+        assert mc.population_aif.name == "georgiou"
+
     def test_load_dsc_config(self, tmp_config) -> None:
         """Valid DSC config loads successfully."""
         path = tmp_config("""\
@@ -115,16 +143,81 @@ class TestLoadConfig:
         config = load_config(path)
         assert config.modality == "asl"
 
+    def test_load_asl_nested_multi_pld_config(self, tmp_config) -> None:
+        """Nested ASL config (M0 knobs + multi-PLD mode) round-trips via load_config."""
+        path = tmp_config("""\
+            modality: asl
+            pipeline:
+              labeling_scheme: pcasl
+              partition_coefficient: 0.95
+              m0:
+                method: reference_region
+                reference_region: white_matter
+                tr_m0: 5000.0
+              difference:
+                method: mean
+              quantification:
+                mode: multi_pld
+                plds: [500.0, 1000.0, 1500.0, 2000.0, 2500.0]
+                att_model: buxton
+        """)
+        config = load_config(path)
+        mc = config.get_modality_config()
+        assert mc.partition_coefficient == 0.95
+        assert mc.m0.method == "reference_region"
+        assert mc.m0.reference_region == "white_matter"
+        assert mc.m0.tr_m0 == 5000.0
+        assert mc.difference.method == "mean"
+        assert mc.quantification.mode == "multi_pld"
+        assert mc.quantification.plds == [500.0, 1000.0, 1500.0, 2000.0, 2500.0]
+
     def test_load_ivim_config(self, tmp_config) -> None:
         """Valid IVIM config loads successfully."""
         path = tmp_config("""\
             modality: ivim
             pipeline:
-              fitting_method: segmented
-              b_threshold: 200.0
+              fitting:
+                method: segmented
+                b_threshold: 200.0
         """)
         config = load_config(path)
         assert config.modality == "ivim"
+
+    def test_load_ivim_nested_method_configs_round_trip(self, tmp_config) -> None:
+        """Nested IVIM selection-point configs round-trip through load_config.
+
+        Selecting bayesian surfaces its prior knobs, the simplified model is
+        selectable with its own b_threshold, and per-method/shared knobs all
+        round-trip.
+        """
+        path = tmp_config("""\
+            modality: ivim
+            pipeline:
+              fitting:
+                method: bayesian
+                b_threshold: 150.0
+                prior_scale: 2.0
+                compute_uncertainty: false
+                max_iterations: 800
+                initial_guess:
+                  D: 0.9e-3
+                  f: 0.12
+              model:
+                model: simplified
+                b_threshold: 180.0
+              normalize_signal: false
+        """)
+        config = load_config(path)
+        mc = config.get_modality_config()
+        assert mc.fitting.method == "bayesian"
+        assert mc.fitting.b_threshold == 150.0
+        assert mc.fitting.prior_scale == 2.0
+        assert mc.fitting.compute_uncertainty is False
+        assert mc.fitting.max_iterations == 800
+        assert mc.fitting.initial_guess == {"D": 0.9e-3, "f": 0.12}
+        assert mc.model.model == "simplified"
+        assert mc.model.b_threshold == 180.0
+        assert mc.normalize_signal is False
 
     def test_load_nonexistent_file(self) -> None:
         """Missing config file raises FileNotFoundError."""
@@ -196,36 +289,65 @@ class TestDCEPipelineYAML:
     """Tests for DCE pipeline config validation."""
 
     def test_defaults(self) -> None:
-        """Default DCE config values match expected."""
+        """Default DCE config values match expected (nested registry configs)."""
         cfg = DCEPipelineYAML()
-        assert cfg.model == "extended_tofts"
-        assert cfg.t1_mapping_method == "vfa"
+        assert cfg.model.method == "extended_tofts"
+        assert cfg.t1_mapping_method.method == "vfa"
+        assert cfg.t1_mapping_method.fit_method == "linear"
+        assert cfg.concentration.method == "spgr"
         assert cfg.aif_source == "population"
-        assert cfg.population_aif == "parker"
+        assert cfg.population_aif.name == "parker"
         assert cfg.save_intermediate is False
 
     def test_invalid_model(self) -> None:
-        """Invalid model name raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid DCE model"):
-            DCEPipelineYAML(model="nonexistent_model")
+        """Invalid model name raises ValidationError (no matching union member)."""
+        with pytest.raises(ValidationError):
+            DCEPipelineYAML(model={"method": "nonexistent_model"})
 
     def test_invalid_t1_method(self) -> None:
         """Invalid T1 mapping method raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid T1 mapping method"):
-            DCEPipelineYAML(t1_mapping_method="invalid_method")
+        with pytest.raises(ValidationError):
+            DCEPipelineYAML(t1_mapping_method={"method": "invalid_method"})
 
     def test_invalid_aif_source(self) -> None:
         """Invalid AIF source raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid AIF source"):
+        with pytest.raises(ValidationError):
             DCEPipelineYAML(aif_source="invalid_source")
 
     def test_valid_models(self) -> None:
-        """All registered DCE model names are accepted."""
-        from osipy.dce import list_models
+        """All registered DCE model names are accepted (nested config)."""
+        from osipy.dce.config import DCE_MODEL_CONFIGS
 
-        for name in list_models():
-            cfg = DCEPipelineYAML(model=name)
-            assert cfg.model == name
+        for name in DCE_MODEL_CONFIGS:
+            cfg = DCEPipelineYAML(model={"method": name})
+            assert cfg.model.method == name
+
+    def test_vfa_fit_method_surfaces_and_validates(self) -> None:
+        """Selecting VFA exposes its fit_method knob; cross-method keys rejected."""
+        cfg = DCEPipelineYAML(
+            t1_mapping_method={"method": "vfa", "fit_method": "nonlinear"}
+        )
+        assert cfg.t1_mapping_method.method == "vfa"
+        assert cfg.t1_mapping_method.fit_method == "nonlinear"
+        # Look-Locker has no fit_method knob (extra=forbid).
+        with pytest.raises(ValidationError):
+            DCEPipelineYAML(
+                t1_mapping_method={"method": "look_locker", "fit_method": "linear"}
+            )
+
+    def test_concentration_method_selectable(self) -> None:
+        """Both spgr and linear concentration models are selectable."""
+        for name in ("spgr", "linear"):
+            cfg = DCEPipelineYAML(concentration={"method": name})
+            assert cfg.concentration.method == name
+
+    def test_population_aif_selectable(self) -> None:
+        """All registered population AIFs are selectable via the nested config."""
+        from osipy.dce.config import POPULATION_AIF_CONFIGS
+
+        for name in POPULATION_AIF_CONFIGS:
+            cfg = DCEPipelineYAML(population_aif={"name": name})
+            assert cfg.population_aif.name == name
 
     def test_acquisition_defaults(self) -> None:
         """Acquisition sub-model has correct defaults."""
@@ -249,24 +371,33 @@ class TestDSCPipelineYAML:
         """Default DSC config values match expected."""
         cfg = DSCPipelineYAML()
         assert cfg.te == 30.0
-        assert cfg.deconvolution_method == "oSVD"
+        assert cfg.deconvolution.method == "oSVD"
+        assert cfg.deconvolution.oscillation_index == 0.035
         assert cfg.apply_leakage_correction is True
-        assert cfg.svd_threshold == 0.2
         assert cfg.baseline_frames == 10
         assert cfg.hematocrit_ratio == 0.73
 
     def test_invalid_deconvolution_method(self) -> None:
         """Invalid deconvolution method raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid deconvolution method"):
-            DSCPipelineYAML(deconvolution_method="invalid_method")
+        with pytest.raises(ValidationError):
+            DSCPipelineYAML(deconvolution={"method": "invalid_method"})
 
     def test_valid_deconvolution_methods(self) -> None:
-        """All registered deconvolution methods are accepted."""
-        from osipy.dsc import list_deconvolvers
+        """All registered deconvolution methods are accepted (nested config)."""
+        from osipy.dsc.deconvolution.config import DECONVOLVER_CONFIGS
 
-        for name in list_deconvolvers():
-            cfg = DSCPipelineYAML(deconvolution_method=name)
-            assert cfg.deconvolution_method == name
+        for name in DECONVOLVER_CONFIGS:
+            cfg = DSCPipelineYAML(deconvolution={"method": name})
+            assert cfg.deconvolution.method == name
+
+    def test_method_params_surface_and_validate(self) -> None:
+        """Selecting a method exposes its params; unknown keys are rejected."""
+        cfg = DSCPipelineYAML(deconvolution={"method": "cSVD", "threshold": 0.35})
+        assert cfg.deconvolution.method == "cSVD"
+        assert cfg.deconvolution.threshold == 0.35
+        # A knob from a different method must not be accepted (extra=forbid).
+        with pytest.raises(ValidationError):
+            DSCPipelineYAML(deconvolution={"method": "cSVD", "oscillation_index": 0.05})
 
 
 # ---------------------------------------------------------------------------
@@ -278,32 +409,34 @@ class TestASLPipelineYAML:
     """Tests for ASL pipeline config validation."""
 
     def test_defaults(self) -> None:
-        """Default ASL config values match expected."""
+        """Default ASL config values match expected (nested registry configs)."""
         cfg = ASLPipelineYAML()
         assert cfg.labeling_scheme == "pcasl"
         assert cfg.pld == 1800.0
         assert cfg.label_duration == 1800.0
         assert cfg.t1_blood == 1650.0
-        assert cfg.labeling_efficiency == 0.85
-        assert cfg.m0_method == "single"
         assert cfg.t1_tissue == 1330.0
+        assert cfg.labeling_efficiency == 0.85
         assert cfg.partition_coefficient == 0.9
-        assert cfg.difference_method == "pairwise"
+        assert cfg.m0.method == "single"
+        assert cfg.m0.t1_tissue == 1330.0
+        assert cfg.difference.method == "pairwise"
+        assert cfg.quantification.mode == "single_pld"
         assert cfg.label_control_order == "label_first"
 
     def test_invalid_labeling_scheme(self) -> None:
         """Invalid labeling scheme raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid labeling scheme"):
+        with pytest.raises(ValidationError):
             ASLPipelineYAML(labeling_scheme="invalid")
 
     def test_invalid_m0_method(self) -> None:
-        """Invalid M0 method raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid M0 method"):
-            ASLPipelineYAML(m0_method="invalid")
+        """Invalid M0 method raises ValidationError (no matching union member)."""
+        with pytest.raises(ValidationError):
+            ASLPipelineYAML(m0={"method": "invalid"})
 
     def test_invalid_label_control_order(self) -> None:
         """Invalid label/control order raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid label/control order"):
+        with pytest.raises(ValidationError):
             ASLPipelineYAML(label_control_order="invalid")
 
     def test_valid_labeling_schemes(self) -> None:
@@ -312,6 +445,58 @@ class TestASLPipelineYAML:
             cfg = ASLPipelineYAML(labeling_scheme=scheme)
             assert cfg.labeling_scheme == scheme
 
+    def test_valid_m0_methods(self) -> None:
+        """All registered M0 calibration methods are accepted (nested config)."""
+        from osipy.asl.config import M0_CONFIGS
+
+        for name in M0_CONFIGS:
+            cfg = ASLPipelineYAML(m0={"method": name})
+            assert cfg.m0.method == name
+
+    def test_m0_params_surface_and_validate(self) -> None:
+        """Selecting an M0 method exposes its knobs; cross-method keys rejected."""
+        cfg = ASLPipelineYAML(
+            m0={"method": "reference_region", "reference_region": "white_matter"}
+        )
+        assert cfg.m0.method == "reference_region"
+        assert cfg.m0.reference_region == "white_matter"
+        # 'single' has no reference_region knob (extra=forbid).
+        with pytest.raises(ValidationError):
+            ASLPipelineYAML(m0={"method": "single", "reference_region": "csf"})
+
+    def test_valid_difference_methods(self) -> None:
+        """All registered difference methods are selectable via the nested config."""
+        from osipy.asl.config import DIFFERENCE_CONFIGS
+
+        for name in DIFFERENCE_CONFIGS:
+            cfg = ASLPipelineYAML(difference={"method": name})
+            assert cfg.difference.method == name
+
+    def test_difference_rejects_cross_method_keys(self) -> None:
+        """Difference selection rejects unknown/cross-method keys (extra=forbid)."""
+        with pytest.raises(ValidationError):
+            ASLPipelineYAML(difference={"method": "pairwise", "threshold": 0.2})
+
+    def test_quantification_modes_selectable(self) -> None:
+        """Both single_pld and multi_pld modes are selectable."""
+        cfg_single = ASLPipelineYAML(quantification={"mode": "single_pld"})
+        assert cfg_single.quantification.mode == "single_pld"
+        cfg_multi = ASLPipelineYAML(
+            quantification={
+                "mode": "multi_pld",
+                "plds": [500.0, 1000.0, 1500.0],
+                "att_model": "buxton",
+            }
+        )
+        assert cfg_multi.quantification.mode == "multi_pld"
+        assert cfg_multi.quantification.plds == [500.0, 1000.0, 1500.0]
+        assert cfg_multi.quantification.att_model == "buxton"
+
+    def test_single_pld_rejects_multi_pld_keys(self) -> None:
+        """single_pld mode rejects multi-PLD-only keys (extra=forbid)."""
+        with pytest.raises(ValidationError):
+            ASLPipelineYAML(quantification={"mode": "single_pld", "plds": [500.0]})
+
 
 # ---------------------------------------------------------------------------
 # TestIVIMPipelineYAML
@@ -319,27 +504,65 @@ class TestASLPipelineYAML:
 
 
 class TestIVIMPipelineYAML:
-    """Tests for IVIM pipeline config validation."""
+    """Tests for IVIM pipeline config validation (registry-driven unions)."""
 
     def test_defaults(self) -> None:
-        """Default IVIM config values match expected."""
+        """Default IVIM config uses segmented fitting + biexponential model."""
         cfg = IVIMPipelineYAML()
-        assert cfg.fitting_method == "segmented"
-        assert cfg.b_threshold == 200.0
-        assert cfg.normalize_signal is True
+        assert cfg.fitting.method == "segmented"
+        assert cfg.fitting.b_threshold == 200.0
         assert cfg.fitting.max_iterations == 500
         assert cfg.fitting.tolerance == 1e-6
+        assert cfg.model.model == "biexponential"
+        assert cfg.normalize_signal is True
 
     def test_invalid_fitting_method(self) -> None:
         """Invalid fitting method raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid fitting method"):
-            IVIMPipelineYAML(fitting_method="invalid")
+        with pytest.raises(ValidationError):
+            IVIMPipelineYAML(fitting={"method": "invalid"})
 
     def test_valid_fitting_methods(self) -> None:
-        """All valid fitting methods are accepted."""
-        for method in ("segmented", "full", "bayesian"):
-            cfg = IVIMPipelineYAML(fitting_method=method)
-            assert cfg.fitting_method == method
+        """All registered fitting methods are accepted."""
+        from osipy.ivim.config import IVIM_FITTING_CONFIGS
+
+        for method in IVIM_FITTING_CONFIGS:
+            cfg = IVIMPipelineYAML(fitting={"method": method})
+            assert cfg.fitting.method == method
+
+    def test_bayesian_surfaces_prior_scale(self) -> None:
+        """Selecting bayesian surfaces prior_scale; segmented does not."""
+        cfg = IVIMPipelineYAML(fitting={"method": "bayesian", "prior_scale": 2.5})
+        assert cfg.fitting.method == "bayesian"
+        assert cfg.fitting.prior_scale == 2.5
+        # prior_scale is a bayesian-only knob — segmented must reject it.
+        with pytest.raises(ValidationError):
+            IVIMPipelineYAML(fitting={"method": "segmented", "prior_scale": 2.5})
+
+    def test_full_rejects_b_threshold(self) -> None:
+        """The full strategy has no b_threshold knob (cross-method key rejected)."""
+        with pytest.raises(ValidationError):
+            IVIMPipelineYAML(fitting={"method": "full", "b_threshold": 150.0})
+
+    def test_fitting_rejects_unknown_keys(self) -> None:
+        """Unknown keys on the fitting config are rejected (extra=forbid)."""
+        with pytest.raises(ValidationError):
+            IVIMPipelineYAML(fitting={"method": "segmented", "nonsense": 1})
+
+    def test_valid_signal_models(self) -> None:
+        """Both registered signal models are selectable."""
+        from osipy.ivim.config import IVIM_MODEL_CONFIGS
+
+        for name in IVIM_MODEL_CONFIGS:
+            cfg = IVIMPipelineYAML(model={"model": name})
+            assert cfg.model.model == name
+
+    def test_simplified_model_surfaces_b_threshold(self) -> None:
+        """The simplified model exposes its own b_threshold; biexp rejects it."""
+        cfg = IVIMPipelineYAML(model={"model": "simplified", "b_threshold": 175.0})
+        assert cfg.model.model == "simplified"
+        assert cfg.model.b_threshold == 175.0
+        with pytest.raises(ValidationError):
+            IVIMPipelineYAML(model={"model": "biexponential", "b_threshold": 175.0})
 
 
 # ---------------------------------------------------------------------------
@@ -362,14 +585,12 @@ class TestDCEFittingConfig:
 
     def test_invalid_fitter(self) -> None:
         """Invalid fitter name raises ValidationError."""
-        with pytest.raises(ValidationError, match="Invalid fitter"):
+        with pytest.raises(ValidationError):
             DCEFittingConfig(fitter="nonexistent_fitter")
 
     def test_valid_fitters(self) -> None:
-        """All registered fitters are accepted."""
-        from osipy.common.fitting.registry import list_fitters
-
-        for name in list_fitters():
+        """The DCE-supported fitters are accepted."""
+        for name in ("lm", "bayesian"):
             cfg = DCEFittingConfig(fitter=name)
             assert cfg.fitter == name
 
@@ -413,7 +634,8 @@ class TestDCEFittingConfig:
         path = tmp_config("""\
             modality: dce
             pipeline:
-              model: tofts
+              model:
+                method: tofts
               fitting:
                 fitter: lm
                 max_iterations: 200
@@ -428,6 +650,7 @@ class TestDCEFittingConfig:
         """)
         config = load_config(path)
         mc = config.get_modality_config()
+        assert mc.model.method == "tofts"
         assert mc.fitting.fitter == "lm"
         assert mc.fitting.max_iterations == 200
         assert mc.fitting.tolerance == 1e-8
@@ -442,20 +665,25 @@ class TestDCEFittingConfig:
 
 
 class TestIVIMFittingConfig:
-    """Tests for IVIM fitting configuration."""
+    """Tests for the registry-driven IVIM fitting MethodConfig models."""
 
-    def test_defaults(self) -> None:
-        """Default IVIM fitting config values match expected."""
-        cfg = IVIMFittingConfig()
+    def test_segmented_defaults(self) -> None:
+        """Default segmented fitting config values match expected."""
+        from osipy.ivim.config import SegmentedFittingConfig
+
+        cfg = SegmentedFittingConfig()
+        assert cfg.method == "segmented"
         assert cfg.max_iterations == 500
         assert cfg.tolerance == 1e-6
+        assert cfg.b_threshold == 200.0
         assert cfg.bounds is None
         assert cfg.initial_guess is None
-        assert isinstance(cfg.bayesian, BayesianIVIMFittingConfig)
 
     def test_bounds_override(self) -> None:
         """IVIM bounds override parses correctly."""
-        cfg = IVIMFittingConfig(
+        from osipy.ivim.config import SegmentedFittingConfig
+
+        cfg = SegmentedFittingConfig(
             bounds={"D": [1e-4, 3e-3], "D_star": [5e-3, 0.05], "f": [0.0, 0.5]}
         )
         assert cfg.bounds["D"] == [1e-4, 3e-3]
@@ -463,78 +691,106 @@ class TestIVIMFittingConfig:
 
     def test_bounds_validation_wrong_length(self) -> None:
         """Bounds with != 2 elements raises ValidationError."""
+        from osipy.ivim.config import SegmentedFittingConfig
+
         with pytest.raises(ValidationError, match="must be"):
-            IVIMFittingConfig(bounds={"D": [1e-4]})
+            SegmentedFittingConfig(bounds={"D": [1e-4]})
+
+    def test_bounds_validation_lower_gt_upper(self) -> None:
+        """Lower bound > upper bound raises ValidationError."""
+        from osipy.ivim.config import SegmentedFittingConfig
+
+        with pytest.raises(ValidationError, match="Lower bound > upper bound"):
+            SegmentedFittingConfig(bounds={"D": [3e-3, 1e-4]})
 
     def test_initial_guess_override(self) -> None:
         """IVIM initial guess override parses correctly."""
-        cfg = IVIMFittingConfig(initial_guess={"D": 0.8e-3, "D_star": 0.02, "f": 0.15})
+        from osipy.ivim.config import SegmentedFittingConfig
+
+        cfg = SegmentedFittingConfig(initial_guess={"D": 0.8e-3, "f": 0.15})
         assert cfg.initial_guess["D"] == 0.8e-3
 
     def test_bayesian_defaults(self) -> None:
-        """Bayesian sub-config has expected defaults."""
-        cfg = BayesianIVIMFittingConfig()
+        """Bayesian fitting config has expected prior knobs."""
+        from osipy.ivim.config import BayesianFittingConfig
+
+        cfg = BayesianFittingConfig()
+        assert cfg.method == "bayesian"
         assert cfg.prior_scale == 1.5
         assert cfg.noise_std is None
         assert cfg.compute_uncertainty is True
+        assert cfg.b_threshold == 200.0
 
     def test_bayesian_custom_priors(self) -> None:
         """Custom Bayesian parameters parse correctly."""
-        cfg = IVIMFittingConfig(
-            bayesian={"prior_scale": 2.0, "compute_uncertainty": False}
-        )
-        assert cfg.bayesian.prior_scale == 2.0
-        assert cfg.bayesian.compute_uncertainty is False
-        assert cfg.bayesian.noise_std is None  # default preserved
+        from osipy.ivim.config import BayesianFittingConfig
+
+        cfg = BayesianFittingConfig(prior_scale=2.0, compute_uncertainty=False)
+        assert cfg.prior_scale == 2.0
+        assert cfg.compute_uncertainty is False
+        assert cfg.noise_std is None  # default preserved
+
+    def test_full_has_no_b_threshold(self) -> None:
+        """The full strategy intentionally exposes no b_threshold knob."""
+        from osipy.ivim.config import FullFittingConfig
+
+        cfg = FullFittingConfig()
+        assert cfg.method == "full"
+        assert "b_threshold" not in cfg.model_fields
 
     def test_ivim_yaml_includes_fitting(self) -> None:
-        """IVIMPipelineYAML includes fitting sub-config with defaults."""
+        """IVIMPipelineYAML includes a validated fitting MethodConfig."""
+        from osipy.ivim.config import SegmentedFittingConfig
+
         cfg = IVIMPipelineYAML()
-        assert isinstance(cfg.fitting, IVIMFittingConfig)
+        assert isinstance(cfg.fitting, SegmentedFittingConfig)
         assert cfg.fitting.max_iterations == 500
 
     def test_ivim_config_from_yaml(self, tmp_config) -> None:
-        """Full IVIM config with fitting section loads from YAML."""
+        """Full IVIM config with bayesian fitting + simplified model loads."""
         path = tmp_config("""\
             modality: ivim
             pipeline:
-              fitting_method: bayesian
-              b_threshold: 150.0
               fitting:
+                method: bayesian
+                b_threshold: 150.0
                 max_iterations: 1000
                 tolerance: 1.0e-8
+                prior_scale: 2.0
+                compute_uncertainty: false
                 bounds:
                   D: [1.0e-4, 3.0e-3]
                   D_star: [5.0e-3, 0.05]
                   f: [0.0, 0.5]
                 initial_guess:
                   D: 0.8e-3
-                  D_star: 0.02
                   f: 0.15
-                bayesian:
-                  prior_scale: 2.0
-                  compute_uncertainty: false
+              model:
+                model: simplified
+                b_threshold: 180.0
         """)
         config = load_config(path)
         mc = config.get_modality_config()
-        assert mc.fitting_method == "bayesian"
+        assert mc.fitting.method == "bayesian"
         assert mc.fitting.max_iterations == 1000
         assert mc.fitting.tolerance == 1e-8
         assert mc.fitting.bounds["D"] == [1e-4, 3e-3]
         assert mc.fitting.initial_guess["D"] == 0.8e-3
-        assert mc.fitting.bayesian.prior_scale == 2.0
-        assert mc.fitting.bayesian.compute_uncertainty is False
+        assert mc.fitting.prior_scale == 2.0
+        assert mc.fitting.compute_uncertainty is False
+        assert mc.model.model == "simplified"
+        assert mc.model.b_threshold == 180.0
 
     def test_fitting_section_optional(self, tmp_config) -> None:
-        """IVIM config without fitting section uses defaults."""
+        """IVIM config without explicit fitting section uses defaults."""
         path = tmp_config("""\
             modality: ivim
             pipeline:
-              fitting_method: segmented
-              b_threshold: 200.0
+              normalize_signal: true
         """)
         config = load_config(path)
         mc = config.get_modality_config()
+        assert mc.fitting.method == "segmented"
         assert mc.fitting.max_iterations == 500
         assert mc.fitting.tolerance == 1e-6
         assert mc.fitting.bounds is None
@@ -557,6 +813,9 @@ class TestDumpDefaults:
         """Round-trip: dump_defaults output can be loaded and validated."""
         for modality in ("dce", "dsc", "asl", "ivim"):
             template = dump_defaults(modality)
+            # Templates must be ASCII so they round-trip on Windows (cp1252)
+            # as well as UTF-8.
+            template.encode("ascii")
             config_path = tmp_path / f"{modality}_config.yaml"
             config_path.write_text(template)
             config = load_config(config_path)
@@ -694,6 +953,114 @@ class TestFitDelayWiring:
         )
 
         assert captured.get("fit_delay") is True
+
+
+# ---------------------------------------------------------------------------
+# TestDCERegistryConfigWiring — non-default knobs reach the components
+# ---------------------------------------------------------------------------
+
+
+class TestDCERegistryConfigWiring:
+    """A non-default selection-point knob auto-constructs the right component."""
+
+    def test_yaml_model_name_reaches_fit_model(self, tmp_config, monkeypatch) -> None:
+        """A model selected in YAML drives fit_model's model_name (auto-construct)."""
+        import numpy as np
+
+        from osipy.cli.config import load_config
+        from osipy.common.aif import ArterialInputFunction
+        from osipy.common.dataset import PerfusionDataset
+        from osipy.common.types import AIFType, Modality
+        from osipy.pipeline import dce_pipeline
+        from osipy.pipeline.dce_pipeline import DCEPipeline, DCEPipelineConfig
+
+        path = tmp_config("""\
+            modality: dce
+            pipeline:
+              model:
+                method: patlak
+        """)
+        mc = load_config(path).get_modality_config()
+
+        captured: dict[str, object] = {}
+
+        def _fake_fit_model(**kwargs):
+            captured.update(kwargs)
+
+            class _Result:
+                def __init__(self) -> None:
+                    self.parameter_maps: dict = {}
+                    self.quality_mask = np.ones((2, 2, 2), dtype=bool)
+
+            return _Result()
+
+        monkeypatch.setattr(dce_pipeline, "fit_model", _fake_fit_model)
+
+        time = np.linspace(0, 60, 10)
+        dataset = PerfusionDataset(
+            data=np.random.rand(2, 2, 2, 10),
+            affine=np.eye(4),
+            modality=Modality.DCE,
+            time_points=time,
+        )
+        # Runner passes the validated nested config straight through.
+        cfg = DCEPipelineConfig(model=mc.model)
+        DCEPipeline(cfg).run(
+            dce_data=dataset,
+            time=time,
+            t1_map=None,
+            aif=ArterialInputFunction(
+                time=time,
+                concentration=np.abs(np.random.rand(10)),
+                aif_type=AIFType.POPULATION,
+            ),
+        )
+        assert captured.get("model_name") == "patlak"
+
+    def test_nonlinear_vfa_knob_reaches_compute_t1_vfa(self, monkeypatch) -> None:
+        """vfa_fit_method=nonlinear propagates to compute_t1_vfa(method=...)."""
+        import numpy as np
+
+        from osipy.pipeline.dce_pipeline import DCEPipeline, DCEPipelineConfig
+
+        captured: dict[str, object] = {}
+
+        class _T1Result:
+            def __init__(self) -> None:
+                from osipy.common.parameter_map import ParameterMap
+
+                vals = np.full((2, 2, 1), 1200.0)
+                self.t1_map = ParameterMap(
+                    name="T1", symbol="T1", units="ms", values=vals, affine=np.eye(4)
+                )
+                self.quality_mask = np.ones((2, 2, 1), dtype=bool)
+
+        def _fake_compute_t1_vfa(**kwargs):
+            captured.update(kwargs)
+            return _T1Result()
+
+        monkeypatch.setattr("osipy.dce.t1_mapping.compute_t1_vfa", _fake_compute_t1_vfa)
+
+        cfg = DCEPipelineConfig(t1_mapping_method="vfa", vfa_fit_method="nonlinear")
+        pipeline = DCEPipeline(cfg)
+        pipeline._compute_t1_map(
+            np.random.rand(2, 2, 1, 4),
+            flip_angles=np.array([2.0, 5.0, 10.0, 15.0]),
+            tr=5.0,
+        )
+        assert captured.get("method") == "nonlinear"
+
+    def test_population_aif_knob_constructs_selected_aif(self) -> None:
+        """A non-default population AIF name builds that AIF in the pipeline."""
+        import numpy as np
+
+        from osipy.pipeline.dce_pipeline import DCEPipeline, DCEPipelineConfig
+
+        cfg = DCEPipelineConfig(aif_source="population", population_aif="georgiou")
+        pipeline = DCEPipeline(cfg)
+        time = np.linspace(0, 60, 20)
+        aif = pipeline._get_aif(np.zeros((2, 2, 1, 20)), time, mask=None)
+        assert aif.population_model == "Georgiou"
 
 
 # ---------------------------------------------------------------------------

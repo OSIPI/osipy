@@ -30,31 +30,14 @@ References
    MRM 2024;91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
-from osipy.common.convolution import (
-    biexpconv,
-    conv,
-    convmat,
-    deconv,
-    expconv,
-    fft_convolve,
-    invconvmat,
-    nexpconv,
-    uconv,
-)
-from osipy.common.convolution.registry import (
-    get_convolution,
-    list_convolutions,
-    register_convolution,
-)
+from osipy.common.convolution import convolve_aif, expconv
 from osipy.common.dataset import PerfusionDataset
 from osipy.common.exceptions import (
     AIFError,
     DataValidationError,
     FittingError,
     IOError,
-    MetadataError,
     OsipyError,
-    ValidationError,
 )
 from osipy.common.fitting.registry import get_fitter, list_fitters, register_fitter
 from osipy.common.parameter_map import ParameterMap
@@ -84,7 +67,6 @@ __all__ = [
     "IOError",
     "IVIMAcquisitionParams",
     "LabelingType",
-    "MetadataError",
     # Enums
     "Modality",
     # Exceptions
@@ -92,23 +74,11 @@ __all__ = [
     "ParameterMap",
     # Core data containers
     "PerfusionDataset",
-    "ValidationError",
-    "biexpconv",
     # Convolution functions
-    "conv",
-    "convmat",
-    "deconv",
+    "convolve_aif",
     "expconv",
-    "fft_convolve",
-    "get_convolution",
     "get_fitter",
-    "invconvmat",
-    "list_convolutions",
     "list_fitters",
-    "nexpconv",
-    # Convolution registry
-    "register_convolution",
     # Fitter registry
     "register_fitter",
-    "uconv",
 ]

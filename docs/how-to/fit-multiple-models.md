@@ -9,13 +9,15 @@ Run separate configs with different models and compare outputs:
 ```bash
 # Generate a base config
 osipy --dump-defaults dce > config_tofts.yaml
-# Edit config_tofts.yaml: set model: tofts, then copy and change model name
+# Edit config_tofts.yaml: set model.method: tofts, then copy and change the name
 osipy config_tofts.yaml data.nii.gz -o results/tofts/
 osipy config_etofts.yaml data.nii.gz -o results/extended_tofts/
 osipy config_patlak.yaml data.nii.gz -o results/patlak/
 ```
 
-The only field that changes between configs is `pipeline.model`. Compare the output parameter maps and R² maps across runs.
+The only field that changes between configs is `pipeline.model.method`
+(`tofts`, `extended_tofts`, `patlak`, `2cum`, or `2cxm`). Compare the output
+parameter maps and R² maps across runs.
 
 ## Available Models
 

@@ -165,6 +165,7 @@ nav:
     - explanation/index.md
     - Software Architecture:
       - Architecture Overview: explanation/architecture.md
+      - Registry-Driven Configuration: explanation/configuration.md
       - xp Abstraction Pattern: explanation/xp-abstraction.md
       - OSIPI Standards: explanation/osipi-standards.md
     - MRI Physics:

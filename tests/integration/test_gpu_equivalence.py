@@ -194,10 +194,10 @@ class TestDSCDeconvolutionGPUHandling:
         residue = np.exp(-t / 5.0)
 
         # Create tissue concentration via convolution
-        t[1] - t[0]
-        from osipy.common.convolution import conv
+        dt = t[1] - t[0]
+        from osipy.common.convolution import convolve_aif
 
-        tissue = conv(aif, residue, t)
+        tissue = convolve_aif(aif, residue, dt=dt)
 
         # Create 4D data (small volume)
         nx, ny, nz = 4, 4, 2
@@ -300,58 +300,6 @@ class TestConvolutionGPUEquivalence:
             result_gpu_np,
             rtol=1e-10,
             err_msg="expconv GPU/CPU results differ",
-        )
-
-    def test_conv_gpu_cpu_equivalence(self):
-        """Test piecewise linear convolution GPU/CPU equivalence."""
-        from osipy.common.convolution import conv
-
-        np.random.seed(42)
-        n = 100
-        t = np.linspace(0, 10, n)
-        f = np.exp(-t / 2)
-        h = np.exp(-t / 3)
-
-        # CPU computation
-        result_cpu = conv(f, h, t)
-
-        # GPU computation
-        f_gpu = to_gpu(f)
-        h_gpu = to_gpu(h)
-        t_gpu = to_gpu(t)
-        result_gpu = conv(f_gpu, h_gpu, t_gpu)
-
-        result_gpu_np = to_numpy(result_gpu)
-
-        assert_allclose(
-            result_cpu, result_gpu_np, rtol=1e-6, err_msg="conv GPU/CPU results differ"
-        )
-
-    def test_fft_convolve_gpu_cpu_equivalence(self):
-        """Test FFT convolution GPU/CPU equivalence."""
-        from osipy.common.convolution import fft_convolve
-
-        np.random.seed(42)
-        n = 256
-        dt = 0.1
-        f = np.random.randn(n)
-        h = np.exp(-np.arange(n) * dt / 5)
-
-        # CPU computation
-        result_cpu = fft_convolve(f, h, dt)
-
-        # GPU computation
-        f_gpu = to_gpu(f)
-        h_gpu = to_gpu(h)
-        result_gpu = fft_convolve(f_gpu, h_gpu, dt)
-
-        result_gpu_np = to_numpy(result_gpu)
-
-        assert_allclose(
-            result_cpu,
-            result_gpu_np,
-            rtol=1e-6,
-            err_msg="FFT convolve GPU/CPU results differ",
         )
 
 

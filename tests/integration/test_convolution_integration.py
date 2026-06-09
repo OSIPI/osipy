@@ -7,11 +7,7 @@ results.
 
 import numpy as np
 
-from osipy.common.convolution import (
-    conv,
-    deconv,
-    fft_convolve,
-)
+from osipy.common.convolution import convolve_aif
 from osipy.dce.models.extended_tofts import ExtendedToftsModel, ExtendedToftsParams
 from osipy.dce.models.tofts import ToftsModel, ToftsParams
 from osipy.dsc.deconvolution import get_deconvolver
@@ -91,7 +87,8 @@ class TestDeconvolutionWithDSCModels:
         residue = true_cbf * np.exp(-t / mtt)
 
         # Create tissue concentration: C(t) = CBF * AIF ⊗ R(t)
-        tissue = conv(aif, residue / true_cbf, t)  # Normalized convolution
+        dt = t[1] - t[0]
+        tissue = convolve_aif(aif, residue / true_cbf, dt=dt)  # Normalized convolution
         tissue = tissue.reshape(1, 1, 1, n_time)  # 4D shape
 
         # Run SVD deconvolution via registry
@@ -105,56 +102,3 @@ class TestDeconvolutionWithDSCModels:
 
         # CBF should be positive
         assert result.cbf[0, 0, 0] > 0
-
-    def test_circulant_deconvolution_delay_insensitive(self):
-        """Test that circulant SVD is insensitive to bolus arrival delay."""
-        t = np.linspace(0, 60, 61)
-
-        # Create AIF with and without delay
-        aif = np.exp(-((t - 10) ** 2) / 10) * (t > 10)
-        aif_delayed = np.exp(-((t - 15) ** 2) / 10) * (t > 15)
-
-        # Residue function
-        residue = np.exp(-t / 10)
-
-        # Tissue curves
-        tissue = conv(aif, residue, t)
-        tissue_delayed = conv(aif_delayed, residue, t)
-
-        # Deconvolve with circulant method
-        recovered = deconv(tissue, aif, t, method="tsvd", tol=0.1, circulant=True)
-        recovered_delayed = deconv(
-            tissue_delayed, aif_delayed, t, method="tsvd", tol=0.1, circulant=True
-        )
-
-        # Both should give similar peak values (CBF proxy)
-        cbf = np.max(recovered)
-        cbf_delayed = np.max(recovered_delayed)
-
-        # Within 50% is acceptable for this test
-        assert abs(cbf - cbf_delayed) / max(cbf, cbf_delayed) < 0.5
-
-
-class TestConvolutionNumericalAccuracy:
-    """Test numerical accuracy of convolution operations."""
-
-    def test_conv_vs_fft_on_uniform_grid(self):
-        """Compare piecewise-linear and FFT convolution on uniform grid."""
-        n = 200
-        dt = 0.1
-        t = np.arange(n) * dt
-
-        # Test signals
-        f = np.exp(-t / 2)
-        h = np.exp(-t / 5)
-
-        # Piecewise-linear
-        result_pw = conv(f, h, t, dt=dt)
-
-        # FFT
-        result_fft = fft_convolve(f, h, dt, mode="same")
-
-        # Both should give similar results in the middle
-        middle = slice(30, 150)
-        correlation = np.corrcoef(result_pw[middle], result_fft[middle])[0, 1]
-        assert correlation > 0.7

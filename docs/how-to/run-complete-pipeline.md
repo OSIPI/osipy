@@ -117,11 +117,13 @@ Complete DSC-MRI analysis:
 
 ```python
 import osipy
+from osipy.dsc.deconvolution.config import OSVDConfig
 from osipy.pipeline import DSCPipeline, DSCPipelineConfig
 
-# Create pipeline with config object
+# Create pipeline with config object. The deconvolution method is a nested
+# config: OSVDConfig (per-voxel adaptive threshold), SSVDConfig, or CSVDConfig.
 config = DSCPipelineConfig(
-    deconvolution_method="oSVD",
+    deconvolution=OSVDConfig(oscillation_index=0.035, default_threshold=0.2),
     apply_leakage_correction=True,
 )
 

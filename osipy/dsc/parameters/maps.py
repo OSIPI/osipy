@@ -78,6 +78,7 @@ def compute_perfusion_maps(
     deconvolve: bool = True,
     deconvolution_method: str = "oSVD",
     svd_threshold: float = 0.2,
+    fitter: Any = None,
     density: float = 1.04,
     hematocrit_ratio: float = 0.73,
 ) -> DSCPerfusionMaps:
@@ -155,7 +156,10 @@ def compute_perfusion_maps(
             dsc_model = DSCConvolutionModel()
             matrix_type = "toeplitz" if deconvolution_method == "sSVD" else "circulant"
             bound = BoundDSCModel(dsc_model, aif, time, matrix_type=matrix_type)
-            fitter = FITTER_REGISTRY[deconvolution_method]()
+            # Use an explicitly-constructed fitter (carrying its config) when
+            # provided; otherwise fall back to a default-constructed one.
+            if fitter is None:
+                fitter = FITTER_REGISTRY[deconvolution_method]()
 
             # Reshape to 4D for fit_image: (x, y, z, t)
             original_shape = delta_r2.shape

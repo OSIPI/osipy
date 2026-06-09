@@ -19,7 +19,7 @@ References
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -27,9 +27,9 @@ import numpy as np
 from osipy.common.aif import (
     ArterialInputFunction,
     detect_aif,
-    get_population_aif,
 )
 from osipy.common.backend.array_module import get_array_module
+from osipy.common.config import MethodConfig, config_params, construct_from_config
 from osipy.common.dataset import PerfusionDataset
 from osipy.common.exceptions import DataValidationError
 from osipy.common.types import Modality
@@ -38,6 +38,13 @@ from osipy.dce import (
     DCEFitResult,
     compute_t1_map,
     signal_to_concentration,
+)
+from osipy.dce.config import (
+    CONCENTRATION_CONFIGS,
+    DCE_MODEL_CONFIGS,
+    POPULATION_AIF_CONFIGS,
+    POPULATION_AIF_REGISTRY,
+    T1_METHOD_CONFIGS,
 )
 from osipy.dce.fitting import fit_model
 
@@ -73,7 +80,9 @@ class DCEPipelineConfig:
     fitter : str | None
         Fitter registry name (e.g., 'lm', 'bayesian').
     concentration_method : str
-        Signal-to-concentration conversion method.
+        Signal-to-concentration conversion method ('spgr' or 'linear').
+    vfa_fit_method : str
+        VFA T1 fit when t1_mapping_method='vfa': 'linear' or 'nonlinear'.
     bounds_override : dict[str, tuple[float, float]] | None
         Per-parameter bound overrides for fitting.
     aif_detection_method : str
@@ -89,17 +98,27 @@ class DCEPipelineConfig:
     fit_delay : bool
         If True, jointly fit an arterial delay parameter with the DCE model
         (adds one parameter per voxel). Defaults to False.
+
+    Notes
+    -----
+    Selection points (model, T1 method, concentration model, population AIF)
+    are registry-driven: their names map to :class:`MethodConfig` models in
+    :mod:`osipy.dce.config`, and the pipeline builds each component from a
+    validated config via :func:`construct_from_config`. The string fields here
+    are normalized to those configs in :meth:`__post_init__`, so callers may
+    pass either a name (e.g. ``model="tofts"``) or a ``MethodConfig`` instance.
     """
 
-    t1_mapping_method: str = "vfa"
-    model: str = "extended_tofts"
+    t1_mapping_method: str | MethodConfig = "vfa"
+    model: str | MethodConfig = "extended_tofts"
     aif_source: str = "population"
-    population_aif: str = "parker"
+    population_aif: str | MethodConfig = "parker"
     acquisition_params: DCEAcquisitionParams | None = None
     output_dir: Path | None = None
     save_intermediate: bool = False
     fitter: str | None = None
-    concentration_method: str = "spgr"
+    concentration_method: str | MethodConfig = "spgr"
+    vfa_fit_method: str = "linear"
     bounds_override: dict[str, tuple[float, float]] | None = None
     aif_detection_method: str = "multi_criteria"
     initial_guess_override: dict[str, float] | None = None
@@ -107,6 +126,59 @@ class DCEPipelineConfig:
     tolerance: float | None = None
     r2_threshold: float | None = None
     fit_delay: bool = False
+
+    # Validated MethodConfig instances (built in __post_init__).
+    model_config_obj: MethodConfig = field(init=False, repr=False)
+    t1_config_obj: MethodConfig = field(init=False, repr=False)
+    concentration_config_obj: MethodConfig = field(init=False, repr=False)
+    population_aif_config_obj: MethodConfig = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Normalize name/MethodConfig fields into validated config objects.
+
+        Each selection point accepts either a registry name (str) or an
+        already-validated :class:`MethodConfig`. Names are looked up in the
+        corresponding ``*_CONFIGS`` map; the VFA ``fit_method`` knob is folded
+        into the VFA config so the nonlinear path is selectable via the flat
+        ``vfa_fit_method`` field as well as a nested config.
+        """
+        self.model_config_obj = self._resolve(
+            self.model, DCE_MODEL_CONFIGS, "DCE model"
+        )
+        self.t1_config_obj = self._resolve(
+            self.t1_mapping_method, T1_METHOD_CONFIGS, "T1 mapping method"
+        )
+        # Fold the flat vfa_fit_method into the VFA config (unless a nested
+        # config already specified it explicitly).
+        if self.t1_config_obj.method == "vfa" and not isinstance(
+            self.t1_mapping_method, MethodConfig
+        ):
+            self.t1_config_obj = T1_METHOD_CONFIGS["vfa"](
+                fit_method=self.vfa_fit_method
+            )
+        self.concentration_config_obj = self._resolve(
+            self.concentration_method, CONCENTRATION_CONFIGS, "concentration model"
+        )
+        self.population_aif_config_obj = self._resolve(
+            self.population_aif,
+            POPULATION_AIF_CONFIGS,
+            "population AIF",
+        )
+
+    @staticmethod
+    def _resolve(
+        value: str | MethodConfig,
+        configs: dict[str, type[MethodConfig]],
+        label: str,
+    ) -> MethodConfig:
+        """Coerce a name or MethodConfig into a validated config instance."""
+        if isinstance(value, MethodConfig):
+            return value
+        if value not in configs:
+            valid = ", ".join(sorted(configs))
+            msg = f"Unknown {label} '{value}'. Valid: {valid}"
+            raise DataValidationError(msg)
+        return configs[value]()
 
 
 @dataclass
@@ -225,7 +297,7 @@ class DCEPipeline:
                 signal=signal,
                 t1_map=t1_map,
                 acquisition_params=acq_params,
-                method=self.config.concentration_method,
+                method=self.config.concentration_config_obj.method,
             )
         else:
             # Assume input is already concentration or use direct signal
@@ -251,7 +323,7 @@ class DCEPipeline:
         fit_mask = self._build_fit_mask(concentration, t1_map, mask)
 
         fit_result = fit_model(
-            model_name=self.config.model,
+            model_name=self.config.model_config_obj.method,
             concentration=concentration,
             aif=aif,
             time=time,
@@ -312,15 +384,19 @@ class DCEPipeline:
         signal = t1_data.data if isinstance(t1_data, PerfusionDataset) else t1_data
         affine = t1_data.affine if isinstance(t1_data, PerfusionDataset) else np.eye(4)
 
-        if self.config.t1_mapping_method == "vfa":
+        t1_cfg = self.config.t1_config_obj
+        if t1_cfg.method == "vfa":
             if flip_angles is None or tr is None:
                 msg = "flip_angles and tr required for VFA T1 mapping"
                 raise DataValidationError(msg)
+            # config_params(t1_cfg) carries the VFA knobs (fit_method); rename
+            # to the compute_t1_vfa keyword so the nonlinear path is selectable.
+            fit_method = config_params(t1_cfg).get("fit_method", "linear")
             t1_result = compute_t1_vfa(
                 signal=signal,
                 flip_angles=flip_angles,
                 tr=tr,
-                method="linear",
+                method=fit_method,
             )
             return ParameterMap(
                 name="T1",
@@ -334,7 +410,7 @@ class DCEPipeline:
         # Look-Locker branch
         if not isinstance(t1_data, PerfusionDataset):
             t1_data = PerfusionDataset(data=signal, modality=Modality.DCE)
-        ll_result = compute_t1_map(t1_data, method="look_locker")
+        ll_result = compute_t1_map(t1_data, method=t1_cfg.method)
         return ParameterMap(
             name="T1",
             symbol="T1",
@@ -352,7 +428,11 @@ class DCEPipeline:
     ) -> ArterialInputFunction:
         """Get AIF based on configuration."""
         if self.config.aif_source == "population":
-            aif_model = get_population_aif(self.config.population_aif)
+            aif_model = construct_from_config(
+                POPULATION_AIF_REGISTRY,
+                self.config.population_aif_config_obj,
+                discriminator="name",
+            )
             return aif_model(time)
 
         elif self.config.aif_source == "detect":

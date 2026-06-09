@@ -8,11 +8,40 @@ YAML files, and ``dump_defaults()`` for generating commented templates.
 from __future__ import annotations
 
 import logging
+import typing
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
+
+from osipy.asl.config import (
+    DIFFERENCE_CONFIGS,
+    M0_CONFIGS,
+    QUANT_DISCRIMINATOR,
+    QUANTIFICATION_CONFIGS,
+    PairwiseDifferenceConfig,
+    SingleM0Config,
+    SinglePLDConfig,
+)
+from osipy.common.config import method_union
+from osipy.dce.config import (
+    CONCENTRATION_CONFIGS,
+    DCE_MODEL_CONFIGS,
+    POPULATION_AIF_CONFIGS,
+    T1_METHOD_CONFIGS,
+    ExtendedToftsConfig,
+    SPGRConcentrationConfig,
+    VFAConfig,
+)
+from osipy.dsc.deconvolution.config import DECONVOLVER_CONFIGS, OSVDConfig
+from osipy.ivim.config import (
+    IVIM_FITTING_CONFIGS,
+    IVIM_MODEL_CONFIGS,
+    MODEL_DISCRIMINATOR,
+    BiexponentialModelConfig,
+    SegmentedFittingConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +54,7 @@ logger = logging.getLogger(__name__)
 class DataConfig(BaseModel):
     """Data loading configuration."""
 
-    format: str = Field(
-        default="auto",
-        description="auto | nifti | dicom | bids",
-    )
+    format: Literal["auto", "nifti", "dicom", "bids"] = Field(default="auto")
     mask: str | None = Field(
         default=None,
         description="tissue mask, relative to data_path or absolute",
@@ -74,7 +100,7 @@ class DataConfig(BaseModel):
 class OutputConfig(BaseModel):
     """Output configuration."""
 
-    format: str = Field(default="nifti", description="nifti")
+    format: Literal["nifti"] = Field(default="nifti")
 
 
 class BackendConfig(BaseModel):
@@ -89,7 +115,7 @@ class BackendConfig(BaseModel):
 class LoggingConfig(BaseModel):
     """Logging configuration."""
 
-    level: str = Field(default="INFO", description="DEBUG | INFO | WARNING | ERROR")
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +126,7 @@ class LoggingConfig(BaseModel):
 class DCEFittingConfig(BaseModel):
     """DCE model fitting configuration from YAML."""
 
-    fitter: str = Field(default="lm", description="lm | bayesian")
+    fitter: Literal["lm", "bayesian"] = Field(default="lm")
     max_iterations: int = Field(default=100)
     tolerance: float = Field(default=1e-6)
     r2_threshold: float = Field(
@@ -136,74 +162,6 @@ class DCEFittingConfig(BaseModel):
             )
         },
     )
-
-    @field_validator("fitter")
-    @classmethod
-    def validate_fitter(cls, v: str) -> str:
-        """Validate fitter name against registry."""
-        from osipy.common.fitting.registry import FITTER_REGISTRY
-
-        if v not in FITTER_REGISTRY:
-            valid = sorted(FITTER_REGISTRY.keys())
-            msg = f"Invalid fitter '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
-
-    @field_validator("bounds")
-    @classmethod
-    def validate_bounds(
-        cls, v: dict[str, list[float]] | None
-    ) -> dict[str, list[float]] | None:
-        """Validate bounds are [lower, upper] pairs."""
-        if v is None:
-            return v
-        for name, pair in v.items():
-            if len(pair) != 2:
-                msg = f"Bounds for '{name}' must be [lower, upper], got {pair}"
-                raise ValueError(msg)
-            if pair[0] > pair[1]:
-                msg = f"Lower bound > upper bound for '{name}': {pair}"
-                raise ValueError(msg)
-        return v
-
-
-class BayesianIVIMFittingConfig(BaseModel):
-    """Bayesian IVIM fitting configuration from YAML."""
-
-    prior_scale: float = Field(default=1.5)
-    noise_std: float | None = Field(default=None, examples=[0.01])
-    compute_uncertainty: bool = Field(default=True)
-
-
-class IVIMFittingConfig(BaseModel):
-    """IVIM model fitting configuration from YAML."""
-
-    max_iterations: int = Field(default=500)
-    tolerance: float = Field(default=1e-6)
-    bounds: dict[str, list[float]] | None = Field(
-        default=None,
-        description="override model defaults (omit to use model defaults)",
-        json_schema_extra={
-            "yaml_example": (
-                "S0: [0.0, 1.0e+10]        # signal units\n"
-                "D: [1.0e-4, 5.0e-3]       # mm^2/s\n"
-                "D_star: [2.0e-3, 0.1]     # mm^2/s\n"
-                "f: [0.0, 0.7]             # dimensionless"
-            )
-        },
-    )
-    initial_guess: dict[str, float] | None = Field(
-        default=None,
-        description="override data-driven initial estimates",
-        json_schema_extra={
-            "yaml_example": (
-                "D: 1.0e-3                 # mm^2/s\n"
-                "D_star: 0.01              # mm^2/s\n"
-                "f: 0.1                    # dimensionless"
-            )
-        },
-    )
-    bayesian: BayesianIVIMFittingConfig = BayesianIVIMFittingConfig()
 
     @field_validator("bounds")
     @classmethod
@@ -254,56 +212,42 @@ class DCEAcquisitionYAML(BaseModel):
     )
 
 
+# Discriminated unions of DCE selection-point configs, generated from the
+# registries: selecting a method/name pulls in exactly that option's params.
+_DCEModelConfig = method_union(DCE_MODEL_CONFIGS)
+_T1MethodConfig = method_union(T1_METHOD_CONFIGS)
+_ConcentrationConfig = method_union(CONCENTRATION_CONFIGS)
+_PopulationAIFConfig = method_union(POPULATION_AIF_CONFIGS, discriminator="name")
+
+
+def _default_population_aif() -> Any:
+    """Default population AIF config (Parker), from the registry."""
+    return POPULATION_AIF_CONFIGS["parker"]()
+
+
 class DCEPipelineYAML(BaseModel):
     """DCE pipeline settings from YAML."""
 
-    model: str = Field(
-        default="extended_tofts",
-        description="tofts | extended_tofts | patlak | 2cxm | 2cum",
+    model: _DCEModelConfig = Field(
+        default_factory=ExtendedToftsConfig,
+        description="pharmacokinetic model + parameters",
     )
-    t1_mapping_method: str = Field(default="vfa", description="vfa | look_locker")
-    aif_source: str = Field(
-        default="population", description="population | detect | manual"
+    t1_mapping_method: _T1MethodConfig = Field(
+        default_factory=VFAConfig,
+        description="T1 mapping method + parameters",
     )
-    population_aif: str = Field(
-        default="parker",
-        description="parker | georgiou | fritz_hansen | weinmann | mcgrath",
+    concentration: _ConcentrationConfig = Field(
+        default_factory=SPGRConcentrationConfig,
+        description="signal-to-concentration model",
+    )
+    aif_source: Literal["population", "detect", "manual"] = Field(default="population")
+    population_aif: _PopulationAIFConfig = Field(
+        default_factory=_default_population_aif,
+        description="population AIF model; used when aif_source: population",
     )
     save_intermediate: bool = Field(default=False)
     acquisition: DCEAcquisitionYAML = DCEAcquisitionYAML()
     fitting: DCEFittingConfig = DCEFittingConfig()
-
-    @field_validator("model")
-    @classmethod
-    def validate_model(cls, v: str) -> str:
-        """Validate DCE model name against registry."""
-        from osipy.dce import list_models
-
-        valid = list_models()
-        if v not in valid:
-            msg = f"Invalid DCE model '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
-
-    @field_validator("t1_mapping_method")
-    @classmethod
-    def validate_t1_method(cls, v: str) -> str:
-        """Validate T1 mapping method."""
-        valid = ["vfa", "look_locker"]
-        if v not in valid:
-            msg = f"Invalid T1 mapping method '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
-
-    @field_validator("aif_source")
-    @classmethod
-    def validate_aif_source(cls, v: str) -> str:
-        """Validate AIF source."""
-        valid = ["population", "detect", "manual"]
-        if v not in valid:
-            msg = f"Invalid AIF source '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
 
 
 # ---------------------------------------------------------------------------
@@ -311,33 +255,26 @@ class DCEPipelineYAML(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# Discriminated union of DSC deconvolution method configs, generated from the
+# registry: selecting ``method`` pulls in that method's parameters.
+_DeconvolverConfig = method_union(DECONVOLVER_CONFIGS)
+
+
 class DSCPipelineYAML(BaseModel):
     """DSC pipeline settings from YAML."""
 
     te: float = Field(default=30.0, description="ms, echo time")
-    deconvolution_method: str = Field(default="oSVD", description="oSVD | cSVD | sSVD")
-    apply_leakage_correction: bool = Field(default=True)
-    svd_threshold: float = Field(
-        default=0.2, description="truncation threshold for SVD"
-    )
     baseline_frames: int = Field(
         default=10, description="number of pre-bolus frames for baseline"
     )
     hematocrit_ratio: float = Field(
         default=0.73, description="large-to-small vessel hematocrit ratio"
     )
-
-    @field_validator("deconvolution_method")
-    @classmethod
-    def validate_deconv(cls, v: str) -> str:
-        """Validate deconvolution method against registry."""
-        from osipy.dsc import list_deconvolvers
-
-        valid = list_deconvolvers()
-        if v not in valid:
-            msg = f"Invalid deconvolution method '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
+    apply_leakage_correction: bool = Field(default=True)
+    deconvolution: _DeconvolverConfig = Field(
+        default_factory=OSVDConfig,
+        description="deconvolution method + parameters",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -345,63 +282,48 @@ class DSCPipelineYAML(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# Discriminated unions of ASL selection-point configs, generated from the
+# registries: selecting a method/mode pulls in exactly that option's params.
+_M0Config = method_union(M0_CONFIGS)
+_DifferenceConfig = method_union(DIFFERENCE_CONFIGS)
+_QuantificationConfig = method_union(
+    QUANTIFICATION_CONFIGS, discriminator=QUANT_DISCRIMINATOR
+)
+
+
 class ASLPipelineYAML(BaseModel):
     """ASL pipeline settings from YAML."""
 
-    labeling_scheme: str = Field(default="pcasl", description="pcasl | pasl | casl")
+    labeling_scheme: Literal["pcasl", "pasl", "casl"] = Field(default="pcasl")
     pld: float = Field(default=1800.0, description="ms, post-labeling delay")
     label_duration: float = Field(default=1800.0, description="ms, labeling duration")
     t1_blood: float = Field(
         default=1650.0, description="ms, longitudinal relaxation time of blood"
     )
-    labeling_efficiency: float = Field(
-        default=0.85, description="labeling efficiency (0 to 1)"
-    )
-    m0_method: str = Field(
-        default="single", description="single | voxelwise | reference_region"
-    )
     t1_tissue: float = Field(
         default=1330.0, description="ms, longitudinal relaxation time of tissue"
+    )
+    labeling_efficiency: float = Field(
+        default=0.85, description="labeling efficiency (0 to 1)"
     )
     partition_coefficient: float = Field(
         default=0.9, description="blood-brain partition coefficient (mL/g)"
     )
-    difference_method: str = Field(
-        default="pairwise", description="pairwise | surround | mean"
+    m0: _M0Config = Field(
+        default_factory=SingleM0Config,
+        description="M0 calibration method + parameters",
     )
-    label_control_order: str = Field(
-        default="label_first", description="label_first | control_first"
+    difference: _DifferenceConfig = Field(
+        default_factory=PairwiseDifferenceConfig,
+        description="label-control subtraction method",
     )
-
-    @field_validator("labeling_scheme")
-    @classmethod
-    def validate_labeling(cls, v: str) -> str:
-        """Validate ASL labeling scheme."""
-        valid = ["pasl", "casl", "pcasl"]
-        if v not in valid:
-            msg = f"Invalid labeling scheme '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
-
-    @field_validator("m0_method")
-    @classmethod
-    def validate_m0(cls, v: str) -> str:
-        """Validate M0 calibration method."""
-        valid = ["single", "voxelwise", "reference_region"]
-        if v not in valid:
-            msg = f"Invalid M0 method '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
-
-    @field_validator("label_control_order")
-    @classmethod
-    def validate_order(cls, v: str) -> str:
-        """Validate label/control ordering."""
-        valid = ["label_first", "control_first"]
-        if v not in valid:
-            msg = f"Invalid label/control order '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
+    quantification: _QuantificationConfig = Field(
+        default_factory=SinglePLDConfig,
+        description="CBF quantification mode (multi_pld adds plds + ATT estimation)",
+    )
+    label_control_order: Literal["label_first", "control_first"] = Field(
+        default="label_first"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -409,30 +331,26 @@ class ASLPipelineYAML(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# Discriminated unions of IVIM selection-point configs, generated from the
+# registries: selecting a method/model pulls in exactly that option's params.
+_IVIMFittingConfig = method_union(IVIM_FITTING_CONFIGS)
+_IVIMModelConfig = method_union(IVIM_MODEL_CONFIGS, discriminator=MODEL_DISCRIMINATOR)
+
+
 class IVIMPipelineYAML(BaseModel):
     """IVIM pipeline settings from YAML."""
 
-    fitting_method: str = Field(
-        default="segmented", description="segmented | full | bayesian"
+    fitting: _IVIMFittingConfig = Field(
+        default_factory=SegmentedFittingConfig,
+        description="fitting strategy + parameters",
     )
-    b_threshold: float = Field(
-        default=200.0,
-        description="s/mm^2, threshold separating D and D* regimes",
+    model: _IVIMModelConfig = Field(
+        default_factory=BiexponentialModelConfig,
+        description="IVIM signal model",
     )
     normalize_signal: bool = Field(
         default=True, description="normalize to S(b=0) before fitting"
     )
-    fitting: IVIMFittingConfig = IVIMFittingConfig()
-
-    @field_validator("fitting_method")
-    @classmethod
-    def validate_fitting(cls, v: str) -> str:
-        """Validate IVIM fitting method."""
-        valid = ["segmented", "full", "bayesian"]
-        if v not in valid:
-            msg = f"Invalid fitting method '{v}'. Valid: {valid}"
-            raise ValueError(msg)
-        return v
 
 
 # ---------------------------------------------------------------------------
@@ -562,13 +480,60 @@ def _yaml_scalar(value: Any) -> str:
     return str(value)
 
 
-def _render_model_yaml(model: BaseModel, indent: int = 0) -> list[str]:
+def _discriminator_choices(field: Any) -> tuple[str, list[str]] | None:
+    """For a discriminated-union field, return ``(discriminator, [choices])``.
+
+    Choices are each union member's discriminator-literal value (i.e. the
+    registry keys), so the inline comment is derived from the registry rather
+    than hand-maintained.
+    """
+    disc = getattr(field, "discriminator", None)
+    if not disc:
+        return None
+    choices: list[str] = []
+    for member in typing.get_args(field.annotation):
+        member_fields = getattr(member, "model_fields", None)
+        if member_fields and disc in member_fields:
+            choices.append(str(member_fields[disc].default))
+    if not choices:
+        return None
+    return disc, sorted(choices)
+
+
+def _literal_choices(field: Any) -> list[str] | None:
+    """Return the allowed values of a ``Literal[...]`` field, else ``None``."""
+    if typing.get_origin(field.annotation) is Literal:
+        return [str(a) for a in typing.get_args(field.annotation)]
+    return None
+
+
+def _comment(choices: list[str] | None, description: str) -> str:
+    """Compose an inline ``# ...`` comment from derived choices + description."""
+    parts: list[str] = []
+    if choices:
+        parts.append(" | ".join(choices))
+    if description and description not in parts:
+        parts.append(description)
+    # ASCII-only separator: generated templates must round-trip on Windows
+    # (cp1252) as well as UTF-8.
+    return "  # " + " - ".join(parts) if parts else ""
+
+
+def _render_model_yaml(
+    model: BaseModel,
+    indent: int = 0,
+    choices_override: dict[str, list[str]] | None = None,
+) -> list[str]:
     """Recursively render a pydantic model instance as commented YAML lines.
 
     For each field on ``model``:
 
-    * If the value is a nested ``BaseModel``, emit ``name:`` and recurse.
-    * If the default value is not ``None``, emit ``name: value  # description``.
+    * If the value is a nested ``BaseModel``, emit ``name:`` and recurse. For a
+      discriminated-union field, the allowed discriminator values are derived
+      from the union members (the registry keys) and rendered as the inline
+      comment on the discriminator line of the recursed member.
+    * ``Literal[...]`` fields render their allowed values as the comment.
+    * If the default value is not ``None``, emit ``name: value  # comment``.
     * If the default is ``None``, emit a commented-out example line using
       the field's ``examples=[...]`` metadata, or — for complex dict fields —
       use the multi-line block in ``json_schema_extra["yaml_example"]``.
@@ -579,6 +544,10 @@ def _render_model_yaml(model: BaseModel, indent: int = 0) -> list[str]:
         Populated pydantic model (use defaults via ``ModelCls()``).
     indent : int
         Number of leading spaces (for nesting).
+    choices_override : dict[str, list[str]] | None
+        Inline-comment choices to apply to specific fields of *model* — used to
+        carry a discriminated union's choices down onto the member's
+        discriminator line.
 
     Returns
     -------
@@ -586,23 +555,31 @@ def _render_model_yaml(model: BaseModel, indent: int = 0) -> list[str]:
         YAML lines (without trailing newlines).
     """
     pad = " " * indent
+    overrides = choices_override or {}
     lines: list[str] = []
     for name, field in type(model).model_fields.items():
         description = (field.description or "").strip()
         extra = field.json_schema_extra or {}
         value = getattr(model, name)
 
-        # Nested pydantic model: recurse.
+        # Nested pydantic model: recurse, carrying any union choices onto the
+        # member's discriminator line.
         if isinstance(value, BaseModel):
             lines.append(f"{pad}{name}:")
-            lines.extend(_render_model_yaml(value, indent=indent + 2))
+            disc = _discriminator_choices(field)
+            sub_override = {disc[0]: disc[1]} if disc else None
+            lines.extend(
+                _render_model_yaml(
+                    value, indent=indent + 2, choices_override=sub_override
+                )
+            )
             continue
+
+        choices = overrides.get(name) or _literal_choices(field)
 
         # Commented-out optional field with a multi-line example block.
         if value is None and isinstance(extra, dict) and "yaml_example" in extra:
-            header = f"{pad}# {name}:"
-            if description:
-                header += f"  # {description}"
+            header = f"{pad}# {name}:{_comment(choices, description)}"
             lines.append(header)
             for sub in str(extra["yaml_example"]).splitlines():
                 lines.append(f"{pad}#   {sub}" if sub else f"{pad}#")
@@ -617,16 +594,12 @@ def _render_model_yaml(model: BaseModel, indent: int = 0) -> list[str]:
             rendered_example = (
                 _yaml_scalar(example) if example is not None else "<value>"
             )
-            line = f"{pad}# {name}: {rendered_example}"
-            if description:
-                line += f"  # {description}"
+            line = f"{pad}# {name}: {rendered_example}{_comment(choices, description)}"
             lines.append(line)
             continue
 
         # Normal field with a default value.
-        line = f"{pad}{name}: {_yaml_scalar(value)}"
-        if description:
-            line += f"  # {description}"
+        line = f"{pad}{name}: {_yaml_scalar(value)}{_comment(choices, description)}"
         lines.append(line)
 
     return lines

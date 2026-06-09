@@ -39,10 +39,15 @@ _PIPELINE_COMMENTS: dict[str, str] = {
     "label_duration": "ms, labeling duration",
     "t1_blood": "ms, longitudinal relaxation of blood",
     "labeling_efficiency": "labeling efficiency (0 to 1)",
-    "m0_method": "M0 calibration method",
+    "m0": "M0 calibration method + parameters",
+    "method": "selection (registry name)",
+    "mode": "quantification mode (single_pld | multi_pld)",
+    "plds": "ms, multi-PLD schedule",
+    "att_model": "ATT estimation model",
     "t1_tissue": "ms, longitudinal relaxation of tissue",
     "partition_coefficient": "blood-brain partition coefficient (mL/g)",
-    "difference_method": "label-control subtraction method",
+    "difference": "label-control subtraction method",
+    "quantification": "CBF quantification mode + parameters",
     "label_control_order": "label/control ordering",
     "fitting_method": "IVIM fitting method",
     "b_threshold": "s/mm^2, threshold separating D and D* regimes",
@@ -271,18 +276,51 @@ def _collect_data_config(
     return cfg
 
 
+def _collect_method_config(
+    label: str,
+    configs: dict[str, Any],
+    default: str,
+    discriminator: str = "method",
+) -> dict[str, Any]:
+    """Prompt for a registry-derived selection plus its config model's params.
+
+    Selecting an option surfaces exactly that option's knobs (introspected
+    from its :class:`MethodConfig` fields), mirroring ``_collect_dsc_config``.
+    """
+    names = sorted(configs)
+    chosen = _prompt_choice(label, names, default=default)
+    selection: dict[str, Any] = {discriminator: chosen}
+    for fname, finfo in configs[chosen].model_fields.items():
+        if fname == discriminator:
+            continue
+        # Skip fields whose default is None or a complex container (e.g.
+        # bounds / initial_guess dicts): they have no sensible inline prompt,
+        # so leave them at the config default and let the user edit the YAML.
+        if finfo.default is None or isinstance(finfo.default, (dict, list)):
+            continue
+        selection[fname] = _prompt_value(
+            finfo.description or fname,
+            default=finfo.default,
+            expected_type=type(finfo.default),
+        )
+    return selection
+
+
 def _collect_dce_config() -> dict[str, Any]:
     """Collect DCE pipeline settings."""
-    from osipy.common.aif.population import list_aifs
-    from osipy.dce import list_models
-    from osipy.dce.t1_mapping.registry import list_t1_methods
+    from osipy.dce.config import (
+        CONCENTRATION_CONFIGS,
+        DCE_MODEL_CONFIGS,
+        POPULATION_AIF_CONFIGS,
+        T1_METHOD_CONFIGS,
+    )
 
     print("\n--- DCE Pipeline Settings ---")
     cfg: dict[str, Any] = {}
 
-    models = list_models()
-    cfg["model"] = _prompt_choice(
-        "Pharmacokinetic model:", models, default="extended_tofts"
+    # Pharmacokinetic model (+ any params it exposes).
+    cfg["model"] = _collect_method_config(
+        "Pharmacokinetic model:", DCE_MODEL_CONFIGS, default="extended_tofts"
     )
 
     # T1 data availability determines whether we do T1 mapping or use
@@ -295,9 +333,9 @@ def _collect_dce_config() -> dict[str, Any]:
     acquisition: dict[str, Any] = {}
 
     if has_t1_data:
-        t1_methods = list_t1_methods()
-        cfg["t1_mapping_method"] = _prompt_choice(
-            "T1 mapping method:", t1_methods, default="vfa"
+        # T1 mapping method (+ its params, e.g. VFA linear/nonlinear).
+        cfg["t1_mapping_method"] = _collect_method_config(
+            "T1 mapping method:", T1_METHOD_CONFIGS, default="vfa"
         )
     else:
         # No T1 data — use an assumed value and skip T1 mapping config
@@ -305,14 +343,21 @@ def _collect_dce_config() -> dict[str, Any]:
             "Assumed T1 value (ms)", default=1400.0, expected_type=float
         )
 
+    # Signal-to-concentration model (+ its params).
+    cfg["concentration"] = _collect_method_config(
+        "Signal-to-concentration model:", CONCENTRATION_CONFIGS, default="spgr"
+    )
+
     # AIF source
     aif_sources = ["population", "detect", "manual"]
     cfg["aif_source"] = _prompt_choice("AIF source:", aif_sources, default="population")
 
     if cfg["aif_source"] == "population":
-        aifs = list_aifs()
-        cfg["population_aif"] = _prompt_choice(
-            "Population AIF:", aifs, default="parker"
+        cfg["population_aif"] = _collect_method_config(
+            "Population AIF:",
+            POPULATION_AIF_CONFIGS,
+            default="parker",
+            discriminator="name",
         )
 
     # Acquisition parameters
@@ -332,35 +377,48 @@ def _collect_dce_config() -> dict[str, Any]:
 
 def _collect_dsc_config() -> dict[str, Any]:
     """Collect DSC pipeline settings."""
-    from osipy.dsc import list_deconvolvers
+    from osipy.dsc.deconvolution.config import DECONVOLVER_CONFIGS
 
     print("\n--- DSC Pipeline Settings ---")
     cfg: dict[str, Any] = {}
 
-    methods = list_deconvolvers()
-    cfg["deconvolution_method"] = _prompt_choice(
-        "Deconvolution method:", methods, default="oSVD"
-    )
-
     cfg["te"] = _prompt_value("Echo time TE (ms)", default=30.0, expected_type=float)
-    cfg["apply_leakage_correction"] = _prompt_yes_no(
-        "Apply leakage correction?", default=True
-    )
-    cfg["svd_threshold"] = _prompt_value(
-        "SVD truncation threshold", default=0.2, expected_type=float
-    )
     cfg["baseline_frames"] = _prompt_value(
         "Number of baseline frames", default=10, expected_type=int
     )
     cfg["hematocrit_ratio"] = _prompt_value(
         "Hematocrit ratio", default=0.73, expected_type=float
     )
+    cfg["apply_leakage_correction"] = _prompt_yes_no(
+        "Apply leakage correction?", default=True
+    )
+
+    # Deconvolution method + its parameters, derived from the registry config
+    # models (selecting a method surfaces exactly that method's knobs).
+    methods = sorted(DECONVOLVER_CONFIGS)
+    method = _prompt_choice("Deconvolution method:", methods, default="oSVD")
+    deconvolution: dict[str, Any] = {"method": method}
+    for fname, finfo in DECONVOLVER_CONFIGS[method].model_fields.items():
+        if fname == "method":
+            continue
+        deconvolution[fname] = _prompt_value(
+            finfo.description or fname,
+            default=finfo.default,
+            expected_type=type(finfo.default),
+        )
+    cfg["deconvolution"] = deconvolution
 
     return cfg
 
 
 def _collect_asl_config() -> dict[str, Any]:
     """Collect ASL pipeline settings."""
+    from osipy.asl.config import (
+        DIFFERENCE_CONFIGS,
+        M0_CONFIGS,
+        QUANTIFICATION_CONFIGS,
+    )
+
     print("\n--- ASL Pipeline Settings ---")
     cfg: dict[str, Any] = {}
 
@@ -379,26 +437,28 @@ def _collect_asl_config() -> dict[str, Any]:
     cfg["t1_blood"] = _prompt_value(
         "T1 of blood (ms)", default=1650.0, expected_type=float
     )
-    cfg["labeling_efficiency"] = _prompt_value(
-        "Labeling efficiency (0-1)", default=0.85, expected_type=float
-    )
-
-    m0_methods = ["single", "voxelwise", "reference_region"]
-    cfg["m0_method"] = _prompt_choice(
-        "M0 calibration method:", m0_methods, default="single"
-    )
-
     cfg["t1_tissue"] = _prompt_value(
         "T1 of tissue (ms)", default=1330.0, expected_type=float
+    )
+    cfg["labeling_efficiency"] = _prompt_value(
+        "Labeling efficiency (0-1)", default=0.85, expected_type=float
     )
     cfg["partition_coefficient"] = _prompt_value(
         "Partition coefficient (mL/g)", default=0.9, expected_type=float
     )
 
-    diff_methods = ["pairwise", "surround", "mean"]
-    cfg["difference_method"] = _prompt_choice(
-        "Difference method:", diff_methods, default="pairwise"
+    # M0 calibration method + its params (e.g. tr_m0, t1_tissue, reference_region).
+    cfg["m0"] = _collect_method_config(
+        "M0 calibration method:", M0_CONFIGS, default="single"
     )
+
+    # Label/control difference method (selection only, no extra knobs).
+    cfg["difference"] = _collect_method_config(
+        "Difference method:", DIFFERENCE_CONFIGS, default="pairwise"
+    )
+
+    # Quantification mode: single-PLD vs multi-PLD (Buxton + ATT estimation).
+    cfg["quantification"] = _collect_quantification_config(QUANTIFICATION_CONFIGS)
 
     orders = ["label_first", "control_first"]
     cfg["label_control_order"] = _prompt_choice(
@@ -408,27 +468,52 @@ def _collect_asl_config() -> dict[str, Any]:
     return cfg
 
 
+def _collect_quantification_config(configs: dict[str, Any]) -> dict[str, Any]:
+    """Prompt for the ASL quantification mode and its parameters.
+
+    Single-PLD has no extra knobs; multi-PLD prompts for the PLD schedule
+    (comma-separated) and the ATT model.
+    """
+    names = sorted(configs)
+    mode = _prompt_choice("Quantification mode:", names, default="single_pld")
+    selection: dict[str, Any] = {"mode": mode}
+    if mode == "multi_pld":
+        raw = _prompt_value(
+            "PLD schedule (comma-separated ms)",
+            default="500, 1000, 1500, 2000, 2500",
+            expected_type=str,
+        )
+        selection["plds"] = [float(x) for x in str(raw).split(",")]
+        selection["att_model"] = _prompt_value(
+            "ATT model", default="buxton", expected_type=str
+        )
+    return selection
+
+
 def _collect_ivim_config() -> dict[str, Any]:
     """Collect IVIM pipeline settings."""
+    from osipy.ivim.config import IVIM_FITTING_CONFIGS, IVIM_MODEL_CONFIGS
+
     print("\n--- IVIM Pipeline Settings ---")
     cfg: dict[str, Any] = {}
 
-    fitting_methods = ["segmented", "full", "bayesian"]
-    cfg["fitting_method"] = _prompt_choice(
-        "Fitting method:", fitting_methods, default="segmented"
+    # Fitting strategy + its params (selecting a method surfaces exactly that
+    # method's knobs: e.g. bayesian adds prior_scale, full has no b_threshold).
+    cfg["fitting"] = _collect_method_config(
+        "Fitting method:", IVIM_FITTING_CONFIGS, default="segmented"
     )
-    cfg["b_threshold"] = _prompt_value(
-        "B-value threshold (s/mm^2)", default=200.0, expected_type=float
+
+    # Signal model + its params (simplified exposes its b_threshold).
+    cfg["model"] = _collect_method_config(
+        "Signal model:",
+        IVIM_MODEL_CONFIGS,
+        default="biexponential",
+        discriminator="model",
     )
+
     cfg["normalize_signal"] = _prompt_yes_no(
         "Normalize signal to S(b=0)?", default=True
     )
-
-    if cfg["fitting_method"] == "bayesian":
-        print(
-            "  Note: Bayesian fitting uses default priors and MCMC settings.\n"
-            "  Edit the generated YAML to customize (fitting.bayesian section)."
-        )
 
     return cfg
 

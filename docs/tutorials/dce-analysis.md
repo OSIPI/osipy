@@ -8,7 +8,7 @@ DCE-MRI workflow: data loading, T1 mapping, signal-to-concentration conversion, 
 - DCE-MRI data with known acquisition parameters
 - VFA data for T1 mapping (or pre-computed T1 map)
 
-**Using the CLI?** Generate a config with `osipy --dump-defaults dce > config.yaml`, edit it, then run `osipy config.yaml data.nii.gz`. See [How to Run Pipeline from YAML](../how-to/run-pipeline-cli.md). The tutorial below covers the Python API for step-by-step control.
+**Using the CLI?** Generate a config with `osipy --dump-defaults dce > config.yaml`, edit it, then run `osipy config.yaml data.nii.gz`. The PK model, T1 mapping method, concentration model, and population AIF are each selectable config blocks — for example set `t1_mapping_method.fit_method: nonlinear` for LM-refined VFA T1, or `concentration.method: linear` for the linear signal-to-concentration approximation. See [How to Run Pipeline from YAML](../how-to/run-pipeline-cli.md). The tutorial below covers the Python API for step-by-step control.
 
 ## Background
 

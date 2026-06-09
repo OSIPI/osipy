@@ -3,6 +3,7 @@
 ## Software Architecture
 
 - [Architecture Overview](architecture.md) — Module structure, data flow, and registry-driven extensibility.
+- [Registry-Driven Configuration](configuration.md) — How the CLI/YAML config is generated from the registries via `MethodConfig` schemas.
 - [The xp Abstraction Pattern](xp-abstraction.md) — GPU/CPU agnostic code using `xp = get_array_module()`.
 - [OSIPI Standards](osipi-standards.md) — CAPLEX naming, units, and validation against DROs.
 
@@ -18,6 +19,7 @@
 | If you want to understand... | Read |
 |------------------------------|------|
 | How the code is organized | [Architecture Overview](architecture.md) |
+| Why the YAML config is shaped the way it is | [Registry-Driven Configuration](configuration.md) |
 | How GPU acceleration works | [xp Abstraction Pattern](xp-abstraction.md) |
 | What OSIPI standards mean | [OSIPI Standards](osipi-standards.md) |
 | How DCE models work mathematically | [Pharmacokinetic Models](pharmacokinetic-models.md) |

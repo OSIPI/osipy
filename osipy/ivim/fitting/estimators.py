@@ -38,7 +38,6 @@ from osipy.common.exceptions import FittingError
 from osipy.common.fitting.base import BaseFitter
 from osipy.common.fitting.least_squares import LevenbergMarquardtFitter
 from osipy.common.parameter_map import ParameterMap
-from osipy.ivim.models.biexponential import IVIMBiexponentialModel
 from osipy.ivim.models.binding import BoundIVIMModel
 
 if TYPE_CHECKING:
@@ -72,6 +71,14 @@ class IVIMFitParams:
         Convergence tolerance.
     bounds : dict | None
         Custom parameter bounds.
+    initial_guess : dict | None
+        Custom initial parameter estimates (e.g. ``{"D": 1e-3, "f": 0.1}``).
+        Any parameter named here seeds the optimizer in place of the
+        data-driven estimate; unspecified parameters keep their
+        data-driven guess.
+    signal_model : str
+        Registered IVIM signal model name (``"biexponential"`` or
+        ``"simplified"``). Selects the forward model used during fitting.
     bayesian_params : dict | None
         Bayesian-specific parameters (prior_std, noise_std,
         compute_uncertainty).  Only used when ``method`` is
@@ -83,7 +90,35 @@ class IVIMFitParams:
     max_iterations: int = 500
     tolerance: float = 1e-6
     bounds: dict[str, tuple[float, float]] | None = None
+    initial_guess: dict[str, float] | None = None
+    signal_model: str = "biexponential"
     bayesian_params: Any = None
+
+
+def _build_signal_model(params: "IVIMFitParams") -> Any:
+    """Construct the IVIM signal model selected in *params*.
+
+    Looks the model up in the IVIM model registry by ``params.signal_model``
+    (``"biexponential"`` or ``"simplified"``). The simplified model takes a
+    ``b_threshold`` constructor knob, which we seed from the fit params so its
+    perfusion-cutoff matches the segmentation threshold.
+
+    Parameters
+    ----------
+    params : IVIMFitParams
+        Fitting parameters carrying the ``signal_model`` selection.
+
+    Returns
+    -------
+    IVIMModel
+        Instantiated signal model.
+    """
+    from osipy.ivim.models.registry import get_ivim_model
+
+    name = getattr(params, "signal_model", "biexponential") or "biexponential"
+    if name == "simplified":
+        return get_ivim_model(name, b_threshold=params.b_threshold)
+    return get_ivim_model(name)
 
 
 @dataclass
@@ -309,9 +344,15 @@ def _fit_ivim_vectorized(
         b_values = to_gpu(b_values)
         mask_3d = to_gpu(mask_3d)
 
-    # Create BoundIVIMModel with analytical Jacobian
-    model = IVIMBiexponentialModel()
-    bound_model = BoundIVIMModel(model, b_values, b_threshold=params.b_threshold)
+    # Create BoundIVIMModel with analytical Jacobian, using the selected
+    # signal model and seeding any user-supplied initial guesses.
+    model = _build_signal_model(params)
+    bound_model = BoundIVIMModel(
+        model,
+        b_values,
+        b_threshold=params.b_threshold,
+        initial_guess=params.initial_guess,
+    )
 
     # Use shared fitter — returns dict[str, ParameterMap]
     fitter = fitter or LevenbergMarquardtFitter()
@@ -443,8 +484,13 @@ def _ivim_bayesian(
         b_values = to_gpu(b_values)
         mask_3d = to_gpu(mask_3d)
 
-    model = IVIMBiexponentialModel()
-    bound_model = BoundIVIMModel(model, b_values, b_threshold=params.b_threshold)
+    model = _build_signal_model(params)
+    bound_model = BoundIVIMModel(
+        model,
+        b_values,
+        b_threshold=params.b_threshold,
+        initial_guess=params.initial_guess,
+    )
 
     bayesian_cfg = getattr(params, "bayesian_params", None) or {}
     fitter = TwoStageBayesianIVIMFitter(

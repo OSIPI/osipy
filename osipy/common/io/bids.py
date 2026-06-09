@@ -223,8 +223,6 @@ def load_bids(
         If BIDS directory or required files not found.
     IOError
         If BIDS dataset structure is invalid.
-    MetadataError
-        If required metadata is missing and interactive=False.
 
     Examples
     --------

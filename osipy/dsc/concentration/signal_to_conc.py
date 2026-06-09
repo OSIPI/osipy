@@ -23,7 +23,6 @@ References
    2024;91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from osipy.common.backend.array_module import get_array_module, to_numpy
@@ -32,29 +31,6 @@ from osipy.common.exceptions import DataValidationError
 if TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
-
-
-@dataclass
-class DSCAcquisitionParams:
-    """Acquisition parameters for DSC-MRI.
-
-    Attributes
-    ----------
-    te : float
-        Echo time TE (OSIPI: Q.MS1.005) in milliseconds.
-    tr : float
-        Repetition time (TR) in milliseconds.
-    field_strength : float
-        Main magnetic field strength in Tesla.
-    r2_star : float
-        T2* relaxivity of contrast agent (1/s/mM).
-        Default is for Gd-DTPA at 1.5T.
-    """
-
-    te: float = 30.0  # ms
-    tr: float = 1500.0  # ms
-    field_strength: float = 1.5  # T
-    r2_star: float = 32.0  # s⁻¹ mM⁻¹ at 1.5T
 
 
 def signal_to_delta_r2(

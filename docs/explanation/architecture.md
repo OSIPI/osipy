@@ -251,17 +251,13 @@ Used by DCE pharmacokinetic models for convolving the AIF with tissue response f
 !!! example "Convolution functions"
 
     ```python
-    # Piecewise-linear convolution (registered as "piecewise_linear")
-    def convolve_aif(aif, time, kernel_func):
-        """Convolve AIF with a model kernel."""
+    # Discrete AIF convolution with a tissue residue/response function
+    def convolve_aif(aif, residue, dt):
+        """Convolve the AIF with a model kernel."""
 
-    # Recursive exponential convolution (registered as "exponential")
+    # Recursive exponential convolution (Flouri et al. 2016)
     def expconv(time_constant, time, input_function):
         """Fast exponential convolution for compartment models."""
-
-    # FFT-based convolution (registered as "fft")
-    def fft_convolve(signal_a, signal_b, dt):
-        """Frequency-domain convolution."""
     ```
 
 ### Modality Modules
@@ -270,7 +266,7 @@ All four modalities use the shared `LevenbergMarquardtFitter` via binding adapte
 
 #### DCE Module
 
-The most coupled modality — uses shared Fitting (LM optimizer), AIF (population models and detection), and Convolution (piecewise-linear, exponential, FFT) from common.
+The most coupled modality — uses shared Fitting (LM optimizer), AIF (population models and detection), and Convolution (`convolve_aif`, `expconv`) from common.
 
 !!! example "DCE module key functions and classes"
 
@@ -500,9 +496,14 @@ All extension points use the registry pattern — one file, one decorator. 17+ r
 | T1 mapping method | `@register_t1_method("name")` | `get_t1_method("name")` | `list_t1_methods()` |
 | Concentration model | `@register_concentration_model("name")` | `get_concentration_model("name")` | `list_concentration_models()` |
 | IVIM fitting strategy | `@register_ivim_fitter("name")` | `get_ivim_fitter("name")` | `list_ivim_fitters()` |
-| Convolution method | `@register_convolution("name")` | `get_convolution("name")` | `list_convolutions()` |
 
 All registries use `DataValidationError` for unknown names and `logging.getLogger(__name__)` with warnings for overwrites.
+
+Each selectable component also declares a pydantic `MethodConfig`, so the CLI
+config, interactive wizard, and `--dump-defaults` templates are generated
+directly from `registry × schema`. See
+[Registry-Driven Configuration](configuration.md) for how a single decorator
+plus a config model turns a component into a validated, wired CLI toggle.
 
 ### Adding a New Model
 

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from osipy.common.convolution import biexpconv, expconv, nexpconv
+from osipy.common.convolution import expconv
 from osipy.common.exceptions import DataValidationError
 
 
@@ -98,138 +98,6 @@ class TestExpconv:
         # So result ≈ t (approximately, for large T)
         # Check that result grows roughly linearly
         assert result[-1] > result[len(t) // 2]
-
-
-class TestBiexpconv:
-    """Tests for biexpconv() bi-exponential convolution."""
-
-    def test_biexpconv_empty_input(self):
-        """Test biexpconv with empty arrays."""
-        result = biexpconv(np.array([]), 1.0, 2.0, np.array([]))
-        assert len(result) == 0
-
-    def test_biexpconv_zero_time_constants(self):
-        """Test biexpconv with zero time constants."""
-        t = np.linspace(0, 10, 101)
-        f = np.ones_like(t)
-
-        result = biexpconv(f, 0.0, 1.0, t)
-        assert_allclose(result, np.zeros_like(t))
-
-    def test_biexpconv_equal_time_constants(self):
-        """Test biexpconv with equal time constants (limiting case)."""
-        t = np.linspace(0, 10, 101)
-        T = 5.0
-
-        f = np.ones_like(t)
-
-        # Should handle T1 == T2 gracefully
-        result = biexpconv(f, T, T, t)
-
-        # Should return finite values
-        assert len(result) == len(t)
-        assert np.all(np.isfinite(result))
-
-    def test_biexpconv_basic(self):
-        """Test basic biexpconv computation."""
-        t = np.linspace(0, 20, 201)
-        T1, T2 = 2.0, 5.0
-
-        f = np.ones_like(t)
-
-        result = biexpconv(f, T1, T2, t)
-
-        # Check basic properties
-        assert len(result) == len(t)
-        assert np.all(np.isfinite(result))
-
-    def test_biexpconv_symmetry(self):
-        """Test that biexpconv is symmetric in T1, T2."""
-        t = np.linspace(0, 20, 201)
-        T1, T2 = 2.0, 5.0
-
-        f = np.exp(-t / 3)
-
-        result_12 = biexpconv(f, T1, T2, t)
-        result_21 = biexpconv(f, T2, T1, t)
-
-        # biexpconv(f, T1, T2) = (E1 - E2) / (T1 - T2)
-        # biexpconv(f, T2, T1) = (E2 - E1) / (T2 - T1) = (E1 - E2) / (T1 - T2)
-        # They should be equal (not negatives)
-        assert_allclose(result_12, result_21, rtol=1e-10)
-
-
-class TestNexpconv:
-    """Tests for nexpconv() n-exponential convolution."""
-
-    def test_nexpconv_empty_input(self):
-        """Test nexpconv with empty arrays."""
-        result = nexpconv(np.array([]), 1.0, 3, np.array([]))
-        assert len(result) == 0
-
-    def test_nexpconv_n_equals_1(self):
-        """Test that n=1 is equivalent to expconv."""
-        t = np.linspace(0, 20, 201)
-        T = 5.0
-
-        f = np.exp(-t / 2)
-
-        result_nexp = nexpconv(f, T, 1, t)
-        result_exp = expconv(f, T, t)
-
-        assert_allclose(result_nexp, result_exp, rtol=1e-10)
-
-    def test_nexpconv_invalid_parameters(self):
-        """Test nexpconv with invalid parameters."""
-        t = np.linspace(0, 10, 101)
-        f = np.ones_like(t)
-
-        # Zero time constant
-        result = nexpconv(f, 0.0, 3, t)
-        assert_allclose(result, np.zeros_like(t))
-
-        # n < 1
-        result = nexpconv(f, 1.0, 0, t)
-        assert_allclose(result, np.zeros_like(t))
-
-    def test_nexpconv_n_equals_2(self):
-        """Test nexpconv with n=2 (gamma variate with shape=2)."""
-        t = np.linspace(0, 30, 301)
-        T = 5.0
-
-        f = np.ones_like(t)
-
-        result = nexpconv(f, T, 2, t)
-
-        # Check basic properties
-        assert len(result) == len(t)
-        assert result[0] == 0.0
-        assert np.all(np.isfinite(result))
-
-        # n=2 gamma variate should have delayed peak
-        peak_idx = np.argmax(result)
-        assert peak_idx > 0
-
-    def test_nexpconv_large_n(self):
-        """Test nexpconv with large n (uses Gaussian approximation)."""
-        t = np.linspace(0, 100, 501)
-        T = 2.0
-        n = 25  # Large n triggers Gaussian approximation
-
-        # Use a decaying input so the convolution result has a clear peak
-        f = np.exp(-t / 10)
-
-        result = nexpconv(f, T, n, t)
-
-        # Check basic properties
-        assert len(result) == len(t)
-        assert np.all(np.isfinite(result))
-
-        # For decaying input, the result should have a peak
-        # somewhere after t=0 due to the delayed gamma variate
-        peak_idx = np.argmax(result)
-        assert peak_idx > 0  # Peak is not at t=0
-        assert result[0] == 0.0 or result[0] < result[peak_idx]  # Increases from start
 
 
 class TestExpconvFlouri:

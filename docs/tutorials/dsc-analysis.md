@@ -8,7 +8,7 @@ Generate CBV, CBF, and MTT maps from Dynamic Susceptibility Contrast (DSC) MRI u
 - DSC-MRI data with known acquisition parameters
 - Understanding of basic perfusion MRI concepts
 
-**Using the CLI?** Generate a config with `osipy --dump-defaults dsc > config.yaml`, edit it, then run `osipy config.yaml data.nii.gz`. See [How to Run Pipeline from YAML](../how-to/run-pipeline-cli.md). The tutorial below covers the Python API for step-by-step control.
+**Using the CLI?** Generate a config with `osipy --dump-defaults dsc > config.yaml`, edit it, then run `osipy config.yaml data.nii.gz`. The deconvolution method is a selectable config block (`deconvolution.method`: oSVD, sSVD, or cSVD) that surfaces its own parameters — `oSVD` takes `oscillation_index`/`default_threshold`, while `sSVD`/`cSVD` take a single `threshold`. See [How to Run Pipeline from YAML](../how-to/run-pipeline-cli.md). The tutorial below covers the Python API for step-by-step control.
 
 ## Background
 

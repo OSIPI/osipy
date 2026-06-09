@@ -1,19 +1,8 @@
-"""Convolution and deconvolution operations for pharmacokinetic modeling.
-
-This module provides accurate numerical convolution and deconvolution operations
-following the dcmri approach (https://github.com/dcmri/dcmri) for improved
-numerical accuracy, particularly for non-uniform time grids.
+"""Convolution operations for pharmacokinetic modeling.
 
 Key functions:
-    - conv(): Piecewise-linear convolution with analytic integration
-    - uconv(): Optimized convolution for uniform time grids
     - expconv(): Recursive exponential convolution (Flouri et al. 2016)
-    - biexpconv(): Analytical bi-exponential convolution
-    - nexpconv(): N-exponential gamma-variate convolution
-    - deconv(): Matrix-based deconvolution with TSVD/Tikhonov regularization
-    - convmat(): Convolution matrix construction
-    - invconvmat(): Regularized pseudo-inverse of convolution matrix
-    - fft_convolve(): FFT-based convolution for large uniform datasets
+    - convolve_aif(): FFT-based AIF/impulse-response convolution
 
 References
 ----------
@@ -29,36 +18,7 @@ The expconv function in this package is a derivative work adapted from dcmri
 (Apache-2.0); see the project NOTICE file for attribution.
 """
 
-from osipy.common.convolution.conv import conv, uconv
-from osipy.common.convolution.deconv import (
-    deconv,
-    deconvolve_svd,
-    deconvolve_svd_batch,
-)
-from osipy.common.convolution.expconv import biexpconv, expconv, nexpconv
-from osipy.common.convolution.fft import convolve_aif, fft_convolve
-from osipy.common.convolution.matrix import convmat, invconvmat
-from osipy.common.convolution.registry import (
-    get_convolution,
-    list_convolutions,
-    register_convolution,
-)
+from osipy.common.convolution.expconv import expconv
+from osipy.common.convolution.fft import convolve_aif
 
-__all__ = [
-    "biexpconv",
-    "conv",
-    "convmat",
-    "convolve_aif",
-    "deconv",
-    "deconvolve_svd",
-    "deconvolve_svd_batch",
-    "expconv",
-    "fft_convolve",
-    "get_convolution",
-    "invconvmat",
-    "list_convolutions",
-    "nexpconv",
-    # Registry
-    "register_convolution",
-    "uconv",
-]
+__all__ = ["convolve_aif", "expconv"]

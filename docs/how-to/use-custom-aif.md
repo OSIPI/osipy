@@ -9,8 +9,9 @@ Point to your AIF file in the config:
 ```yaml
 modality: dce
 pipeline:
-  model: extended_tofts
-  aif_source: file
+  model:
+    method: extended_tofts
+  aif_source: manual
 data:
   aif_file: /path/to/aif.npy  # NumPy array with shape (n_timepoints,)
 ```

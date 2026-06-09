@@ -321,9 +321,9 @@ class TestValidateConfig:
         yaml_str = _generate_yaml(
             "dce",
             {
-                "model": "extended_tofts",
+                "model": {"method": "extended_tofts"},
                 "aif_source": "population",
-                "population_aif": "parker",
+                "population_aif": {"name": "parker"},
                 "acquisition": {
                     "t1_assumed": 1400.0,
                     "baseline_frames": 5,
@@ -340,7 +340,7 @@ class TestValidateConfig:
 
         yaml_str = _generate_yaml(
             "dce",
-            {"model": "nonexistent_model"},
+            {"model": {"method": "nonexistent_model"}},
             {"format": "auto"},
         )
         with pytest.raises(ValidationError):
@@ -460,12 +460,16 @@ class TestCollectDCEConfig:
     """Tests for _collect_dce_config()."""
 
     def test_defaults_with_t1_data(self) -> None:
-        """Defaults with T1 data: model, has_t1=yes, t1_method, aif, pop_aif, baseline, relaxivity."""
+        """Defaults with T1 data: model, has_t1, t1_method (+ fit_method),
+        concentration, aif, pop_aif, baseline, relaxivity. Selection points are
+        now nested registry configs."""
         inputs = _make_input_fn(
             [
                 "",  # model: extended_tofts
                 "",  # has T1 data: yes (default)
                 "",  # T1 method: vfa
+                "",  # VFA fit_method: linear
+                "",  # concentration model: spgr
                 "",  # AIF source: population
                 "",  # population AIF: parker
                 "",  # baseline frames: 5
@@ -474,10 +478,11 @@ class TestCollectDCEConfig:
         )
         with patch("builtins.input", side_effect=inputs):
             cfg = _collect_dce_config()
-        assert cfg["model"] == "extended_tofts"
-        assert cfg["t1_mapping_method"] == "vfa"
+        assert cfg["model"] == {"method": "extended_tofts"}
+        assert cfg["t1_mapping_method"] == {"method": "vfa", "fit_method": "linear"}
+        assert cfg["concentration"] == {"method": "spgr"}
         assert cfg["aif_source"] == "population"
-        assert cfg["population_aif"] == "parker"
+        assert cfg["population_aif"] == {"name": "parker"}
         assert cfg["acquisition"]["baseline_frames"] == 5
         assert cfg["acquisition"]["relaxivity"] == 4.5
         assert "t1_assumed" not in cfg["acquisition"]
@@ -489,6 +494,7 @@ class TestCollectDCEConfig:
                 "",  # model: extended_tofts
                 "n",  # has T1 data: no
                 "",  # t1_assumed: 1400.0
+                "",  # concentration model: spgr
                 "",  # AIF source: population
                 "",  # population AIF: parker
                 "",  # baseline frames: 5
@@ -507,6 +513,8 @@ class TestCollectDCEConfig:
                 "",  # model
                 "",  # has T1 data: yes
                 "",  # T1 method
+                "",  # VFA fit_method: linear
+                "",  # concentration model: spgr
                 "detect",  # AIF source
                 "",  # baseline frames
                 "",  # relaxivity
@@ -517,46 +525,156 @@ class TestCollectDCEConfig:
         assert cfg["aif_source"] == "detect"
         assert "population_aif" not in cfg
 
+    def test_nonlinear_vfa_selectable(self) -> None:
+        """The VFA nonlinear fit_method is collectable as a knob."""
+        inputs = _make_input_fn(
+            [
+                "",  # model: extended_tofts
+                "",  # has T1 data: yes
+                "vfa",  # T1 method
+                "nonlinear",  # VFA fit_method
+                "linear",  # concentration model
+                "",  # AIF source: population
+                "georgiou",  # population AIF
+                "",  # baseline frames
+                "",  # relaxivity
+            ]
+        )
+        with patch("builtins.input", side_effect=inputs):
+            cfg = _collect_dce_config()
+        assert cfg["t1_mapping_method"] == {"method": "vfa", "fit_method": "nonlinear"}
+        assert cfg["concentration"] == {"method": "linear"}
+        assert cfg["population_aif"] == {"name": "georgiou"}
+
 
 class TestCollectDSCConfig:
     """Tests for _collect_dsc_config()."""
 
     def test_defaults(self) -> None:
         """Pressing Enter for all prompts returns defaults."""
-        inputs = _make_input_fn(["", "", "", "", "", ""])
+        # Prompts: te, baseline_frames, hematocrit_ratio, leakage, method,
+        # then oSVD's two params (oscillation_index, default_threshold).
+        inputs = _make_input_fn([""] * 7)
         with patch("builtins.input", side_effect=inputs):
             cfg = _collect_dsc_config()
-        assert cfg["deconvolution_method"] == "oSVD"
         assert cfg["te"] == 30.0
         assert cfg["apply_leakage_correction"] is True
+        assert cfg["deconvolution"]["method"] == "oSVD"
+        assert cfg["deconvolution"]["oscillation_index"] == 0.035
+        assert cfg["deconvolution"]["default_threshold"] == 0.2
 
 
 class TestCollectASLConfig:
     """Tests for _collect_asl_config()."""
 
     def test_defaults(self) -> None:
-        """Pressing Enter for all prompts returns defaults."""
-        inputs = _make_input_fn([""] * 10)
+        """Pressing Enter for all prompts returns defaults (nested configs)."""
+        # Prompts: labeling_scheme, pld, label_duration, t1_blood, t1_tissue,
+        # labeling_efficiency, partition_coefficient (7), then m0 method +
+        # its 3 knobs (4), difference method (1), quantification mode (1),
+        # label/control order (1) = 14.
+        inputs = _make_input_fn([""] * 14)
         with patch("builtins.input", side_effect=inputs):
             cfg = _collect_asl_config()
         assert cfg["labeling_scheme"] == "pcasl"
         assert cfg["pld"] == 1800.0
-        assert cfg["m0_method"] == "single"
-        assert cfg["difference_method"] == "pairwise"
+        assert cfg["t1_tissue"] == 1330.0
+        assert cfg["partition_coefficient"] == 0.9
+        assert cfg["m0"]["method"] == "single"
+        assert cfg["m0"]["tr_m0"] == 6000.0
+        assert cfg["difference"]["method"] == "pairwise"
+        assert cfg["quantification"]["mode"] == "single_pld"
         assert cfg["label_control_order"] == "label_first"
+
+    def test_multi_pld_mode_collects_plds(self) -> None:
+        """Selecting multi_pld surfaces the PLD schedule and ATT model prompts."""
+        inputs = _make_input_fn(
+            [
+                "",  # labeling_scheme: default
+                "",  # pld
+                "",  # label_duration
+                "",  # t1_blood
+                "",  # t1_tissue
+                "",  # labeling_efficiency
+                "",  # partition_coefficient
+                "single",  # m0 method
+                "",  # m0 t1_tissue
+                "",  # m0 tr_m0
+                "",  # m0 te_m0
+                "pairwise",  # difference method
+                "multi_pld",  # quantification mode
+                "500, 1000, 1500",  # plds
+                "buxton",  # att_model
+                "",  # label/control order
+            ]
+        )
+        with patch("builtins.input", side_effect=inputs):
+            cfg = _collect_asl_config()
+        assert cfg["quantification"]["mode"] == "multi_pld"
+        assert cfg["quantification"]["plds"] == [500.0, 1000.0, 1500.0]
+        assert cfg["quantification"]["att_model"] == "buxton"
 
 
 class TestCollectIVIMConfig:
     """Tests for _collect_ivim_config()."""
 
     def test_defaults(self) -> None:
-        """Pressing Enter for all prompts returns defaults."""
-        inputs = _make_input_fn(["", "", ""])
+        """Pressing Enter for all prompts returns defaults (segmented + biexp)."""
+        inputs = _make_input_fn(
+            [
+                "",  # fitting method: segmented
+                "",  # max_iterations
+                "",  # tolerance
+                "",  # b_threshold
+                "",  # signal model: biexponential
+                "",  # normalize: yes
+            ]
+        )
         with patch("builtins.input", side_effect=inputs):
             cfg = _collect_ivim_config()
-        assert cfg["fitting_method"] == "segmented"
-        assert cfg["b_threshold"] == 200.0
+        assert cfg["fitting"]["method"] == "segmented"
+        assert cfg["fitting"]["b_threshold"] == 200.0
+        assert cfg["model"]["model"] == "biexponential"
         assert cfg["normalize_signal"] is True
+
+    def test_bayesian_surfaces_prior_scale(self) -> None:
+        """Selecting bayesian surfaces its prior_scale knob in the collected dict."""
+        # bayesian fields: max_iterations, tolerance, bounds(skip), initial_guess(skip),
+        # method, b_threshold, prior_scale, noise_std(skip None), compute_uncertainty
+        inputs = _make_input_fn(
+            [
+                "bayesian",  # fitting method
+                "",  # max_iterations
+                "",  # tolerance
+                "",  # b_threshold
+                "",  # prior_scale
+                "",  # compute_uncertainty
+                "",  # signal model: biexponential
+                "",  # normalize
+            ]
+        )
+        with patch("builtins.input", side_effect=inputs):
+            cfg = _collect_ivim_config()
+        assert cfg["fitting"]["method"] == "bayesian"
+        assert cfg["fitting"]["prior_scale"] == 1.5
+
+    def test_simplified_model_selectable(self) -> None:
+        """Selecting the simplified model surfaces its b_threshold knob."""
+        inputs = _make_input_fn(
+            [
+                "",  # fitting method: segmented
+                "",  # max_iterations
+                "",  # tolerance
+                "",  # b_threshold (fitting)
+                "simplified",  # signal model
+                "",  # model b_threshold
+                "",  # normalize
+            ]
+        )
+        with patch("builtins.input", side_effect=inputs):
+            cfg = _collect_ivim_config()
+        assert cfg["model"]["model"] == "simplified"
+        assert cfg["model"]["b_threshold"] == 200.0
 
 
 # ---------------------------------------------------------------------------
@@ -573,10 +691,11 @@ class TestAllModalitiesValidation:
         # Map of default pipeline configs matching what defaults produce
         defaults = {
             "dce": {
-                "model": "extended_tofts",
-                "t1_mapping_method": "vfa",
+                "model": {"method": "extended_tofts"},
+                "t1_mapping_method": {"method": "vfa", "fit_method": "linear"},
+                "concentration": {"method": "spgr"},
                 "aif_source": "population",
-                "population_aif": "parker",
+                "population_aif": {"name": "parker"},
                 "acquisition": {"baseline_frames": 5, "relaxivity": 4.5},
             },
             "dsc": {
@@ -592,16 +711,17 @@ class TestAllModalitiesValidation:
                 "pld": 1800.0,
                 "label_duration": 1800.0,
                 "t1_blood": 1650.0,
-                "labeling_efficiency": 0.85,
-                "m0_method": "single",
                 "t1_tissue": 1330.0,
+                "labeling_efficiency": 0.85,
                 "partition_coefficient": 0.9,
-                "difference_method": "pairwise",
+                "m0": {"method": "single"},
+                "difference": {"method": "pairwise"},
+                "quantification": {"mode": "single_pld"},
                 "label_control_order": "label_first",
             },
             "ivim": {
-                "fitting_method": "segmented",
-                "b_threshold": 200.0,
+                "fitting": {"method": "segmented", "b_threshold": 200.0},
+                "model": {"model": "biexponential"},
                 "normalize_signal": True,
             },
         }
@@ -656,6 +776,8 @@ class TestRunWizard:
                 "",  # model: extended_tofts
                 "",  # has T1 data: yes
                 "",  # T1 method: vfa
+                "",  # VFA fit_method: linear
+                "",  # concentration model: spgr
                 "",  # AIF source: population
                 "",  # population AIF: parker
                 "",  # baseline frames: 5
@@ -678,7 +800,7 @@ class TestRunWizard:
         assert out_file.exists()
         parsed = yaml.safe_load(out_file.read_text())
         assert parsed["modality"] == "dce"
-        assert parsed["pipeline"]["model"] == "extended_tofts"
+        assert parsed["pipeline"]["model"]["method"] == "extended_tofts"
         assert parsed["pipeline"]["acquisition"]["baseline_frames"] == 5
 
     def test_full_ivim_wizard(self, tmp_path: Path) -> None:
@@ -689,7 +811,10 @@ class TestRunWizard:
                 "4",  # modality: ivim
                 # -- pipeline (first) --
                 "",  # fitting method: segmented
-                "",  # b threshold: 200.0
+                "",  # max_iterations
+                "",  # tolerance
+                "",  # b_threshold (fitting)
+                "",  # signal model: biexponential
                 "",  # normalize: yes
                 # -- data (second) --
                 "",  # format: auto
@@ -722,11 +847,15 @@ class TestRunWizard:
                 "",  # pld: default
                 "",  # label duration: default
                 "",  # t1 blood: default
-                "",  # labeling efficiency: default
-                "",  # m0 method: default
                 "",  # t1 tissue: default
+                "",  # labeling efficiency: default
                 "",  # partition coeff: default
+                "",  # m0 method: default
+                "",  # m0 t1_tissue: default
+                "",  # m0 tr_m0: default
+                "",  # m0 te_m0: default
                 "",  # difference method: default
+                "",  # quantification mode: default
                 "",  # label/control order: default
                 # -- data (second) --
                 "",  # data format: auto

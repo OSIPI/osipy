@@ -4,17 +4,20 @@ Select the appropriate population-based arterial input function for DCE-MRI anal
 
 ## Via CLI (YAML Config)
 
-Set `population_aif` in your pipeline config:
+Set the `population_aif` block in your pipeline config. The AIF is selected by
+its `name`:
 
 ```yaml
 modality: dce
 pipeline:
-  model: extended_tofts
+  model:
+    method: extended_tofts
   aif_source: population
-  population_aif: parker  # or georgiou, fritz_hansen, weinmann, mcgrath
+  population_aif:
+    name: parker  # or georgiou, fritz_hansen, weinmann, mcgrath
 ```
 
-Available values: `parker`, `georgiou`, `fritz_hansen`, `weinmann`, `mcgrath`. See the characteristics table below to choose.
+Available names: `parker`, `georgiou`, `fritz_hansen`, `weinmann`, `mcgrath`. See the characteristics table below to choose.
 
 ## Via Python API
 

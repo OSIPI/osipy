@@ -8,7 +8,7 @@ Separate diffusion and perfusion components from multi-b-value DWI data using bi
 - Multi-b-value DWI data (minimum 4 b-values, ideally 8+)
 - Understanding of basic diffusion MRI concepts
 
-**Using the CLI?** Generate a config with `osipy --dump-defaults ivim > config.yaml`, edit it, then run `osipy config.yaml data.nii.gz`. See [How to Run Pipeline from YAML](../how-to/run-pipeline-cli.md). The tutorial below covers the Python API for step-by-step control.
+**Using the CLI?** Generate a config with `osipy --dump-defaults ivim > config.yaml`, edit it, then run `osipy config.yaml data.nii.gz`. The fitting strategy (`fitting.method`: segmented, full, or bayesian) and the signal model (`model.model`: biexponential or simplified) are selectable config blocks; the Bayesian strategy exposes `prior_scale`/`noise_std`/`compute_uncertainty`, and `bounds`/`initial_guess` overrides live under `fitting`. See [How to Run Pipeline from YAML](../how-to/run-pipeline-cli.md). The tutorial below covers the Python API for step-by-step control.
 
 ## Background
 

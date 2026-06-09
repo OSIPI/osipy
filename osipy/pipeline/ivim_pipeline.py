@@ -45,6 +45,9 @@ class IVIMPipelineConfig:
     ----------
     fitting_method : FittingMethod
         IVIM fitting method.
+    signal_model : str
+        Registered IVIM signal model name (``"biexponential"`` or
+        ``"simplified"``). Selects the forward model used during fitting.
     b_threshold : float
         b-value threshold for segmented fitting (s/mm²).
     normalize_signal : bool
@@ -54,7 +57,8 @@ class IVIMPipelineConfig:
     bounds : dict[str, tuple[float, float]] | None
         Custom parameter bounds, e.g. ``{"D": (1e-4, 5e-3)}``.
     initial_guess : dict[str, float] | None
-        Custom initial parameter estimates, e.g. ``{"D": 1e-3}``.
+        Custom initial parameter estimates, e.g. ``{"D": 1e-3}``. Seeds the
+        optimizer's starting values; threaded through to ``IVIMFitParams``.
     max_iterations : int
         Maximum iterations for optimization.
     tolerance : float
@@ -66,6 +70,7 @@ class IVIMPipelineConfig:
     """
 
     fitting_method: FittingMethod = FittingMethod.SEGMENTED
+    signal_model: str = "biexponential"
     b_threshold: float = 200.0
     normalize_signal: bool = True
     output_dir: Path | None = None
@@ -168,8 +173,10 @@ class IVIMPipeline:
 
         fit_params = IVIMFitParams(
             method=self.config.fitting_method,
+            signal_model=self.config.signal_model,
             b_threshold=self.config.b_threshold,
             bounds=self.config.bounds,
+            initial_guess=self.config.initial_guess,
             max_iterations=self.config.max_iterations,
             tolerance=self.config.tolerance,
             bayesian_params=self.config.bayesian_params,
@@ -180,9 +187,9 @@ class IVIMPipeline:
             b_values=b_values,
             mask=mask,
             params=fit_params,
-            progress_callback=lambda p: progress_callback("IVIM Fitting", p)
-            if progress_callback
-            else None,
+            progress_callback=lambda p: (
+                progress_callback("IVIM Fitting", p) if progress_callback else None
+            ),
         )
 
         if progress_callback:

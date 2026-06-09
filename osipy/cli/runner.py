@@ -437,8 +437,9 @@ def _run_dce(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
     )
 
     pipeline_cfg = DCEPipelineConfig(
-        model=mc.model,  # type: ignore[attr-defined]
+        model=mc.model,  # type: ignore[attr-defined]  # validated MethodConfig
         t1_mapping_method=mc.t1_mapping_method,  # type: ignore[attr-defined]
+        concentration_method=mc.concentration,  # type: ignore[attr-defined]
         aif_source=mc.aif_source,  # type: ignore[attr-defined]
         population_aif=mc.population_aif,  # type: ignore[attr-defined]
         acquisition_params=acq_params,
@@ -560,9 +561,18 @@ def _run_dce_from_dicom(
         {k: tuple(v) for k, v in fitting.bounds.items()} if fitting.bounds else None
     )
 
+    # DICOM VFA stacks are always VFA T1 mapping; honor the configured VFA
+    # fit_method (linear/nonlinear) when the user selected VFA, else default.
+    t1_cfg = mc.t1_mapping_method  # type: ignore[attr-defined]  # validated MethodConfig
+    if t1_cfg.method != "vfa":
+        from osipy.dce.config import VFAConfig
+
+        t1_cfg = VFAConfig()
+
     pipeline_cfg = DCEPipelineConfig(
-        model=mc.model,  # type: ignore[attr-defined]
-        t1_mapping_method="vfa",
+        model=mc.model,  # type: ignore[attr-defined]  # validated MethodConfig
+        t1_mapping_method=t1_cfg,
+        concentration_method=mc.concentration,  # type: ignore[attr-defined]
         aif_source=mc.aif_source,  # type: ignore[attr-defined]
         population_aif=mc.population_aif,  # type: ignore[attr-defined]
         acquisition_params=dce_acq_params,
@@ -576,7 +586,10 @@ def _run_dce_from_dicom(
         fit_delay=fitting.fit_delay,
     )
 
-    logger.info("[Step 3-6] Running DCE pipeline (%s model)...", mc.model)  # type: ignore[attr-defined]
+    logger.info(
+        "[Step 3-6] Running DCE pipeline (%s model)...",
+        mc.model.method,  # type: ignore[attr-defined]
+    )
     pipeline = DCEPipeline(pipeline_cfg)
     t_fit = time.perf_counter()
     result = pipeline.run(
@@ -622,9 +635,10 @@ def _run_dsc(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
 
     pipeline_cfg = DSCPipelineConfig(
         te=mc.te,  # type: ignore[attr-defined]
-        deconvolution_method=mc.deconvolution_method,  # type: ignore[attr-defined]
+        baseline_frames=mc.baseline_frames,  # type: ignore[attr-defined]
+        hematocrit_ratio=mc.hematocrit_ratio,  # type: ignore[attr-defined]
         apply_leakage_correction=mc.apply_leakage_correction,  # type: ignore[attr-defined]
-        svd_threshold=mc.svd_threshold,  # type: ignore[attr-defined]
+        deconvolution=mc.deconvolution,  # type: ignore[attr-defined]
     )
 
     time_array = dataset.time_points
@@ -672,13 +686,19 @@ def _run_asl(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
     }
     labeling_scheme = scheme_map[mc.labeling_scheme]  # type: ignore[attr-defined]
 
+    # Pass the validated nested configs straight through (no per-knob mapping):
+    # m0 / difference / quantification carry their own method+params.
     pipeline_cfg = ASLPipelineConfig(
         labeling_scheme=labeling_scheme,
         pld=mc.pld,  # type: ignore[attr-defined]
         label_duration=mc.label_duration,  # type: ignore[attr-defined]
         t1_blood=mc.t1_blood,  # type: ignore[attr-defined]
+        t1_tissue=mc.t1_tissue,  # type: ignore[attr-defined]
         labeling_efficiency=mc.labeling_efficiency,  # type: ignore[attr-defined]
-        m0_method=mc.m0_method,  # type: ignore[attr-defined]
+        partition_coefficient=mc.partition_coefficient,  # type: ignore[attr-defined]
+        m0=mc.m0,  # type: ignore[attr-defined]
+        difference=mc.difference,  # type: ignore[attr-defined]
+        quantification=mc.quantification,  # type: ignore[attr-defined]
     )
 
     # Load M0 calibration data
@@ -705,6 +725,8 @@ def _run_asl(config: PipelineConfig, data_path: Path, output_dir: Path) -> None:
     elapsed_fit = time.perf_counter() - t_fit
 
     maps: dict[str, Any] = {"cbf": result.cbf_result.cbf_map}
+    if result.att_map is not None:
+        maps["att"] = result.att_map
     _log_parameter_stats(maps, result.cbf_result.quality_mask, elapsed_fit)
     _save_results(maps, result.cbf_result.quality_mask, output_dir, affine)
 
@@ -720,32 +742,39 @@ def _run_ivim(config: PipelineConfig, data_path: Path, output_dir: Path) -> None
     affine = dataset.affine
     mask = _load_mask(config.data.mask, base_dir)
 
-    # Map string to FittingMethod enum
-    method_map = {
-        "segmented": FittingMethod.SEGMENTED,
-        "full": FittingMethod.FULL,
-        "bayesian": FittingMethod.BAYESIAN,
-    }
-    fitting_method = method_map[mc.fitting_method]  # type: ignore[attr-defined]
+    # The fitting strategy is a validated discriminated union carrying its own
+    # method + per-method knobs; the signal model likewise. Pass them straight
+    # through to the pipeline config (no per-knob re-mapping).
+    fitting = mc.fitting  # type: ignore[attr-defined]  # validated MethodConfig
+    model_cfg = mc.model  # type: ignore[attr-defined]  # validated MethodConfig
 
-    fitting = mc.fitting  # type: ignore[attr-defined]  # IVIMFittingConfig
+    fitting_method = FittingMethod(fitting.method)
+
     bounds = (
         {k: tuple(v) for k, v in fitting.bounds.items()} if fitting.bounds else None
     )
 
-    # Convert Bayesian config if using Bayesian method
+    # b_threshold lives on the fitting method (segmented/bayesian) for fitting
+    # and on the simplified model for its perfusion cutoff. Prefer the model's
+    # threshold when the simplified model is selected (so they stay consistent),
+    # otherwise use the fitting method's threshold (default 200 for "full").
+    b_threshold = getattr(model_cfg, "b_threshold", None)
+    if b_threshold is None:
+        b_threshold = getattr(fitting, "b_threshold", 200.0)
+
+    # Bayesian-only knobs surface only on the bayesian config.
     bayesian_params = None
     if fitting_method == FittingMethod.BAYESIAN:
-        bc = fitting.bayesian
         bayesian_params = {
-            "prior_scale": bc.prior_scale,
-            "noise_std": bc.noise_std,
-            "compute_uncertainty": bc.compute_uncertainty,
+            "prior_scale": fitting.prior_scale,
+            "noise_std": fitting.noise_std,
+            "compute_uncertainty": fitting.compute_uncertainty,
         }
 
     pipeline_cfg = IVIMPipelineConfig(
         fitting_method=fitting_method,
-        b_threshold=mc.b_threshold,  # type: ignore[attr-defined]
+        signal_model=model_cfg.model,
+        b_threshold=b_threshold,
         normalize_signal=mc.normalize_signal,  # type: ignore[attr-defined]
         bounds=bounds,
         initial_guess=fitting.initial_guess,

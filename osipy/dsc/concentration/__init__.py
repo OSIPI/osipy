@@ -14,14 +14,12 @@ References
 """
 
 from osipy.dsc.concentration.signal_to_conc import (
-    DSCAcquisitionParams,
     delta_r2_to_concentration,
     gamma_variate_fit,
     signal_to_delta_r2,
 )
 
 __all__ = [
-    "DSCAcquisitionParams",
     "delta_r2_to_concentration",
     "gamma_variate_fit",
     "signal_to_delta_r2",

@@ -13,11 +13,6 @@ GPU/CPU Agnostic:
 
 NO scipy dependency - uses xp.linalg for SVD (numpy.linalg or cupy.linalg).
 
-For general-purpose deconvolution operations, see also:
-- `osipy.common.convolution.deconv`: Matrix-based deconvolution with TSVD/Tikhonov
-- `osipy.common.convolution.convmat`: Convolution matrix construction
-- `osipy.common.convolution.invconvmat`: Regularized matrix inversion
-
 References
 ----------
 .. [1] OSIPI CAPLEX, https://osipi.github.io/OSIPI_CAPLEX/
