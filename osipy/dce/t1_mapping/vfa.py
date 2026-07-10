@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from osipy.common import dataset
+from osipy.common import dataset
 from osipy.common.backend.array_module import get_array_module, to_numpy
 from osipy.common.dataset import PerfusionDataset
 from osipy.common.exceptions import DataValidationError
@@ -149,8 +151,15 @@ def _compute_t1_vfa_impl(
         raise DataValidationError(msg)
 
     params = dataset.acquisition_params
-    if not params.flip_angles:
+
+    if params.flip_angles is None:
         msg = "VFA T1 mapping requires flip_angles in acquisition_params"
+        raise DataValidationError(msg)
+
+    flip_angles = np.atleast_1d(np.asarray(params.flip_angles))
+
+    if flip_angles.size == 0:
+        msg = "VFA T1 mapping requires at least one flip angle"
         raise DataValidationError(msg)
 
     if params.tr is None:
@@ -158,7 +167,7 @@ def _compute_t1_vfa_impl(
         raise DataValidationError(msg)
 
     xp = get_array_module(dataset.data)
-    flip_angles = xp.asarray(params.flip_angles)
+    flip_angles = xp.asarray(flip_angles)
     tr = params.tr
 
     # Check data dimensions match flip angles

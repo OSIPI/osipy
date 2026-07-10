@@ -4,7 +4,11 @@ Tests for compute_t1_vfa, compute_t1_look_locker, compute_t1_map,
 signal models, binding adapters, and Jacobian accuracy.
 """
 
+from unittest import result
+
 import numpy as np
+from osipy.common import dataset
+from osipy.dce.t1_mapping.vfa import compute_t1_vfa
 import pytest
 
 from osipy.common.dataset import PerfusionDataset
@@ -468,6 +472,32 @@ class TestVFAFitting:
 
         t1_mean = np.nanmean(result.t1_map.values[result.quality_mask])
         np.testing.assert_allclose(t1_mean, t1_true, rtol=0.01)
+        
+    def test_vfa_accepts_numpy_flip_angles(self) -> None:
+        """VFA fitting accepts NumPy arrays for flip_angles in the dataset."""
+        from osipy.dce.t1_mapping.vfa import compute_t1_vfa
+
+        t1_true = 1000.0
+        m0_true = 100.0
+        tr = 5.0
+
+        flip_angles = np.array([2.0, 5.0, 10.0, 15.0, 20.0])
+
+        dataset = _make_vfa_dataset(
+            t1=t1_true,
+            m0=m0_true,
+            flip_angles=flip_angles.tolist(),
+            tr=tr,
+        )
+
+        # Replace the list with a NumPy array to reproduce the reported bug
+        dataset.acquisition_params.flip_angles = flip_angles
+
+        result = compute_t1_vfa(dataset, method="linear")
+
+        t1_mean = np.nanmean(result.t1_map.values[result.quality_mask])
+
+        np.testing.assert_allclose(t1_mean, t1_true, rtol=0.01)    
 
     def test_vfa_invalid_method_raises(self) -> None:
         """Unknown VFA method raises DataValidationError."""
