@@ -4,11 +4,7 @@ Tests for compute_t1_vfa, compute_t1_look_locker, compute_t1_map,
 signal models, binding adapters, and Jacobian accuracy.
 """
 
-from unittest import result
-
 import numpy as np
-from osipy.common import dataset
-from osipy.dce.t1_mapping.vfa import compute_t1_vfa
 import pytest
 
 from osipy.common.dataset import PerfusionDataset
@@ -17,6 +13,7 @@ from osipy.common.models.fittable import FittableModel
 from osipy.common.types import DCEAcquisitionParams, Modality
 from osipy.dce.t1_mapping.binding import BoundLookLockerModel, BoundSPGRModel
 from osipy.dce.t1_mapping.models import LookLockerSignalModel, SPGRSignalModel
+from osipy.dce.t1_mapping.vfa import compute_t1_vfa
 
 # ---------------------------------------------------------------------------
 # Helpers for synthetic data generation
@@ -411,7 +408,6 @@ class TestVFAFitting:
 
     def test_vfa_linear_recovers_t1(self) -> None:
         """VFA linear fit recovers known T1 from synthetic data."""
-        from osipy.dce.t1_mapping.vfa import compute_t1_vfa
 
         t1_true = 1000.0
         m0_true = 100.0
@@ -433,7 +429,6 @@ class TestVFAFitting:
 
     def test_vfa_nonlinear_recovers_t1(self) -> None:
         """VFA nonlinear fit recovers known T1 from synthetic data."""
-        from osipy.dce.t1_mapping.vfa import compute_t1_vfa
 
         t1_true = 1000.0
         m0_true = 100.0
@@ -454,7 +449,6 @@ class TestVFAFitting:
 
     def test_vfa_array_interface(self) -> None:
         """VFA fitting works with individual arrays (no dataset)."""
-        from osipy.dce.t1_mapping.vfa import compute_t1_vfa
 
         t1_true = 800.0
         m0_true = 150.0
@@ -472,10 +466,9 @@ class TestVFAFitting:
 
         t1_mean = np.nanmean(result.t1_map.values[result.quality_mask])
         np.testing.assert_allclose(t1_mean, t1_true, rtol=0.01)
-        
+
     def test_vfa_accepts_numpy_flip_angles(self) -> None:
         """VFA fitting accepts NumPy arrays for flip_angles in the dataset."""
-        from osipy.dce.t1_mapping.vfa import compute_t1_vfa
 
         t1_true = 1000.0
         m0_true = 100.0
@@ -497,11 +490,10 @@ class TestVFAFitting:
 
         t1_mean = np.nanmean(result.t1_map.values[result.quality_mask])
 
-        np.testing.assert_allclose(t1_mean, t1_true, rtol=0.01)    
+        np.testing.assert_allclose(t1_mean, t1_true, rtol=0.01)
 
     def test_vfa_invalid_method_raises(self) -> None:
         """Unknown VFA method raises DataValidationError."""
-        from osipy.dce.t1_mapping.vfa import compute_t1_vfa
 
         dataset = _make_vfa_dataset(1000.0, 100.0, [2.0, 5.0, 10.0], 5.0)
         with pytest.raises(DataValidationError, match="Unknown VFA method"):

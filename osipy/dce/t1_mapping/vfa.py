@@ -24,8 +24,6 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from osipy.common import dataset
-from osipy.common import dataset
 from osipy.common.backend.array_module import get_array_module, to_numpy
 from osipy.common.dataset import PerfusionDataset
 from osipy.common.exceptions import DataValidationError
