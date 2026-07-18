@@ -124,28 +124,23 @@ def check_aif_quality(aif):
     """Check AIF quality metrics."""
     time = aif.time
     conc = aif.concentration
-
     # Check for baseline before bolus
     baseline = conc[:5].mean()
     if baseline > 0.1:
         print("Warning: High baseline concentration")
-
     # Check peak is well-defined
     peak_idx = np.argmax(conc)
     peak_time = time[peak_idx]
     peak_conc = conc[peak_idx]
-
     if peak_idx < 3:
         print("Warning: Peak too early, may miss bolus arrival")
     if peak_idx > len(conc) - 5:
         print("Warning: Peak too late, may be truncated")
-
     # Check signal-to-noise
     tail_std = conc[-10:].std()
     snr = peak_conc / tail_std if tail_std > 0 else np.inf
     if snr < 10:
         print(f"Warning: Low SNR ({snr:.1f})")
-
     print(f"Peak: {peak_conc:.2f} mM at {peak_time:.1f} s")
     print(f"Estimated SNR: {snr:.1f}")
 

@@ -250,11 +250,9 @@ pipeline = DCEPipeline(config)
 results = {}
 for subject in subjects:
     print(f"Processing {subject}...")
-
     # Load subject data
     data = osipy.load_nifti(data_dir / subject / "perf" / f"{subject}_dce.nii.gz")
     time = np.arange(data.shape[-1]) * 3.5
-
     try:
         results[subject] = pipeline.run(data, time)
         valid = results[subject].quality_mask
@@ -311,12 +309,9 @@ class CustomDCEPipeline(osipy.DCEPipeline):
         """Custom masking logic."""
         # Call parent's method
         mask = super().create_mask()
-
         # Add custom filtering
         mask = mask & (self.t1_map > 500) & (self.t1_map < 3000)
-
         return mask
-
     def select_aif(self):
         """Use custom AIF."""
         # Load pre-computed AIF

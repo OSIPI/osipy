@@ -235,21 +235,16 @@ def visualize_fitting_failures(result, concentration, time, aif, slice_idx=None)
     """Visualize fitting success and failures."""
     if slice_idx is None:
         slice_idx = result.quality_mask.shape[2] // 2
-
     quality = result.quality_mask[:, :, slice_idx]
     r_squared = result.r_squared_map[:, :, slice_idx]
-
     fig, axes = plt.subplots(2, 3, figsize=(12, 8))
-
     # Success/failure map
     axes[0, 0].imshow(quality, cmap='RdYlGn')
     axes[0, 0].set_title(f'Quality Mask\n(Green=valid)')
-
     # R² map
     im = axes[0, 1].imshow(r_squared, cmap='viridis', vmin=0, vmax=1)
     axes[0, 1].set_title('R² Map')
     plt.colorbar(im, ax=axes[0, 1])
-
     # R² histogram
     valid_r2 = result.r_squared_map[result.quality_mask > 0]
     axes[0, 2].hist(valid_r2, bins=50, color='steelblue')
@@ -257,7 +252,6 @@ def visualize_fitting_failures(result, concentration, time, aif, slice_idx=None)
     axes[0, 2].set_xlabel('R²')
     axes[0, 2].set_title('R² Distribution')
     axes[0, 2].legend()
-
     # Sample successful fit
     success_idx = np.where(quality > 0)
     if len(success_idx[0]) > 0:
@@ -265,7 +259,6 @@ def visualize_fitting_failures(result, concentration, time, aif, slice_idx=None)
         axes[1, 0].plot(time, concentration[x, y, slice_idx, :], 'ko', label='Data')
         axes[1, 0].set_title(f'Successful Fit\nR²={r_squared[x,y]:.3f}')
         axes[1, 0].legend()
-
     # Sample failed fit
     fail_idx = np.where(quality == 0)
     if len(fail_idx[0]) > 0:
@@ -273,20 +266,17 @@ def visualize_fitting_failures(result, concentration, time, aif, slice_idx=None)
         axes[1, 1].plot(time, concentration[x, y, slice_idx, :], 'ko', label='Data')
         axes[1, 1].set_title(f'Failed Fit\nR²={r_squared[x,y]:.3f}')
         axes[1, 1].legend()
-
     # Failure reasons
     axes[1, 2].axis('off')
     n_total = quality.size
     n_valid = (quality > 0).sum()
     n_low_r2 = (r_squared < 0.5).sum() - (quality == 0).sum()
-
     text = f"""Fitting Summary:
     Total voxels: {n_total}
     Valid fits: {n_valid} ({100*n_valid/n_total:.1f}%)
     Low R² (<0.5): {n_low_r2}
     """
     axes[1, 2].text(0.1, 0.5, text, fontsize=12, family='monospace')
-
     plt.tight_layout()
     return fig
 
@@ -305,22 +295,17 @@ Start with a complex model and fall back to a simpler one for failed voxels:
 def fit_with_fallback(concentration, aif, time, mask):
     # Try Extended Tofts first
     result = osipy.fit_model("extended_tofts", concentration, aif, time, mask=mask)
-
     # Find failed voxels
     failed = (result.quality_mask == 0) & mask
-
     if failed.sum() > 0:
         print(f"Retrying {failed.sum()} voxels with Standard Tofts")
-
         # Retry with simpler model
         result_simple = osipy.fit_model("tofts", concentration, aif, time,
                                         mask=failed)
-
         # Merge results
         # Note: Merging DCEFitResult objects requires manual attribute updates.
         # This is a simplified example—in practice, you would need to update
         # result.parameter_maps, result.quality_mask, and result.r_squared_map.
-
     return result
 
 result = fit_with_fallback(concentration, aif, time, mask)
@@ -335,7 +320,6 @@ Try multiple bound configurations and keep the best result:
 def fit_with_multiple_bounds(concentration, aif, time):
     best_result = None
     best_r2 = -np.inf
-
     # Try different bounds_override configurations
     bounds_configs = [
         # Default-like tight bounds
@@ -345,16 +329,13 @@ def fit_with_multiple_bounds(concentration, aif, time):
         # Narrow bounds for low-permeability tissue
         {'Ktrans': (0.0001, 0.1), 've': (0.1, 0.8), 'vp': (0.001, 0.05)},
     ]
-
     for bounds in bounds_configs:
         result = osipy.fit_model("extended_tofts", concentration, aif, time,
                                 bounds_override=bounds)
         mean_r2 = result.r_squared_map[result.quality_mask > 0].mean()
-
         if mean_r2 > best_r2:
             best_r2 = mean_r2
             best_result = result
-
     return best_result
 ```
 
