@@ -125,18 +125,15 @@ for i in range(shape[0]):
             ktrans = ktrans_true * (0.8 + 0.4 * np.random.rand())
             ve = ve_true * (0.8 + 0.4 * np.random.rand())
             vp = vp_true * (0.8 + 0.4 * np.random.rand())
-
             # Simple Extended Tofts forward model
             # (In practice, use osipy's model prediction)
             cp = aif.concentration
             kep = ktrans / ve
             time_min = time / 60  # Convert to minutes
-
             # Convolution integral (simplified)
             dt = time_min[1] - time_min[0]
             impulse = ktrans * np.exp(-kep * time_min)
             ct = np.convolve(cp, impulse)[:n_timepoints] * dt + vp * cp
-
             # Add noise
             noise = np.random.normal(0, 0.005, n_timepoints)
             concentration[i, j, k, :] = ct + noise

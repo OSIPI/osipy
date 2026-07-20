@@ -160,11 +160,9 @@ def adjust_aif_hematocrit(aif, hct=0.45):
     # Plasma fraction
     plasma_fraction = 1 - hct
     standard_plasma = 1 - 0.45
-
     # Scale concentration
     scale = standard_plasma / plasma_fraction
     adjusted_conc = aif.concentration * scale
-
     return osipy.ArterialInputFunction(
         time=aif.time,
         concentration=adjusted_conc,
