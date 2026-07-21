@@ -25,6 +25,7 @@ References
    91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -34,6 +35,8 @@ from osipy.common.exceptions import DataValidationError
 if TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -257,6 +260,10 @@ def correct_leakage(
 
     except xp.linalg.LinAlgError:
         # Singular matrix — fall back to uncorrected data for masked voxels
+        logger.warning(
+            "Leakage correction fit hit a singular matrix; returning "
+            "uncorrected delta-R2 for masked voxels (K1/K2 set to zero)."
+        )
         corrected_delta_r2 = xp.copy(delta_r2)
         corrected_delta_r2[~mask] = 0
         k1 = xp.zeros(spatial_shape)
@@ -315,8 +322,15 @@ def _compute_reference_curve(
         ref_mask = (enhancement < enhancement_threshold) & mask
 
         # Ensure minimum number of reference voxels
-        if xp.sum(ref_mask) < 100:
+        n_ref = int(to_numpy(xp.sum(ref_mask)))
+        if n_ref < 100:
             # Fall back to using lower quartile of all masked voxels
+            logger.warning(
+                "Only %d low-enhancement reference voxels found (<100); "
+                "falling back to all masked voxels for the reference curve, "
+                "which may reduce leakage-correction accuracy.",
+                n_ref,
+            )
             ref_mask = mask
 
     # Average reference curve

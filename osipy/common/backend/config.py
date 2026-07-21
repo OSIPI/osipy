@@ -314,7 +314,8 @@ def get_gpu_batch_size() -> int:
         config = get_backend()
         props = cp.cuda.runtime.getDeviceProperties(config.device_id)
         return props["multiProcessorCount"] * props["maxThreadsPerMultiProcessor"]
-    except Exception:
+    except Exception as e:
+        logger.debug("Could not determine GPU batch size: %s", e)
         return 0
 
 
