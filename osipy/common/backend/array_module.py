@@ -31,6 +31,7 @@ References
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -38,6 +39,8 @@ import numpy as np
 # NumPy 2.0 renamed trapz -> trapezoid. Ensure compatibility with NumPy <2.0.
 if not hasattr(np, "trapezoid"):
     np.trapezoid = np.trapz  # type: ignore[attr-defined] # noqa: NPY201
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from numpy.typing import ArrayLike, NDArray
@@ -231,6 +234,7 @@ def to_gpu(array: ArrayLike) -> Any:
     # Transfer to GPU
     try:
         return cp.asarray(array)
-    except Exception:
+    except Exception as exc:
         # Fallback to NumPy if GPU transfer fails
+        logger.warning("GPU transfer failed (%s); falling back to CPU/NumPy.", exc)
         return to_numpy(array)

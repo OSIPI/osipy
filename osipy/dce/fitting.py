@@ -24,6 +24,7 @@ References
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -45,6 +46,8 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from osipy.common.fitting.base import BaseFitter
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -226,6 +229,12 @@ def _fit_model_impl(
         fitter = get_fitter(fitter)
     elif fitter is None:
         fitter = LevenbergMarquardtFitter()
+
+    logger.info(
+        "Fitting DCE model '%s' with fitter '%s'",
+        model.name,
+        getattr(fitter, "fitting_method_name", type(fitter).__name__),
+    )
 
     # Handle different input shapes
     original_shape = concentration.shape[:-1]  # Spatial shape
@@ -427,7 +436,10 @@ def _compute_r_squared_vectorized(
         r_squared[quality_mask] = r2_values
 
     except Exception:
-        pass
+        logger.warning(
+            "R-squared computation failed; returning zeros.",
+            exc_info=True,
+        )
 
     return r_squared
 
