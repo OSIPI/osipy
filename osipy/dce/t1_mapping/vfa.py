@@ -149,7 +149,7 @@ def _compute_t1_vfa_impl(
         raise DataValidationError(msg)
 
     params = dataset.acquisition_params
-    if params.flip_angles is None or params.flip_angles == []:
+    if params.flip_angles is None or len(params.flip_angles) == 0:
         msg = "VFA T1 mapping requires flip_angles in acquisition_params"
         raise DataValidationError(msg)
 
