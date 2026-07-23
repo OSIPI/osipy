@@ -47,7 +47,7 @@ dce_dataset = osipy.load_nifti("dce_4d.nii.gz")
 vfa_data = osipy.load_nifti("vfa_images.nii.gz")
 
 # Define acquisition parameters
-flip_angles = np.array([2, 5, 10, 15])  # degrees
+flip_angles = [2, 5, 10, 15]  # degrees
 tr = 5.0  # Repetition time in ms
 
 # DCE timing
