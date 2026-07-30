@@ -149,8 +149,10 @@ def _compute_t1_vfa_impl(
         raise DataValidationError(msg)
 
     params = dataset.acquisition_params
-    if not params.flip_angles:
-        msg = "VFA T1 mapping requires flip_angles in acquisition_params"
+    flip_angles = np.asarray(params.flip_angles)
+
+    if flip_angles.size == 0:
+        msg = "VFA T1 mapping requires at least one flip angle"
         raise DataValidationError(msg)
 
     if params.tr is None:
@@ -158,7 +160,7 @@ def _compute_t1_vfa_impl(
         raise DataValidationError(msg)
 
     xp = get_array_module(dataset.data)
-    flip_angles = xp.asarray(params.flip_angles)
+    flip_angles = xp.asarray(flip_angles)
     tr = params.tr
 
     # Check data dimensions match flip angles
@@ -348,12 +350,10 @@ def compute_t1_vfa(
             msg = "Either dataset or (signal, flip_angles, tr) must be provided"
             raise DataValidationError(msg)
 
-        flip_angles_array = np.asarray(flip_angles)
-
         # Create acquisition params
         acq_params = DCEAcquisitionParams(
             tr=tr,
-            flip_angles=list(flip_angles_array),
+            flip_angles=flip_angles,  # type: ignore[arg-type]  # normalized in __post_init__
         )
 
         # Create mask if not provided
