@@ -71,6 +71,7 @@ output/
 test_runs/
 .claude/
 site/
+.cache/
 
 # Local-only pipeline verification helper (machine-specific data paths)
 scripts/verify_local_pipelines.sh

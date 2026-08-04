@@ -107,7 +107,6 @@ def compute_aic(r_squared, n_params, n_points):
     # Approximate residual sum of squares from R²
     # RSS = (1 - R²) * TSS, assume TSS = 1 for comparison
     rss = 1 - r_squared
-
     # AIC = n * log(RSS/n) + 2k
     # Simplified for comparison: -n * log(R²) + 2k
     aic = -n_points * np.log(np.maximum(r_squared, 1e-10)) + 2 * n_params
@@ -136,7 +135,6 @@ for name, result in results.items():
                      model_params[name], n_timepoints)
     bic = compute_bic(result.r_squared_map[combined_mask],
                      model_params[name], n_timepoints)
-
     print(f"  {name:12s}: AIC={aic.mean():.1f}, BIC={bic.mean():.1f}")
 ```
 
@@ -149,29 +147,22 @@ def select_best_model(results, mask, criterion='aic'):
     """Select best model per voxel based on information criterion."""
     model_names = list(results.keys())
     n_models = len(model_names)
-
     # Initialize criterion arrays
     shape = results[model_names[0]].r_squared_map.shape
     criteria = np.zeros((*shape, n_models))
-
     n_points = 60  # number of time points
-
     for i, name in enumerate(model_names):
         r2 = results[name].r_squared_map
         n_params = model_params[name]
-
         if criterion == 'aic':
             criteria[..., i] = compute_aic(r2, n_params, n_points)
         else:
             criteria[..., i] = compute_bic(r2, n_params, n_points)
-
     # Select model with lowest criterion
     best_model_idx = np.argmin(criteria, axis=-1)
-
     # Create selection map
     model_selection = np.zeros(shape, dtype=int)
     model_selection[mask] = best_model_idx[mask]
-
     return model_selection, model_names
 
 selection, names = select_best_model(results, combined_mask)
@@ -250,7 +241,6 @@ print("Tumor ROI Analysis:")
 for name, result in results.items():
     ktrans = result.parameter_maps['Ktrans'].values[tumor_mask & combined_mask]
     r2 = result.r_squared_map[tumor_mask & combined_mask]
-
     print(f"\n{name}:")
     print(f"  Ktrans: {ktrans.mean():.4f} ± {ktrans.std():.4f}")
     print(f"  R²:     {r2.mean():.4f}")
