@@ -72,15 +72,39 @@ def _compute_r2(
     return xp.where(ss_tot > 0, 1.0 - ss_res / (ss_tot + 1e-10), 0.0)
 
 
+def _pad_to_matrix_size(
+    arr: NDArray[np.floating[Any]],
+    target_len: int,
+    xp: Any,
+) -> NDArray[np.floating[Any]]:
+    """Zero-pad ``arr`` (n_t, n_voxels) along axis 0 to ``target_len`` rows.
+
+    No-op if already at ``target_len`` (the Toeplitz case, where the AIF
+    matrix is ``n x n`` rather than the circulant ``2n x 2n``).
+    """
+    n_t = arr.shape[0]
+    if n_t == target_len:
+        return arr
+    padded = xp.zeros((target_len, arr.shape[1]), dtype=arr.dtype)
+    padded[:n_t] = arr
+    return padded
+
+
 def _reconstruct_r2(
     observed: NDArray[np.floating[Any]],
     R_batch: NDArray[np.floating[Any]],
     model: FittableModel,
     xp: Any,
 ) -> NDArray[np.floating[Any]]:
-    """Compute R2 from reconstructed signal."""
-    R_nn = xp.maximum(R_batch, 0.0)
-    recon = model._U @ (model._S[:, xp.newaxis] * (model._Vh @ R_nn))
+    """Compute R2 from reconstructed signal.
+
+    ``R_batch`` holds the physical (length n_t) residue; for a circulant
+    model (matrix size 2*n_t) it is zero-padded before applying the
+    forward operator, and the reconstruction is truncated back to n_t.
+    """
+    n_t = observed.shape[0]
+    R_nn = _pad_to_matrix_size(xp.maximum(R_batch, 0.0), model._U.shape[0], xp)
+    recon = (model._U @ (model._S[:, xp.newaxis] * (model._Vh @ R_nn)))[:n_t]
     return _compute_r2(observed, recon, xp)
 
 
@@ -197,14 +221,19 @@ class CSVDFitter(BaseFitter):
             Boolean convergence flags, shape ``(n_voxels,)``.
         """
         xp = get_array_module(observed_batch)
-        _n_t, n_voxels = observed_batch.shape
+        n_t, n_voxels = observed_batch.shape
 
         S = model._S
         s_max = S[0]
         S_inv = xp.where(self.threshold * s_max < S, 1.0 / S, 0.0)
 
-        UtC = model._U.T @ observed_batch
-        R_batch = model._Vh.T @ (S_inv[:, xp.newaxis] * UtC)
+        # Circulant matrix is 2*n_t x 2*n_t: zero-pad the observed curve
+        # before solving, then truncate the residue back to n_t physical
+        # points (the wraparound tail is not the residue function).
+        padded = _pad_to_matrix_size(observed_batch, model._U.shape[0], xp)
+        UtC = model._U.T @ padded
+        R_full = model._Vh.T @ (S_inv[:, xp.newaxis] * UtC)
+        R_batch = R_full[:n_t]
 
         cbf, mtt, ta = _extract_perfusion_params(R_batch, model._dt, xp)
         params = xp.stack([cbf, mtt, ta])
@@ -244,8 +273,10 @@ class OSVDFitter(BaseFitter):
     ) -> tuple[NDArray[Any], NDArray[Any], NDArray[Any]]:
         """Fit a batch of voxels via oscillation-index SVD.
 
-        Searches for the optimal per-voxel truncation threshold that
-        minimizes the oscillation index of R(t) below the target value.
+        Searches, per voxel, for the *least* amount of SVD truncation
+        (ascending threshold) whose residue's oscillation index first
+        drops below the target -- i.e. the minimal regularization needed
+        to suppress ringing, not the maximal one (Wu et al. 2003).
 
         Parameters
         ----------
@@ -276,35 +307,37 @@ class OSVDFitter(BaseFitter):
         s_max = S[0]
         target_oi = self.oscillation_index
 
-        UtC = model._U.T @ observed_batch
+        # Circulant matrix is 2*n_t x 2*n_t: zero-pad the observed curve
+        # before solving, then truncate each candidate residue back to
+        # n_t physical points (the wraparound tail is not the residue
+        # function, and must not feed into the oscillation index).
+        padded = _pad_to_matrix_size(observed_batch, model._U.shape[0], xp)
+        UtC = model._U.T @ padded
 
-        # Search optimal threshold per voxel
+        # Search per-voxel threshold, ascending (least truncation first).
+        # Take the FIRST threshold whose OI meets the target -- not the one
+        # that minimizes OI, which would keep increasing regularization all
+        # the way to the top of the range and over-smooth the residue.
         thresholds = xp.linspace(0.01, 0.5, 20)
         best_threshold = xp.full(
             n_voxels,
             self.default_threshold,
             dtype=observed_batch.dtype,
         )
-        best_oi = xp.full(
-            n_voxels,
-            xp.inf,
-            dtype=observed_batch.dtype,
-        )
+        found = xp.zeros(n_voxels, dtype=bool)
 
         for k in range(len(thresholds)):
             thresh_val = thresholds[k]
             s_thresh = thresh_val * s_max
             S_inv = xp.where(s_thresh < S, 1.0 / S, 0.0)
-            r_all = (model._Vh.T @ (S_inv[:, xp.newaxis] * UtC)).T  # (n_voxels, n_t)
+            r_all = (model._Vh.T @ (S_inv[:, xp.newaxis] * UtC)).T[
+                :, :n_t
+            ]  # (n_voxels, n_t)
 
             oi = _compute_oscillation_index_batch(r_all, xp)
-            improved = (oi < target_oi) & (oi < best_oi)
-            best_oi = xp.where(improved, oi, best_oi)
-            best_threshold = xp.where(
-                improved,
-                thresh_val,
-                best_threshold,
-            )
+            meets_target = (oi < target_oi) & (~found)
+            best_threshold = xp.where(meets_target, thresh_val, best_threshold)
+            found = found | meets_target
 
         # Apply per-voxel thresholds
         unique_thresholds = xp.unique(best_threshold)
@@ -319,7 +352,7 @@ class OSVDFitter(BaseFitter):
             s_thresh = thresh_float * float(to_numpy(s_max))
             S_inv = xp.where(s_thresh < S, 1.0 / S, 0.0)
             r_sel = model._Vh.T @ (S_inv[:, xp.newaxis] * UtC[:, voxel_sel])
-            R_batch[:, voxel_sel] = r_sel
+            R_batch[:, voxel_sel] = r_sel[:n_t]
 
         cbf, mtt, ta = _extract_perfusion_params(
             R_batch,
