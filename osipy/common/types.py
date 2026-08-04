@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from numpy.typing import NDArray
 
 
@@ -178,6 +180,42 @@ class DCEAcquisitionParams(AcquisitionParams):
     temporal_resolution: float = 1.0
     relaxivity: float = 4.5
     t1_assumed: float | None = None
+
+    def __post_init__(self) -> None:
+        """Normalize flip_angles into a validated list[float]."""
+        self.flip_angles = self._normalize_flip_angles(self.flip_angles)
+
+    @staticmethod
+    def _normalize_flip_angles(
+        value: "Sequence[float] | NDArray[np.floating[Any]] | None",
+    ) -> list[float]:
+        """Convert flip_angles input to a validated list[float]."""
+        if value is None:
+            raise ValueError("flip_angles cannot be None")
+
+        if isinstance(value, (int, float)):
+            raise ValueError(
+                f"flip_angles must be a sequence of floats, got a single "
+                f"scalar value: {value!r}"
+            )
+
+        try:
+            arr = np.asarray(value, dtype=float)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"flip_angles must be convertible to a list of floats: {exc}"
+            ) from exc
+
+        if arr.ndim != 1:
+            raise ValueError(
+                f"flip_angles must be a 1D sequence, got shape {arr.shape}"
+            )
+
+        if arr.size > 0 and not np.all(np.isfinite(arr)):
+            raise ValueError("flip_angles contains NaN or infinite values")
+
+        result: list[float] = arr.tolist()
+        return result
 
 
 @dataclass

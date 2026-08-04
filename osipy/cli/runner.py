@@ -596,7 +596,7 @@ def _run_dce_from_dicom(
         dce_data=dce_dataset,
         time=time_seconds,
         t1_data=vfa_dataset,
-        flip_angles=np.asarray(vfa_flip_angles, dtype=float),
+        flip_angles=vfa_flip_angles,
         tr=vfa_tr,
         mask=mask,
     )

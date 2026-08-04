@@ -13,6 +13,7 @@ from osipy.common.models.fittable import FittableModel
 from osipy.common.types import DCEAcquisitionParams, Modality
 from osipy.dce.t1_mapping.binding import BoundLookLockerModel, BoundSPGRModel
 from osipy.dce.t1_mapping.models import LookLockerSignalModel, SPGRSignalModel
+from osipy.dce.t1_mapping.vfa import compute_t1_vfa
 
 # ---------------------------------------------------------------------------
 # Helpers for synthetic data generation
@@ -169,6 +170,62 @@ class TestDCEAcquisitionParamsForT1:
         assert params.tr == 3000.0
         assert len(params.flip_angles) == 1
         assert params.te == 2.0
+
+
+class TestFlipAnglesNormalization:
+    """Tests for DCEAcquisitionParams.__post_init__ flip_angles handling."""
+
+    def test_accepts_list(self) -> None:
+        p = DCEAcquisitionParams(tr=5.0, flip_angles=[2.0, 5.0, 10.0, 15.0])
+        assert p.flip_angles == [2.0, 5.0, 10.0, 15.0]
+        assert isinstance(p.flip_angles, list)
+
+    def test_accepts_numpy_array(self) -> None:
+        p = DCEAcquisitionParams(tr=5.0, flip_angles=np.array([2.0, 5.0, 10.0, 15.0]))
+        assert p.flip_angles == [2.0, 5.0, 10.0, 15.0]
+        assert isinstance(p.flip_angles, list)
+
+    def test_accepts_tuple(self) -> None:
+        p = DCEAcquisitionParams(tr=5.0, flip_angles=(2, 5, 10, 15))
+        assert p.flip_angles == [2.0, 5.0, 10.0, 15.0]
+
+    def test_accepts_int_list(self) -> None:
+        p = DCEAcquisitionParams(tr=5.0, flip_angles=[2, 5, 10, 15])
+        assert all(isinstance(x, float) for x in p.flip_angles)
+
+    def test_allows_empty_list_for_fixed_t1_workflows(self) -> None:
+        p = DCEAcquisitionParams(tr=5.0, flip_angles=[], t1_assumed=1400.0)
+        assert p.flip_angles == []
+
+    def test_allows_empty_array_for_fixed_t1_workflows(self) -> None:
+        p = DCEAcquisitionParams(tr=5.0, flip_angles=np.array([]), t1_assumed=1400.0)
+        assert p.flip_angles == []
+
+    def test_rejects_none(self) -> None:
+        with pytest.raises(ValueError, match="cannot be None"):
+            DCEAcquisitionParams(tr=5.0, flip_angles=None)
+
+    def test_rejects_scalar(self) -> None:
+        with pytest.raises(ValueError, match="single scalar"):
+            DCEAcquisitionParams(tr=5.0, flip_angles=5.0)
+
+    def test_rejects_non_numeric(self) -> None:
+        with pytest.raises(ValueError):
+            DCEAcquisitionParams(tr=5.0, flip_angles=["a", "b", "c"])
+
+    def test_rejects_nan(self) -> None:
+        with pytest.raises(ValueError, match="NaN or infinite"):
+            DCEAcquisitionParams(tr=5.0, flip_angles=[2.0, float("nan"), 10.0])
+
+    def test_rejects_inf(self) -> None:
+        with pytest.raises(ValueError, match="NaN or infinite"):
+            DCEAcquisitionParams(tr=5.0, flip_angles=[2.0, float("inf"), 10.0])
+
+    def test_rejects_2d_array(self) -> None:
+        with pytest.raises(ValueError, match="1D sequence"):
+            DCEAcquisitionParams(
+                tr=5.0, flip_angles=np.array([[2.0, 5.0], [10.0, 15.0]])
+            )
 
 
 class TestSyntheticT1Data:
@@ -476,6 +533,15 @@ class TestVFAFitting:
         dataset = _make_vfa_dataset(1000.0, 100.0, [2.0, 5.0, 10.0], 5.0)
         with pytest.raises(DataValidationError, match="Unknown VFA method"):
             compute_t1_vfa(dataset, method="bogus")
+
+    def test_vfa_rejects_empty_flip_angles(self) -> None:
+        """compute_t1_vfa rejects empty flip_angles even though the
+        dataclass itself allows it (for fixed-T1/t1_assumed workflows)."""
+        dataset = _make_vfa_dataset(1000.0, 100.0, [2.0, 5.0, 10.0], 5.0)
+        dataset.acquisition_params.flip_angles = []
+
+        with pytest.raises(DataValidationError, match="at least one flip angle"):
+            compute_t1_vfa(dataset, method="linear")
 
 
 class TestLookLockerFitting:
