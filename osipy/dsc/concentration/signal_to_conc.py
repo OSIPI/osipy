@@ -23,6 +23,7 @@ References
    2024;91(5):1761-1773. doi:10.1002/mrm.29840
 """
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from osipy.common.backend.array_module import get_array_module, to_numpy
@@ -31,6 +32,8 @@ from osipy.common.exceptions import DataValidationError
 if TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
+
+logger = logging.getLogger(__name__)
 
 
 def signal_to_delta_r2(
@@ -269,8 +272,13 @@ def gamma_variate_fit(
             "mtt": alpha_fit * beta_fit,
         }
 
-    except (RuntimeError, ValueError):
+    except (RuntimeError, ValueError) as exc:
         # If fitting fails, return original curve
+        logger.warning(
+            "First-pass gamma-variate fit failed (%s); "
+            "returning the original concentration curve.",
+            exc,
+        )
         first_pass = concentration.copy()
         peak_conc = float(to_numpy(concentration[peak_idx]))
         t0_init = float(to_numpy(time[baseline_end]))
