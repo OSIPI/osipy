@@ -318,7 +318,10 @@ class OSVDFitter(BaseFitter):
         # Take the FIRST threshold whose OI meets the target -- not the one
         # that minimizes OI, which would keep increasing regularization all
         # the way to the top of the range and over-smooth the residue.
-        thresholds = xp.linspace(0.01, 0.5, 20)
+        # Span 0-95% is Wu et al. (2003)'s sSVD/cSVD calibration range; the
+        # paper does not state oSVD's internal range, but a 0.5 ceiling leaves
+        # the target OI unreachable on short acquisitions.
+        thresholds = xp.linspace(0.01, 0.95, 40)
         best_threshold = xp.full(
             n_voxels,
             self.default_threshold,

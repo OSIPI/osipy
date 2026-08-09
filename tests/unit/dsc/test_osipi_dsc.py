@@ -42,8 +42,9 @@ class TestOSIPIDSCReferenceData:
                         "delay-free accuracy for delay-insensitivity: its "
                         "Fourier-mode SVD basis smears the sharp residue peak "
                         "(Gibbs-type effect), underestimating CBF at high flow "
-                        "(CBF>=50, CBV=4; CBF=35, CBV=2). This is a documented "
-                        "tradeoff of block-circulant SVD (Wu et al. 2003)."
+                        "(CBF>=60, CBV=4; CBF=35, CBV=2). This is a documented "
+                        "tradeoff of block-circulant SVD (Wu et al. 2003); "
+                        "11/14 cases pass"
                     ),
                     strict=False,
                 ),

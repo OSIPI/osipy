@@ -52,6 +52,13 @@ class SVDDeconvolutionParams:
         Default 0.2 for standard SVD.
     oscillation_index : float
         Target oscillation index for oSVD. Default 0.035.
+
+        Optimal values are acquisition-dependent -- Wu et al. (2003) calibrate
+        them per SNR/TR (at TR=1.5s they report 0.085 at SNR=100 and 0.095 at
+        SNR=20, with P_SVD of 3-10%). A strict target on a short acquisition
+        forces heavy truncation, flattening the residue peak and
+        underestimating CBF; loosening it toward those values helps there.
+        The defaults here suit the high-CNR reference data used in testing.
     block_circulant : bool
         Use block-circulant matrix (for cSVD/oSVD). Default True for
         cSVD/oSVD methods.
@@ -169,12 +176,12 @@ def deconvolve_oSVD(
     padded_conc[:, :n_pts] = masked_conc
     UtC = U.T @ padded_conc.T  # (2n, n_masked)
 
-    # Search per-voxel threshold, ascending (least truncation first). Take
-    # the FIRST threshold whose OI meets the target -- not the one that
-    # minimizes OI, which would keep increasing regularization all the way
-    # to the top of the range and over-smooth the residue (Wu et al. 2003
-    # intends the *minimal* regularization needed to suppress ringing).
-    thresholds = xp.linspace(0.01, 0.5, 20)
+    # Search ascending and take the FIRST threshold meeting the target (Wu et
+    # al. 2003: "P_SVD can be varied until ... OI falls below a user-specified
+    # value"). Span 0-95% is the paper's sSVD/cSVD calibration range; it does
+    # not state oSVD's internal range, but a 0.5 ceiling leaves the target
+    # unreachable on short acquisitions, collapsing oSVD onto cSVD.
+    thresholds = xp.linspace(0.01, 0.95, 40)
     s_max = S[0]
     target_oi = params.oscillation_index
 
@@ -672,8 +679,60 @@ def _build_toeplitz_matrix_xp(
 
 # --- Strategy classes wrapping existing functions ---
 
+from osipy.common.exceptions import DataValidationError
 from osipy.dsc.deconvolution.base import BaseDeconvolver
 from osipy.dsc.deconvolution.registry import register_deconvolver
+
+#: Tunable knobs accepted by ``deconvolve()`` for each method.
+_ALLOWED_KWARGS: dict[str, set[str]] = {
+    "sSVD": {"threshold"},
+    "cSVD": {"threshold"},
+    "oSVD": {"oscillation_index", "default_threshold", "threshold"},
+}
+
+
+def _resolve_params(method: str, kwargs: dict[str, Any]) -> SVDDeconvolutionParams:
+    """Build :class:`SVDDeconvolutionParams` from ``deconvolve()`` keywords.
+
+    Accepts the method's knobs directly (``threshold=``, and for oSVD
+    ``oscillation_index=`` / ``default_threshold=``), or a ``params=`` object:
+    either an :class:`SVDDeconvolutionParams` or any config exposing the same
+    field names (e.g. ``SSVDConfig`` / ``OSVDConfig``).
+
+    Unknown keywords raise instead of being silently ignored, so a typo or a
+    knob that does not apply to the chosen method is reported rather than
+    quietly leaving the defaults in place.
+    """
+    kwargs = dict(kwargs)
+    params = kwargs.pop("params", None)
+
+    if isinstance(params, SVDDeconvolutionParams):
+        return params
+
+    if params is not None:
+        # Duck-type a config object: lift any recognised fields it carries,
+        # letting explicit keywords win over the config's values.
+        lifted = {
+            field: getattr(params, field)
+            for field in ("threshold", "oscillation_index", "default_threshold")
+            if hasattr(params, field)
+        }
+        kwargs = {**lifted, **kwargs}
+
+    allowed = _ALLOWED_KWARGS[method]
+    unknown = sorted(set(kwargs) - allowed)
+    if unknown:
+        msg = (
+            f"{method} deconvolve() got unexpected keyword argument(s): "
+            f"{', '.join(unknown)}. Accepted: {', '.join(sorted(allowed))}, params."
+        )
+        raise DataValidationError(msg)
+
+    # oSVD names its fallback truncation level 'default_threshold'.
+    if "default_threshold" in kwargs:
+        kwargs["threshold"] = kwargs.pop("default_threshold")
+
+    return SVDDeconvolutionParams(method=method, **kwargs)
 
 
 @register_deconvolver("sSVD")
@@ -696,7 +755,7 @@ class StandardSVDDeconvolver(BaseDeconvolver):
 
     def deconvolve(self, concentration, aif, time, mask=None, **kwargs):
         """Perform sSVD deconvolution to recover the residue function."""
-        params = kwargs.get("params") or SVDDeconvolutionParams(method="sSVD")
+        params = _resolve_params("sSVD", kwargs)
         return _deconvolve_sSVD(concentration, aif, time, mask, params)
 
 
@@ -720,7 +779,7 @@ class CircularSVDDeconvolver(BaseDeconvolver):
 
     def deconvolve(self, concentration, aif, time, mask=None, **kwargs):
         """Perform cSVD deconvolution to recover the residue function."""
-        params = kwargs.get("params") or SVDDeconvolutionParams(method="cSVD")
+        params = _resolve_params("cSVD", kwargs)
         return deconvolve_cSVD(concentration, aif, time, mask, params)
 
 
@@ -745,5 +804,5 @@ class OscillationSVDDeconvolver(BaseDeconvolver):
 
     def deconvolve(self, concentration, aif, time, mask=None, **kwargs):
         """Perform oSVD deconvolution to recover the residue function."""
-        params = kwargs.get("params") or SVDDeconvolutionParams(method="oSVD")
+        params = _resolve_params("oSVD", kwargs)
         return deconvolve_oSVD(concentration, aif, time, mask, params)
