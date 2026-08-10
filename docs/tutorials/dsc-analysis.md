@@ -239,6 +239,37 @@ The AIF is critical for accurate perfusion quantification:
 | cSVD | Circular SVD | Delay-insensitive | May underestimate |
 | oSVD | Oscillation-index SVD | Robust, accurate | More complex |
 
+### Tuning the regularization
+
+The defaults suit high-CNR data. Optimal values are acquisition-dependent
+(Wu et al. 2003 calibrate them per SNR and TR), so noisier or shorter series
+may need adjusting.
+
+!!! example "Set the truncation threshold or oscillation index"
+
+    ```python
+    from osipy.dsc.deconvolution.config import OSVDConfig, SSVDConfig
+
+    # sSVD / cSVD take a fixed truncation threshold (fraction of max
+    # singular value); higher means more smoothing.
+    osipy.get_deconvolver("sSVD").deconvolve(
+        concentration=delta_r2, aif=aif_curve, time=time, mask=brain_mask,
+        threshold=0.1,
+    )
+
+    # oSVD picks a threshold per voxel, so steer it with the target
+    # oscillation index instead. `default_threshold` is only the fallback
+    # used when no candidate meets the target.
+    osipy.get_deconvolver("oSVD").deconvolve(
+        concentration=delta_r2, aif=aif_curve, time=time, mask=brain_mask,
+        params=OSVDConfig(oscillation_index=0.05),
+    )
+    ```
+
+    `result.threshold_used` reports the threshold actually applied, for oSVD
+    it is the mean over voxels. Unknown or inapplicable keywords raise a
+    `DataValidationError` rather than being silently ignored.
+
 ## Step 7: Calculate CBV
 
 !!! example "Calculate CBV from the concentration integral"
