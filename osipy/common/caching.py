@@ -7,8 +7,13 @@ results like T1 maps and concentration curves.
 
 from __future__ import annotations
 
+import contextlib
+import getpass
 import hashlib
 import json
+import os
+import re
+import sys
 import tempfile
 import time
 import warnings
@@ -130,11 +135,58 @@ class IntermediateCache:
 
         # Set up cache directory for persistent storage
         if self.config.cache_dir is None:
-            self._cache_dir = Path(tempfile.gettempdir()) / "osipy_cache"
+            self._cache_dir = self._default_cache_dir()
         else:
             self._cache_dir = Path(self.config.cache_dir)
 
+        self._prepare_cache_dir()
+
+    @staticmethod
+    def _default_cache_dir() -> Path:
+        """Build a cache directory scoped to the current user.
+
+        Using a fixed, shared directory name (e.g. ``<tmp>/osipy_cache``)
+        would let any other local user read or pre-plant files there.
+        Scoping by username keeps the default cache private on
+        multi-user systems (HPC clusters, CI runners, shared containers).
+        """
+        try:
+            user = getpass.getuser()
+        except OSError:
+            user = "default"
+        safe_user = re.sub(r"[^A-Za-z0-9_.-]", "_", user)
+        return Path(tempfile.gettempdir()) / f"osipy_cache_{safe_user}"
+
+    def _prepare_cache_dir(self) -> None:
+        """Create the cache directory and ensure it is private to this user.
+
+        On POSIX systems this refuses to use a cache directory that is a
+        symlink or that another user owns, and restricts permissions to
+        the owner only. This closes the local cache-poisoning path where
+        another user on a shared machine pre-creates or hijacks the cache
+        directory to plant files.
+        """
         self._cache_dir.mkdir(parents=True, exist_ok=True)
+
+        if sys.platform == "win32":
+            return
+
+        if self._cache_dir.is_symlink():
+            raise RuntimeError(
+                f"Cache directory {self._cache_dir} is a symlink; refusing "
+                "to use it. Configure `cache_dir` to a private, non-symlink "
+                "location."
+            )
+
+        owner_uid = self._cache_dir.stat().st_uid
+        if owner_uid != os.getuid():
+            raise RuntimeError(
+                f"Cache directory {self._cache_dir} is owned by another "
+                "user; refusing to use it. Configure `cache_dir` to a "
+                "private location."
+            )
+
+        self._cache_dir.chmod(0o700)
 
     def get_policy(self, result_type: str) -> RetentionPolicy:
         """Get retention policy for a result type.
@@ -348,37 +400,45 @@ class IntermediateCache:
         self._total_memory_bytes -= entry.size_bytes
 
     def _put_disk(self, entry: CacheEntry) -> None:
-        """Store entry on disk."""
+        """Store entry on disk.
+
+        Writes to a temporary file in the cache directory first, then
+        atomically renames it into place, so a reader never observes a
+        partially written file and a concurrent writer can't corrupt an
+        in-progress read.
+        """
         cache_file = self._get_cache_path(entry.key)
+        fd, tmp_name = tempfile.mkstemp(
+            dir=self._cache_dir, prefix=cache_file.stem, suffix=".tmp"
+        )
 
         try:
-            if isinstance(entry.data, np.ndarray):
-                if self.config.compression:
-                    np.savez_compressed(
-                        cache_file,
+            with os.fdopen(fd, "wb") as tmp_file:
+                if isinstance(entry.data, np.ndarray):
+                    save = np.savez_compressed if self.config.compression else np.savez
+                    save(
+                        tmp_file,
                         data=entry.data,
+                        metadata=json.dumps(entry.metadata),
+                        result_type=entry.result_type,
+                        created_at=entry.created_at,
+                    )
+                elif isinstance(entry.data, dict):
+                    np.savez_compressed(
+                        tmp_file,
+                        **{f"data_{k}": v for k, v in entry.data.items()},
                         metadata=json.dumps(entry.metadata),
                         result_type=entry.result_type,
                         created_at=entry.created_at,
                     )
                 else:
-                    np.savez(
-                        cache_file,
-                        data=entry.data,
-                        metadata=json.dumps(entry.metadata),
-                        result_type=entry.result_type,
-                        created_at=entry.created_at,
-                    )
-            elif isinstance(entry.data, dict):
-                np.savez_compressed(
-                    cache_file,
-                    **{f"data_{k}": v for k, v in entry.data.items()},
-                    metadata=json.dumps(entry.metadata),
-                    result_type=entry.result_type,
-                    created_at=entry.created_at,
-                )
+                    return
+            Path(tmp_name).replace(cache_file)
         except Exception as e:
             warnings.warn(f"Failed to save cache to disk: {e}", stacklevel=2)
+        finally:
+            with contextlib.suppress(FileNotFoundError):
+                Path(tmp_name).unlink()
 
     def _get_disk(self, key: str) -> NDArray[Any] | dict[str, Any] | None:
         """Retrieve entry from disk."""
@@ -388,7 +448,11 @@ class IntermediateCache:
             return None
 
         try:
-            loaded = np.load(cache_file, allow_pickle=True)
+            # allow_pickle=False is intentional: cache entries only ever
+            # contain numeric arrays and JSON-encoded strings, so pickle
+            # support is never needed and would let a file planted by
+            # another user execute arbitrary code on load.
+            loaded = np.load(cache_file, allow_pickle=False)
 
             # Check age
             created_at = float(loaded.get("created_at", 0))

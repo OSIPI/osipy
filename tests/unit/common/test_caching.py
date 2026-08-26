@@ -5,7 +5,11 @@ Tests for osipy/common/caching.py.
 
 from __future__ import annotations
 
+import hashlib
+import os
+import sys
 import tempfile
+import time
 from pathlib import Path
 
 import numpy as np
@@ -17,6 +21,12 @@ from osipy.common.caching import (
     RetentionPolicy,
     configure_cache,
     get_cache,
+)
+
+# Cache-directory hardening only applies on POSIX; on Windows there is no
+# os.getuid()/chmod() and the check is skipped in IntermediateCache itself.
+posix_only = pytest.mark.skipif(
+    sys.platform == "win32", reason="POSIX-only cache directory hardening"
 )
 
 
@@ -216,6 +226,113 @@ class TestGlobalCache:
         stats = cache.get_stats()
 
         assert stats["max_memory_mb"] == 512
+
+
+_poison_executed = False
+
+
+def _poison_payload() -> None:
+    """Stand-in for arbitrary code a malicious cache file could run."""
+    global _poison_executed
+    _poison_executed = True
+
+
+class _EvilReduce:
+    """Object whose pickle reconstruction runs `_poison_payload`."""
+
+    def __reduce__(self) -> tuple:
+        return (_poison_payload, ())
+
+
+class TestCachePoisoningRegression:
+    """Regression tests for GH-171: cache poisoning via pickle deserialization.
+
+    A malicious ``.npz`` file placed at a cache path (e.g. by another user
+    on a shared machine, since the filename is a predictable hash of the
+    cache key) must not be able to execute code when loaded, and the
+    default cache directory must not be a single shared location that
+    every local user can write into.
+    """
+
+    def test_planted_pickle_payload_is_not_executed(self) -> None:
+        """A pre-planted malicious npz at the predictable cache path must
+        not execute code when read back via get()."""
+        global _poison_executed
+        _poison_executed = False
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = CacheConfig(
+                cache_dir=Path(tmpdir),
+                policies={"t1_map": RetentionPolicy.PERSISTENT},
+            )
+            cache = IntermediateCache(config)
+
+            # Plant a file at the exact path osipy would use for this key,
+            # containing an object whose __reduce__ runs arbitrary code.
+            full_key = "t1_map:subject01"
+            key_hash = hashlib.md5(full_key.encode()).hexdigest()
+            poisoned_path = Path(tmpdir) / f"{key_hash}.npz"
+
+            np.savez(
+                poisoned_path,
+                data=np.array(_EvilReduce(), dtype=object),
+                created_at=np.array(time.time()),
+            )
+
+            result = cache.get("t1_map", "subject01")
+
+            assert _poison_executed is False
+            assert result is None
+
+    def test_default_cache_dir_is_scoped_per_user(self) -> None:
+        """The default cache directory must not be a single name shared by
+        every local user (the predictable, world-writable path in GH-171)."""
+        cache_dir = IntermediateCache._default_cache_dir()
+
+        assert cache_dir.name != "osipy_cache"
+        assert cache_dir.name.startswith("osipy_cache_")
+
+    @posix_only
+    def test_default_cache_dir_is_restricted_to_owner(self) -> None:
+        """The cache directory should not be readable/writable by other
+        local users."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = CacheConfig(cache_dir=Path(tmpdir) / "osipy_cache")
+            cache = IntermediateCache(config)
+
+            mode = cache._cache_dir.stat().st_mode & 0o777
+            assert mode == 0o700
+
+    @posix_only
+    def test_symlinked_cache_dir_is_rejected(self) -> None:
+        """A cache_dir that is a symlink (e.g. planted by another user to
+        redirect osipy's writes elsewhere) must be refused."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            real_target = Path(tmpdir) / "real_target"
+            real_target.mkdir()
+            symlink_path = Path(tmpdir) / "osipy_cache_link"
+            symlink_path.symlink_to(real_target, target_is_directory=True)
+
+            config = CacheConfig(cache_dir=symlink_path)
+            with pytest.raises(RuntimeError, match="symlink"):
+                IntermediateCache(config)
+
+    @posix_only
+    def test_cache_dir_owned_by_another_user_is_rejected(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A pre-existing cache directory owned by a different user must be
+        refused, even if permissions happen to look fine."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_dir = Path(tmpdir) / "osipy_cache"
+            cache_dir.mkdir()
+            real_uid = cache_dir.stat().st_uid
+
+            monkeypatch.setattr(os, "getuid", lambda: real_uid + 1)
+
+            config = CacheConfig(cache_dir=cache_dir)
+            with pytest.raises(RuntimeError, match="owned by another user"):
+                IntermediateCache(config)
 
 
 class TestCacheWithPolicies:
