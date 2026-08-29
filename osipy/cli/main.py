@@ -30,10 +30,20 @@ VALID_MODALITIES = ("dce", "dsc", "asl", "ivim")
 
 
 def _get_version() -> str:
-    """Read version without importing the full osipy package."""
-    from importlib.metadata import version
+    """Read version without importing the full osipy package.
 
-    return version("osipy")
+    Falls back to a placeholder instead of raising when osipy isn't
+    installed with discoverable package metadata (e.g. a source checkout
+    run without ``pip install -e .``). This is called eagerly while
+    building the parser, so a raise here would take down the entire CLI,
+    not just ``--version``.
+    """
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("osipy")
+    except PackageNotFoundError:
+        return "(version unknown)"
 
 
 def create_parser() -> argparse.ArgumentParser:
