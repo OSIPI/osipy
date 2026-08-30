@@ -31,9 +31,9 @@ VALID_MODALITIES = ("dce", "dsc", "asl", "ivim")
 
 def _get_version() -> str:
     """Read version without importing the full osipy package."""
-    from importlib.metadata import version
+    from osipy._version import __version__
 
-    return version("osipy")
+    return __version__
 
 
 def create_parser() -> argparse.ArgumentParser:

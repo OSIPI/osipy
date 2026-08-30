@@ -26,7 +26,7 @@ from osipy.cli.config import (
     dump_defaults,
     load_config,
 )
-from osipy.cli.main import create_parser
+from osipy.cli.main import _get_version, create_parser
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -1114,3 +1114,26 @@ class TestCLIParser:
 
         args_short = parser.parse_args(["-o", "/out", "config.yaml", "/data"])
         assert args_short.output == "/out"
+
+
+# ---------------------------------------------------------------------------
+# TestVersionLookup — GH-173
+# ---------------------------------------------------------------------------
+
+
+class TestVersionLookup:
+    """create_parser() must never crash reading the version, since it runs
+    on every CLI invocation, not just `--version`."""
+
+    def test_get_version_matches_version_module(self) -> None:
+        """_get_version() reads straight from osipy._version."""
+        from osipy._version import __version__
+
+        assert _get_version() == __version__
+
+    def test_version_flag_exits_cleanly(self) -> None:
+        """--version exits 0 without raising."""
+        parser = create_parser()
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(["--version"])
+        assert exc_info.value.code == 0
