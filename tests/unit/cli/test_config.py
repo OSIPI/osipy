@@ -1117,49 +1117,22 @@ class TestCLIParser:
 
 
 # ---------------------------------------------------------------------------
-# TestVersionLookupRegression — GH-173
+# TestVersionLookup — GH-173
 # ---------------------------------------------------------------------------
 
 
-class TestVersionLookupRegression:
-    """create_parser() must never crash when osipy's package metadata isn't
-    discoverable (e.g. a source checkout without `pip install -e .`), since
-    it runs on every CLI invocation, not just `--version`."""
+class TestVersionLookup:
+    """create_parser() must never crash reading the version, since it runs
+    on every CLI invocation, not just `--version`."""
 
-    def test_get_version_falls_back_when_metadata_missing(self, monkeypatch) -> None:
-        """_get_version() returns a placeholder instead of raising."""
-        import importlib.metadata
+    def test_get_version_matches_version_module(self) -> None:
+        """_get_version() reads straight from osipy._version."""
+        from osipy._version import __version__
 
-        def _raise(_name: str) -> str:
-            raise importlib.metadata.PackageNotFoundError("osipy")
+        assert _get_version() == __version__
 
-        monkeypatch.setattr(importlib.metadata, "version", _raise)
-
-        assert _get_version() == "(version unknown)"
-
-    def test_create_parser_succeeds_when_metadata_missing(self, monkeypatch) -> None:
-        """create_parser() doesn't raise even if package metadata lookup fails."""
-        import importlib.metadata
-
-        def _raise(_name: str) -> str:
-            raise importlib.metadata.PackageNotFoundError("osipy")
-
-        monkeypatch.setattr(importlib.metadata, "version", _raise)
-
-        parser = create_parser()
-        assert parser is not None
-
-    def test_version_flag_exits_cleanly_when_metadata_missing(
-        self, monkeypatch
-    ) -> None:
-        """--version still exits 0 with a fallback string, not a traceback."""
-        import importlib.metadata
-
-        def _raise(_name: str) -> str:
-            raise importlib.metadata.PackageNotFoundError("osipy")
-
-        monkeypatch.setattr(importlib.metadata, "version", _raise)
-
+    def test_version_flag_exits_cleanly(self) -> None:
+        """--version exits 0 without raising."""
         parser = create_parser()
         with pytest.raises(SystemExit) as exc_info:
             parser.parse_args(["--version"])
