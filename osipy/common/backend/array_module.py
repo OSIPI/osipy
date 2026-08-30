@@ -31,6 +31,7 @@ References
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -201,6 +202,11 @@ def to_gpu(array: ArrayLike) -> Any:
     - If force_cpu is True, returns NumPy array
     - If CuPy is not available, returns NumPy array
     - If input is already on GPU, returns as-is (no copy)
+    - If the GPU transfer itself fails (e.g. out of memory), a
+      ``UserWarning`` is issued and a NumPy array is returned. Callers
+      that decide GPU-vs-CPU behavior (chunk sizing, threading) based on
+      whether GPU was requested must check the type of the *returned*
+      array rather than assuming the transfer succeeded.
 
     Example
     -------
@@ -231,6 +237,11 @@ def to_gpu(array: ArrayLike) -> Any:
     # Transfer to GPU
     try:
         return cp.asarray(array)
-    except Exception:
-        # Fallback to NumPy if GPU transfer fails
+    except Exception as e:
+        warnings.warn(
+            f"GPU transfer failed ({e}); falling back to CPU. "
+            "Fitting will run on CPU for this array even if GPU was requested.",
+            UserWarning,
+            stacklevel=2,
+        )
         return to_numpy(array)

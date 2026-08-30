@@ -120,6 +120,38 @@ class TestToGpu:
         result = to_gpu(data)
         np.testing.assert_array_almost_equal(to_numpy(result), data)
 
+    def test_transfer_failure_warns_and_falls_back(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """GH-175: a failed GPU transfer must warn (not be swallowed
+        silently) and still return a usable NumPy array."""
+        import osipy.common.backend.array_module as array_module
+
+        fake_cp = type(
+            "FakeCupy",
+            (),
+            {
+                "asarray": staticmethod(
+                    lambda arr: (_ for _ in ()).throw(
+                        RuntimeError("CUDA out of memory")
+                    )
+                ),
+                "ndarray": np.ndarray,
+            },
+        )()
+        monkeypatch.setattr(array_module, "_get_cupy", lambda: fake_cp)
+
+        original_config = get_backend()
+        try:
+            set_backend(GPUConfig(force_cpu=False))
+            data = np.array([1.0, 2.0, 3.0])
+            with pytest.warns(UserWarning, match="GPU transfer failed"):
+                result = to_gpu(data)
+            assert isinstance(result, np.ndarray)
+            np.testing.assert_array_equal(result, data)
+        finally:
+            set_backend(original_config)
+
 
 class TestGpuIntegration:
     """Integration tests that run if CuPy is available."""
