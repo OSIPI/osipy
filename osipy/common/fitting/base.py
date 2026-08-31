@@ -148,15 +148,11 @@ class BaseFitter(ABC):
         # Extract masked voxel data: (nt, n_voxels)
         observed_masked = data[mask].T
 
-        # Transfer to GPU once (not per-chunk). to_gpu() falls back to
-        # NumPy (with a warning) if the transfer fails, so use_gpu is
-        # re-derived from the actual returned array rather than trusted
-        # from the pre-transfer decision above — otherwise chunk sizing
-        # and the CPU threading fallback below would silently assume GPU
-        # execution while actually running (slower) single-threaded CPU.
+        # Transfer to GPU once (not per-chunk). to_gpu() raises instead of
+        # silently falling back to NumPy on transfer failure, so use_gpu
+        # stays accurate for the chunk sizing and threading decisions below.
         if use_gpu:
             observed_masked = to_gpu(observed_masked)
-            use_gpu = hasattr(observed_masked, "__cuda_array_interface__")
 
         xp = get_array_module(observed_masked)
 
