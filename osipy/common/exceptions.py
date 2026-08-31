@@ -89,6 +89,26 @@ class AIFError(OsipyError):
     pass
 
 
+class GPUTransferError(OsipyError):
+    """Raised when transferring an array to GPU fails.
+
+    Raised by ``to_gpu()`` when a GPU is available, ``force_cpu`` is not
+    set, and the transfer itself fails for any reason (e.g. out of
+    memory). Callers that want a graceful CPU fallback instead of
+    surfacing this error (e.g. batch processing retrying on CPU after a
+    GPU out-of-memory error) must catch it explicitly.
+
+    Examples
+    --------
+    >>> raise GPUTransferError("GPU transfer failed (CUDA out of memory)")
+    Traceback (most recent call last):
+        ...
+    osipy.common.exceptions.GPUTransferError: GPU transfer failed (CUDA out of memory)
+    """
+
+    pass
+
+
 class IOError(OsipyError):
     """Raised when file I/O operations fail.
 

@@ -148,7 +148,9 @@ class BaseFitter(ABC):
         # Extract masked voxel data: (nt, n_voxels)
         observed_masked = data[mask].T
 
-        # Transfer to GPU once (not per-chunk)
+        # Transfer to GPU once (not per-chunk). to_gpu() raises instead of
+        # silently falling back to NumPy on transfer failure, so use_gpu
+        # stays accurate for the chunk sizing and threading decisions below.
         if use_gpu:
             observed_masked = to_gpu(observed_masked)
 

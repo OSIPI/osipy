@@ -31,9 +31,12 @@ References
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+from osipy.common.exceptions import GPUTransferError
 
 # NumPy 2.0 renamed trapz -> trapezoid. Ensure compatibility with NumPy <2.0.
 if not hasattr(np, "trapezoid"):
@@ -41,6 +44,8 @@ if not hasattr(np, "trapezoid"):
 
 if TYPE_CHECKING:
     from numpy.typing import ArrayLike, NDArray
+
+logger = logging.getLogger(__name__)
 
 # Cache the CuPy module to avoid repeated imports
 _cupy_module: Any = None
@@ -201,6 +206,21 @@ def to_gpu(array: ArrayLike) -> Any:
     - If force_cpu is True, returns NumPy array
     - If CuPy is not available, returns NumPy array
     - If input is already on GPU, returns as-is (no copy)
+    - If a GPU is available, ``force_cpu`` is not set, and the transfer
+      itself fails (e.g. out of memory), the error is logged and
+      re-raised as a ``GPUTransferError`` rather than silently falling
+      back to CPU. A silent fallback here would let callers that decide
+      GPU-vs-CPU behavior (chunk sizing, threading) keep assuming GPU
+      execution when it never happened. Callers that want a graceful
+      CPU fallback on transfer failure (e.g. batch processing that
+      retries a batch on CPU after a GPU out-of-memory error) must catch
+      this exception themselves.
+
+    Raises
+    ------
+    GPUTransferError
+        If a GPU is available, ``force_cpu`` is not set, and the
+        transfer to GPU fails for any reason.
 
     Example
     -------
@@ -231,6 +251,11 @@ def to_gpu(array: ArrayLike) -> Any:
     # Transfer to GPU
     try:
         return cp.asarray(array)
-    except Exception:
-        # Fallback to NumPy if GPU transfer fails
-        return to_numpy(array)
+    except Exception as e:
+        msg = (
+            f"GPU transfer failed ({e}). GPU was requested and detected, "
+            "so refusing to silently fall back to CPU; pass force_cpu=True "
+            "to run on CPU instead."
+        )
+        logger.error(msg)
+        raise GPUTransferError(msg) from e
