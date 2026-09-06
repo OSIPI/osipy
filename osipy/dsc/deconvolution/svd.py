@@ -52,6 +52,13 @@ class SVDDeconvolutionParams:
         Default 0.2 for standard SVD.
     oscillation_index : float
         Target oscillation index for oSVD. Default 0.035.
+
+        Optimal values are acquisition-dependent -- Wu et al. (2003) calibrate
+        them per SNR/TR (at TR=1.5s they report 0.085 at SNR=100 and 0.095 at
+        SNR=20, with P_SVD of 3-10%). A strict target on a short acquisition
+        forces heavy truncation, flattening the residue peak and
+        underestimating CBF; loosening it toward those values helps there.
+        The defaults here suit the high-CNR reference data used in testing.
     block_circulant : bool
         Use block-circulant matrix (for cSVD/oSVD). Default True for
         cSVD/oSVD methods.
@@ -161,11 +168,20 @@ def deconvolve_oSVD(
             threshold_used=params.threshold,
         )
 
-    # Precompute U^T @ C for all masked voxels: (n_t, n_t) @ (n_t, n_masked) -> (n_t, n_masked)
-    UtC = U.T @ masked_conc.T  # (n_timepoints, n_masked)
+    # Zero-pad concentration to the circulant length 2n (block-circulant),
+    # then precompute U^T @ C_padded for all masked voxels.
+    n_pts = masked_conc.shape[1]
+    L = U.shape[0]  # 2n
+    padded_conc = xp.zeros((masked_conc.shape[0], L), dtype=concentration.dtype)
+    padded_conc[:, :n_pts] = masked_conc
+    UtC = U.T @ padded_conc.T  # (2n, n_masked)
 
-    # Search for optimal threshold per voxel across candidate thresholds
-    thresholds = xp.linspace(0.01, 0.5, 20)
+    # Search ascending and take the FIRST threshold meeting the target (Wu et
+    # al. 2003: "P_SVD can be varied until ... OI falls below a user-specified
+    # value"). Span 0-95% is the paper's sSVD/cSVD calibration range; it does
+    # not state oSVD's internal range, but a 0.5 ceiling leaves the target
+    # unreachable on short acquisitions, collapsing oSVD onto cSVD.
+    thresholds = xp.linspace(0.01, 0.95, 40)
     s_max = S[0]
     target_oi = params.oscillation_index
 
@@ -174,23 +190,23 @@ def deconvolve_oSVD(
         params.threshold,
         dtype=concentration.dtype,
     )
-    best_oi = xp.full(masked_conc.shape[0], xp.inf, dtype=concentration.dtype)
+    found = xp.zeros(masked_conc.shape[0], dtype=bool)
 
     for k in range(len(thresholds)):
         thresh_val = thresholds[k]
         # Build truncated S_inv for this threshold
         s_thresh = thresh_val * s_max
         S_inv = xp.where(s_thresh < S, 1.0 / S, 0.0)
-        # Solve for all voxels: r = Vh^T @ diag(S_inv) @ U^T @ c
-        r_all = (Vh.T @ (S_inv[:, None] * UtC)).T  # (n_masked, n_timepoints)
+        # Solve for all voxels: r = Vh^T @ diag(S_inv) @ U^T @ c  (first n points)
+        r_all = (Vh.T @ (S_inv[:, None] * UtC)).T[:, :n_pts]  # (n_masked, n_timepoints)
 
-        # Vectorized oscillation index
+        # Vectorized oscillation index on the physical residue
         oi = _compute_oscillation_index_batch(r_all, xp)
 
-        # Update best threshold where this one is better
-        improved = (oi < target_oi) & (oi < best_oi)
-        best_oi = xp.where(improved, oi, best_oi)
-        best_threshold = xp.where(improved, thresh_val, best_threshold)
+        # Accept the first threshold (per voxel) that meets the target
+        meets_target = (oi < target_oi) & (~found)
+        best_threshold = xp.where(meets_target, thresh_val, best_threshold)
+        found = found | meets_target
 
     # Apply final per-voxel thresholds -- group by unique threshold for efficiency
     unique_thresholds = xp.unique(best_threshold)
@@ -202,7 +218,7 @@ def deconvolve_oSVD(
         s_thresh = thresh_float * float(to_numpy(s_max))
         S_inv = xp.where(s_thresh < S, 1.0 / S, 0.0)
         r_batch = (Vh.T @ (S_inv[:, None] * UtC[:, voxel_sel])).T
-        masked_residue[voxel_sel] = r_batch
+        masked_residue[voxel_sel] = r_batch[:, :n_pts]
 
     # Ensure non-negative
     masked_residue = xp.maximum(masked_residue, 0.0)
@@ -285,12 +301,12 @@ def deconvolve_cSVD(
 
     mask = xp.ones(spatial_shape, dtype=bool) if mask is None else xp.asarray(mask)
 
-    # Build block-circulant AIF matrix and compute SVD once
+    # Build full 2n x 2n block-circulant AIF matrix and compute SVD once
     A = _build_circulant_matrix_xp(aif, n_timepoints, xp) * dt
     U, S, Vh = xp.linalg.svd(A, full_matrices=False)
 
-    # Vectorized solve for all masked voxels
-    residue, cbf, mtt, delay = _vectorized_svd_solve(
+    # Vectorized block-circulant solve (pads concentration to 2n, truncates R)
+    residue, cbf, mtt, delay = _vectorized_circulant_solve(
         concentration,
         mask,
         U,
@@ -484,6 +500,86 @@ def _vectorized_svd_solve(
     )
 
 
+def _vectorized_circulant_solve(
+    concentration: "NDArray[np.floating[Any]]",
+    mask: "NDArray[np.bool_]",
+    U: "NDArray[np.floating[Any]]",
+    S: "NDArray[np.floating[Any]]",
+    Vh: "NDArray[np.floating[Any]]",
+    threshold: float,
+    dt: float,
+    xp: Any,
+) -> tuple[
+    "NDArray[np.floating[Any]]",
+    "NDArray[np.floating[Any]]",
+    "NDArray[np.floating[Any]]",
+    "NDArray[np.floating[Any]]",
+]:
+    """Block-circulant SVD deconvolution for all masked voxels.
+
+    The circulant matrix is ``2n x 2n``, so each concentration curve is
+    zero-padded to length ``2n`` before deconvolution and the residue is
+    truncated to the first ``n`` points. The zero-padding plus the matrix
+    wraparound make this insensitive to bolus arrival delay (Wu et al. 2003).
+    """
+    spatial_shape = concentration.shape[:-1]
+    n = concentration.shape[-1]
+    L = U.shape[0]  # 2n
+
+    flat_conc = concentration.reshape(-1, n)
+    flat_mask = mask.ravel()
+    masked_conc = flat_conc[flat_mask]  # (n_masked, n)
+
+    if masked_conc.shape[0] == 0:
+        return (
+            xp.zeros_like(flat_conc).reshape(concentration.shape),
+            xp.zeros(spatial_shape, dtype=concentration.dtype),
+            xp.zeros(spatial_shape, dtype=concentration.dtype),
+            xp.zeros(spatial_shape, dtype=concentration.dtype),
+        )
+
+    # Zero-pad the concentration curves to the circulant length 2n
+    padded = xp.zeros((masked_conc.shape[0], L), dtype=concentration.dtype)
+    padded[:, :n] = masked_conc
+
+    s_max = S[0]
+    s_thresh = threshold * s_max
+    S_inv = xp.where(s_thresh < S, 1.0 / S, 0.0)
+
+    UtC = U.T @ padded.T  # (2n, n_masked)
+    r_full = (Vh.T @ (S_inv[:, None] * UtC)).T  # (n_masked, 2n)
+
+    # Physical residue is the first n points; drop the wraparound tail
+    masked_residue = xp.maximum(r_full[:, :n], 0.0)
+
+    masked_cbf = xp.max(masked_residue, axis=1)
+    masked_mtt = xp.where(
+        masked_cbf > 0,
+        xp.sum(masked_residue, axis=1) * dt / masked_cbf,
+        0.0,
+    )
+    masked_delay = xp.argmax(masked_residue, axis=1).astype(concentration.dtype) * dt
+
+    residue = xp.zeros_like(flat_conc)
+    residue[flat_mask] = masked_residue
+
+    cbf_flat = xp.zeros(flat_conc.shape[0], dtype=concentration.dtype)
+    cbf_flat[flat_mask] = masked_cbf
+
+    mtt_flat = xp.zeros(flat_conc.shape[0], dtype=concentration.dtype)
+    mtt_flat[flat_mask] = masked_mtt
+
+    delay_flat = xp.zeros(flat_conc.shape[0], dtype=concentration.dtype)
+    delay_flat[flat_mask] = masked_delay
+
+    return (
+        residue.reshape(concentration.shape),
+        cbf_flat.reshape(spatial_shape),
+        mtt_flat.reshape(spatial_shape),
+        delay_flat.reshape(spatial_shape),
+    )
+
+
 def _compute_oscillation_index_batch(
     r: "NDArray[np.floating[Any]]",
     xp: Any,
@@ -537,19 +633,17 @@ def _build_circulant_matrix_xp(
     Returns
     -------
     NDArray
-        Block-circulant matrix.
+        Block-circulant matrix, shape ``(2n, 2n)``.
     """
-    # Pad AIF to double length for circulant
+    # Pad AIF to double length for the block-circulant matrix
     aif_padded = xp.zeros(2 * n, dtype=aif.dtype)
     aif_padded[:n] = aif
 
-    # Build circulant matrix using index arithmetic:
-    # A[i,j] = aif_padded[(i-j) mod 2n]
+    # Build the full 2n x 2n circulant matrix: A[i,j] = aif_padded[(i-j) mod 2n].
+    # The wraparound terms (upper-right block) are what make deconvolution
+    # insensitive to bolus arrival delay.
     idx = (xp.arange(2 * n)[:, None] - xp.arange(2 * n)[None, :]) % (2 * n)
-    A = aif_padded[idx]
-
-    # Return upper-left n x n block
-    return A[:n, :n]
+    return aif_padded[idx]
 
 
 def _build_toeplitz_matrix_xp(
@@ -585,8 +679,60 @@ def _build_toeplitz_matrix_xp(
 
 # --- Strategy classes wrapping existing functions ---
 
+from osipy.common.exceptions import DataValidationError
 from osipy.dsc.deconvolution.base import BaseDeconvolver
 from osipy.dsc.deconvolution.registry import register_deconvolver
+
+#: Tunable knobs accepted by ``deconvolve()`` for each method.
+_ALLOWED_KWARGS: dict[str, set[str]] = {
+    "sSVD": {"threshold"},
+    "cSVD": {"threshold"},
+    "oSVD": {"oscillation_index", "default_threshold", "threshold"},
+}
+
+
+def _resolve_params(method: str, kwargs: dict[str, Any]) -> SVDDeconvolutionParams:
+    """Build :class:`SVDDeconvolutionParams` from ``deconvolve()`` keywords.
+
+    Accepts the method's knobs directly (``threshold=``, and for oSVD
+    ``oscillation_index=`` / ``default_threshold=``), or a ``params=`` object:
+    either an :class:`SVDDeconvolutionParams` or any config exposing the same
+    field names (e.g. ``SSVDConfig`` / ``OSVDConfig``).
+
+    Unknown keywords raise instead of being silently ignored, so a typo or a
+    knob that does not apply to the chosen method is reported rather than
+    quietly leaving the defaults in place.
+    """
+    kwargs = dict(kwargs)
+    params = kwargs.pop("params", None)
+
+    if isinstance(params, SVDDeconvolutionParams):
+        return params
+
+    if params is not None:
+        # Duck-type a config object: lift any recognised fields it carries,
+        # letting explicit keywords win over the config's values.
+        lifted = {
+            field: getattr(params, field)
+            for field in ("threshold", "oscillation_index", "default_threshold")
+            if hasattr(params, field)
+        }
+        kwargs = {**lifted, **kwargs}
+
+    allowed = _ALLOWED_KWARGS[method]
+    unknown = sorted(set(kwargs) - allowed)
+    if unknown:
+        msg = (
+            f"{method} deconvolve() got unexpected keyword argument(s): "
+            f"{', '.join(unknown)}. Accepted: {', '.join(sorted(allowed))}, params."
+        )
+        raise DataValidationError(msg)
+
+    # oSVD names its fallback truncation level 'default_threshold'.
+    if "default_threshold" in kwargs:
+        kwargs["threshold"] = kwargs.pop("default_threshold")
+
+    return SVDDeconvolutionParams(method=method, **kwargs)
 
 
 @register_deconvolver("sSVD")
@@ -609,7 +755,7 @@ class StandardSVDDeconvolver(BaseDeconvolver):
 
     def deconvolve(self, concentration, aif, time, mask=None, **kwargs):
         """Perform sSVD deconvolution to recover the residue function."""
-        params = kwargs.get("params") or SVDDeconvolutionParams(method="sSVD")
+        params = _resolve_params("sSVD", kwargs)
         return _deconvolve_sSVD(concentration, aif, time, mask, params)
 
 
@@ -633,7 +779,7 @@ class CircularSVDDeconvolver(BaseDeconvolver):
 
     def deconvolve(self, concentration, aif, time, mask=None, **kwargs):
         """Perform cSVD deconvolution to recover the residue function."""
-        params = kwargs.get("params") or SVDDeconvolutionParams(method="cSVD")
+        params = _resolve_params("cSVD", kwargs)
         return deconvolve_cSVD(concentration, aif, time, mask, params)
 
 
@@ -658,5 +804,5 @@ class OscillationSVDDeconvolver(BaseDeconvolver):
 
     def deconvolve(self, concentration, aif, time, mask=None, **kwargs):
         """Perform oSVD deconvolution to recover the residue function."""
-        params = kwargs.get("params") or SVDDeconvolutionParams(method="oSVD")
+        params = _resolve_params("oSVD", kwargs)
         return deconvolve_oSVD(concentration, aif, time, mask, params)
