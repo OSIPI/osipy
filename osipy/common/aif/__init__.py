@@ -17,6 +17,7 @@ from osipy.common.aif.detection_registry import (
     list_aif_detectors,
     register_aif_detector,
 )
+from osipy.common.aif.hematocrit import DEFAULT_HEMATOCRIT, correct_hematocrit
 from osipy.common.aif.population import (
     AIF_REGISTRY,
     FritzHansenAIF,
@@ -37,6 +38,7 @@ from osipy.common.aif.population import (
 
 __all__ = [
     "AIF_REGISTRY",
+    "DEFAULT_HEMATOCRIT",
     "AIFDetectionParams",
     "AIFDetectionResult",
     "ArterialInputFunction",
@@ -53,6 +55,7 @@ __all__ = [
     "PopulationAIFType",
     "WeinmannAIF",
     "WeinmannAIFParams",
+    "correct_hematocrit",
     "detect_aif",
     "get_aif_detector",
     "get_population_aif",
