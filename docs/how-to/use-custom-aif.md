@@ -181,7 +181,7 @@ Pass the AIF to fitting functions:
 
 ```python
 # DCE fitting with custom AIF
-result = osipy.fit_model(
+result = osipy.dce_fit_model(
     "extended_tofts",
     concentration=concentration,
     aif=aif,  # Your custom AIF
@@ -189,7 +189,7 @@ result = osipy.fit_model(
 )
 
 # DSC deconvolution with custom AIF
-perfusion_maps = osipy.compute_perfusion_maps(
+perfusion_maps = osipy.dsc_compute_perfusion_maps(
     concentration=delta_r2,
     aif=aif.concentration,  # Pass the concentration array
     time=time,
@@ -274,7 +274,7 @@ aif = osipy.ArterialInputFunction(
 Alternatively, use `fit_delay=True` in `fit_model()` to estimate the delay automatically per voxel:
 
 ```python
-result = osipy.fit_model(
+result = osipy.dce_fit_model(
     "extended_tofts", concentration, aif, time,
     fit_delay=True  # Estimates per-voxel arterial delay
 )

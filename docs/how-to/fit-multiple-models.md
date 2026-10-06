@@ -48,27 +48,27 @@ import numpy as np
 results = {}
 
 # Standard Tofts
-results['tofts'] = osipy.fit_model(
+results['tofts'] = osipy.dce_fit_model(
     "tofts", concentration, aif, time
 )
 
 # Extended Tofts
-results['extended'] = osipy.fit_model(
+results['extended'] = osipy.dce_fit_model(
     "extended_tofts", concentration, aif, time
 )
 
 # Patlak
-results['patlak'] = osipy.fit_model(
+results['patlak'] = osipy.dce_fit_model(
     "patlak", concentration, aif, time
 )
 
 # Two-compartment uptake model
-results['2cum'] = osipy.fit_model(
+results['2cum'] = osipy.dce_fit_model(
     "2cum", concentration, aif, time
 )
 
 # Two-compartment exchange model
-results['2cxm'] = osipy.fit_model(
+results['2cxm'] = osipy.dce_fit_model(
     "2cxm", concentration, aif, time
 )
 ```

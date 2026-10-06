@@ -25,7 +25,7 @@ import numpy as np
 import osipy
 
 # After fitting
-result = osipy.fit_model("extended_tofts", concentration, aif, time)
+result = osipy.dce_fit_model("extended_tofts", concentration, aif, time)
 
 # Check quality
 quality_mask = result.quality_mask
@@ -70,7 +70,7 @@ Apply a stricter mask to exclude low-SNR voxels:
 ```python
 # 1. Apply stricter mask
 high_snr_mask = snr > 10
-result = osipy.fit_model("extended_tofts", concentration, aif, time, mask=high_snr_mask)
+result = osipy.dce_fit_model("extended_tofts", concentration, aif, time, mask=high_snr_mask)
 
 # 2. Spatial smoothing (before fitting)
 # Note: osipy does not currently include a spatial smoothing function.
@@ -127,7 +127,7 @@ Option 1 -- automatic delay fitting (recommended):
 
 ```python
 # Let osipy estimate per-voxel arterial delay automatically
-result = osipy.fit_model(
+result = osipy.dce_fit_model(
     "extended_tofts", concentration, aif, time,
     fit_delay=True  # Adds a "delay" parameter to the fit
 )
@@ -147,7 +147,7 @@ import numpy as np
 # Shift AIF by a known delay
 shifted_conc = shift_aif(aif.concentration, time, delay=5.0, xp=np)
 aif_shifted = osipy.ArterialInputFunction(time=time, concentration=shifted_conc)
-result = osipy.fit_model("extended_tofts", concentration, aif_shifted, time)
+result = osipy.dce_fit_model("extended_tofts", concentration, aif_shifted, time)
 ```
 
 ### Inappropriate Model
@@ -158,8 +158,8 @@ Compare models to check whether the chosen model is appropriate:
 
 ```python
 # Compare models
-result_standard = osipy.fit_model("tofts", concentration, aif, time)
-result_extended = osipy.fit_model("extended_tofts", concentration, aif, time)
+result_standard = osipy.dce_fit_model("tofts", concentration, aif, time)
+result_extended = osipy.dce_fit_model("extended_tofts", concentration, aif, time)
 
 # Check R² improvement
 r2_diff = result_extended.r_squared_map - result_standard.r_squared_map
@@ -190,7 +190,7 @@ Adjust bounds if physiologically justified:
 
 ```python
 # Adjust bounds if physiologically justified
-result = osipy.fit_model(
+result = osipy.dce_fit_model(
     "extended_tofts", concentration, aif, time,
     bounds_override={
         'Ktrans': (0.0001, 2.0),  # Wider range
@@ -294,13 +294,13 @@ Start with a complex model and fall back to a simpler one for failed voxels:
 # Start with complex model, fall back to simpler
 def fit_with_fallback(concentration, aif, time, mask):
     # Try Extended Tofts first
-    result = osipy.fit_model("extended_tofts", concentration, aif, time, mask=mask)
+    result = osipy.dce_fit_model("extended_tofts", concentration, aif, time, mask=mask)
     # Find failed voxels
     failed = (result.quality_mask == 0) & mask
     if failed.sum() > 0:
         print(f"Retrying {failed.sum()} voxels with Standard Tofts")
         # Retry with simpler model
-        result_simple = osipy.fit_model("tofts", concentration, aif, time,
+        result_simple = osipy.dce_fit_model("tofts", concentration, aif, time,
                                         mask=failed)
         # Merge results
         # Note: Merging DCEFitResult objects requires manual attribute updates.
@@ -330,7 +330,7 @@ def fit_with_multiple_bounds(concentration, aif, time):
         {'Ktrans': (0.0001, 0.1), 've': (0.1, 0.8), 'vp': (0.001, 0.05)},
     ]
     for bounds in bounds_configs:
-        result = osipy.fit_model("extended_tofts", concentration, aif, time,
+        result = osipy.dce_fit_model("extended_tofts", concentration, aif, time,
                                 bounds_override=bounds)
         mean_r2 = result.r_squared_map[result.quality_mask > 0].mean()
         if mean_r2 > best_r2:

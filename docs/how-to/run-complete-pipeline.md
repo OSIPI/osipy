@@ -91,7 +91,7 @@ Pass a pre-computed T1 map via `t1_map=` instead of `t1_data=` to skip VFA fitti
 For data where the bolus arrives at different times across tissue, use `fit_delay=True` in direct `fit_model()` calls:
 
 ```python
-result = osipy.fit_model(
+result = osipy.dce_fit_model(
     "extended_tofts", concentration, aif, time,
     fit_delay=True  # Estimates per-voxel delay
 )

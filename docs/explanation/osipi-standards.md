@@ -35,7 +35,7 @@ CAPLEX (Contrast Agent based Perfusion Lexicon) standardizes parameter names:
 
     ```python
     # osipy uses CAPLEX names
-    result = osipy.fit_model("extended_tofts", ...)
+    result = osipy.dce_fit_model("extended_tofts", ...)
 
     # Standard names:
     ktrans = result.parameter_maps["Ktrans"]  # Not "Ktr", "k_trans", "ktrans"
@@ -100,7 +100,7 @@ osipy is validated against the [OSIPI DCE-MRI DRO](https://osf.io/u7a6f/):
     # dro_data.parameters contains ground truth: {"Ktrans": ..., "ve": ..., "vp": ...}
 
     # Fit with osipy (concentration, aif, time come from your imaging data)
-    result = osipy.fit_model("extended_tofts", concentration, aif, time)
+    result = osipy.dce_fit_model("extended_tofts", concentration, aif, time)
 
     # Compare computed maps to DRO ground truth
     validation = validate_against_dro(
@@ -141,7 +141,7 @@ osipy handles conversions automatically:
 
     ```python
     # User provides seconds
-    result = osipy.fit_model("extended_tofts", conc, aif, time_in_seconds)
+    result = osipy.dce_fit_model("extended_tofts", conc, aif, time_in_seconds)
 
     # Ktrans is returned in min⁻¹ (OSIPI standard)
     print(f"Ktrans: {result.parameter_maps['Ktrans'].values.mean():.4f} min⁻¹")

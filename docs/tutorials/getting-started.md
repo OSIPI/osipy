@@ -145,7 +145,7 @@ print(f"Created synthetic data with shape: {concentration.shape}")
 
 ```python
 # Fit Extended Tofts model
-result = osipy.fit_model(
+result = osipy.dce_fit_model(
     "extended_tofts",
     concentration=concentration,
     aif=aif,

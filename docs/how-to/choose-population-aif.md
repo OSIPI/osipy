@@ -188,7 +188,7 @@ aifs = {
 
 results = {}
 for name, aif in aifs.items():
-    result = osipy.fit_model(
+    result = osipy.dce_fit_model(
         "extended_tofts",
         concentration=concentration,
         aif=aif,
@@ -248,7 +248,7 @@ shifted_conc = shift_aif(aif.concentration, time, delay=10.0, xp=np)
 Alternatively, use `fit_delay=True` to estimate the delay automatically during model fitting:
 
 ```python
-result = osipy.fit_model(
+result = osipy.dce_fit_model(
     "extended_tofts", concentration, aif, time,
     fit_delay=True  # Estimates per-voxel delay
 )

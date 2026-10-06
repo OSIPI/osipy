@@ -272,7 +272,7 @@ The AIF is critical for accurate perfusion quantification:
 
     ```python
     # Use the unified perfusion maps function
-    perfusion_maps = osipy.compute_perfusion_maps(
+    perfusion_maps = osipy.dsc_compute_perfusion_maps(
         delta_r2=delta_r2,
         aif=aif_curve,
         time=time,
@@ -316,7 +316,7 @@ For tumors or lesions with BBB breakdown, apply leakage correction:
     )
 
     # Re-compute perfusion maps with corrected ΔR2*
-    corrected_maps = osipy.compute_perfusion_maps(
+    corrected_maps = osipy.dsc_compute_perfusion_maps(
         delta_r2=leakage_result.corrected_delta_r2,
         aif=aif_curve,
         time=time,
@@ -504,7 +504,7 @@ Save results in BIDS format:
     aif_curve = delta_r2[aif_mask].mean(axis=0)
 
     # 6. Compute perfusion maps
-    perfusion_maps = osipy.compute_perfusion_maps(delta_r2, aif_curve, time, brain_mask)
+    perfusion_maps = osipy.dsc_compute_perfusion_maps(delta_r2, aif_curve, time, brain_mask)
 
     # 7. Export (expects dict[str, ParameterMap])
     osipy.export_bids(

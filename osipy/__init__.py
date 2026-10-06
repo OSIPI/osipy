@@ -59,7 +59,8 @@ from typing import TYPE_CHECKING
 from osipy._version import __version__, __version_info__
 
 if TYPE_CHECKING:
-    from osipy.asl import LabelingScheme, apply_m0_calibration, quantify_cbf
+    from osipy.asl import LabelingScheme, apply_m0_calibration
+    from osipy.asl import quantify_cbf as asl_quantify_cbf
     from osipy.asl.quantification import MultiPLDParams, quantify_multi_pld
     from osipy.common.aif import (
         ArterialInputFunction,
@@ -95,15 +96,13 @@ if TYPE_CHECKING:
         ToftsModel,
         TwoCompartmentModel,
         compute_t1_map,
-        fit_model,
-        get_model,
-        list_models,
     )
-    from osipy.dce import (
-        signal_to_concentration as dce_signal_to_concentration,
-    )
+    from osipy.dce import fit_model as dce_fit_model
+    from osipy.dce import get_model as dce_get_model
+    from osipy.dce import list_models as dce_list_models
+    from osipy.dce import signal_to_concentration as dce_signal_to_concentration
+    from osipy.dsc import compute_perfusion_maps as dsc_compute_perfusion_maps
     from osipy.dsc import (
-        compute_perfusion_maps,
         correct_leakage,
         get_deconvolver,
         list_deconvolvers,
@@ -157,32 +156,32 @@ __all__ = [
     "__version__",
     "__version_info__",
     "apply_m0_calibration",
-    "compute_perfusion_maps",
+    # ASL
+    "asl_quantify_cbf",
     # DCE
     "compute_t1_map",
     "correct_leakage",
+    "dce_fit_model",
+    "dce_get_model",
+    "dce_list_models",
     "dce_signal_to_concentration",
     "detect_aif",
     # DICOM discovery + I/O
     "discover_dicom",
+    "dsc_compute_perfusion_maps",
     "export_bids",
     # IVIM
     "fit_ivim",
-    "fit_model",
     # GPU/CPU backend
     "get_array_module",
     "get_backend",
     "get_deconvolver",
-    "get_model",
     "get_population_aif",
     "is_gpu_available",
     "list_deconvolvers",
-    "list_models",
     "load_dicom_series",
     # I/O
     "load_nifti",
-    # ASL
-    "quantify_cbf",
     "quantify_multi_pld",
     "run_analysis",
     "set_backend",
@@ -198,7 +197,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "LabelingScheme": ("osipy.asl", "LabelingScheme"),
     "MultiPLDParams": ("osipy.asl.quantification", "MultiPLDParams"),
     "apply_m0_calibration": ("osipy.asl", "apply_m0_calibration"),
-    "quantify_cbf": ("osipy.asl", "quantify_cbf"),
+    "asl_quantify_cbf": ("osipy.asl", "quantify_cbf"),
     "quantify_multi_pld": ("osipy.asl.quantification", "quantify_multi_pld"),
     # AIF
     "ArterialInputFunction": ("osipy.common.aif", "ArterialInputFunction"),
@@ -237,12 +236,12 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "ToftsModel": ("osipy.dce", "ToftsModel"),
     "TwoCompartmentModel": ("osipy.dce", "TwoCompartmentModel"),
     "compute_t1_map": ("osipy.dce", "compute_t1_map"),
-    "fit_model": ("osipy.dce", "fit_model"),
-    "get_model": ("osipy.dce", "get_model"),
-    "list_models": ("osipy.dce", "list_models"),
+    "dce_fit_model": ("osipy.dce", "fit_model"),
+    "dce_get_model": ("osipy.dce", "get_model"),
+    "dce_list_models": ("osipy.dce", "list_models"),
     "dce_signal_to_concentration": ("osipy.dce", "signal_to_concentration"),
     # DSC
-    "compute_perfusion_maps": ("osipy.dsc", "compute_perfusion_maps"),
+    "dsc_compute_perfusion_maps": ("osipy.dsc", "compute_perfusion_maps"),
     "correct_leakage": ("osipy.dsc", "correct_leakage"),
     "get_deconvolver": ("osipy.dsc", "get_deconvolver"),
     "list_deconvolvers": ("osipy.dsc", "list_deconvolvers"),
@@ -260,9 +259,30 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "run_analysis": ("osipy.pipeline", "run_analysis"),
 }
 
+# Deprecated generic names -> modality-prefixed replacement (see issue #180).
+# These were modality-specific despite their generic names.
+_DEPRECATED_ALIASES: dict[str, str] = {
+    "compute_perfusion_maps": "dsc_compute_perfusion_maps",
+    "fit_model": "dce_fit_model",
+    "get_model": "dce_get_model",
+    "list_models": "dce_list_models",
+    "quantify_cbf": "asl_quantify_cbf",
+}
+
 
 def __getattr__(name: str) -> object:
     """Lazy import public API symbols on first access."""
+    if name in _DEPRECATED_ALIASES:
+        import warnings
+
+        new_name = _DEPRECATED_ALIASES[name]
+        warnings.warn(
+            f"osipy.{name} is deprecated and will be removed in a future "
+            f"release; use osipy.{new_name} instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return __getattr__(new_name)
     if name in _LAZY_IMPORTS:
         module_path, attr_name = _LAZY_IMPORTS[name]
         import importlib

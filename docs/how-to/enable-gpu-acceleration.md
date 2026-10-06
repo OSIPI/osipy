@@ -64,7 +64,7 @@ When GPU is available, osipy uses it automatically:
     aif = osipy.ParkerAIF()(time)
 
     # Fitting automatically uses GPU if available
-    result = osipy.fit_model("extended_tofts", concentration, aif, time)
+    result = osipy.dce_fit_model("extended_tofts", concentration, aif, time)
 
     # Result is returned as numpy (CPU) array
     print(f"Result type: {type(result.parameter_maps['Ktrans'].values)}")  # numpy.ndarray
@@ -85,7 +85,7 @@ For manual control, use CuPy arrays:
     time_gpu = cp.asarray(time)
 
     # Process on GPU
-    result = osipy.fit_model("extended_tofts", concentration_gpu, aif, time_gpu)
+    result = osipy.dce_fit_model("extended_tofts", concentration_gpu, aif, time_gpu)
 
     # Result stays on GPU (CuPy array)
     print(f"Result type: {type(result.parameter_maps['Ktrans'].values)}")  # cupy.ndarray
@@ -143,7 +143,7 @@ For datasets larger than GPU memory, process in chunks:
             chunk = data_2d[start:end]
 
             # Fit chunk (will use GPU)
-            chunk_result = osipy.fit_model(
+            chunk_result = osipy.dce_fit_model(
                 "extended_tofts",
                 chunk[..., np.newaxis, np.newaxis, :].transpose(1, 2, 0, 3),
                 aif, time
@@ -196,11 +196,11 @@ Use specific GPU devices:
     # Select GPU device
     with cp.cuda.Device(0):
         # Processing uses GPU 0
-        result_0 = osipy.fit_model("extended_tofts", data_0, aif, time)
+        result_0 = osipy.dce_fit_model("extended_tofts", data_0, aif, time)
 
     with cp.cuda.Device(1):
         # Processing uses GPU 1
-        result_1 = osipy.fit_model("extended_tofts", data_1, aif, time)
+        result_1 = osipy.dce_fit_model("extended_tofts", data_1, aif, time)
     ```
 
 ## Performance Tips
@@ -211,11 +211,11 @@ Use specific GPU devices:
 
     ```python
     # Process entire volume at once (better GPU utilization)
-    result = osipy.fit_model("extended_tofts", concentration, aif, time)
+    result = osipy.dce_fit_model("extended_tofts", concentration, aif, time)
 
     # NOT: loop over slices (inefficient)
     # for z in range(n_slices):
-    #     result[z] = osipy.fit_model("extended_tofts", concentration[:,:,z,:], aif, time)
+    #     result[z] = osipy.dce_fit_model("extended_tofts", concentration[:,:,z,:], aif, time)
     ```
 
 ### 2. Use Appropriate Data Types
@@ -275,7 +275,7 @@ Use specific GPU devices:
     # CuPy compiles kernels on first use
     # Run a small warmup:
     warmup = np.random.rand(8, 8, 8, 10)
-    _ = osipy.fit_model("extended_tofts", warmup, aif, time[:10])
+    _ = osipy.dce_fit_model("extended_tofts", warmup, aif, time[:10])
 
     # Subsequent runs will be faster
     ```
@@ -316,10 +316,10 @@ or when GPU memory is insufficient.
     import osipy
 
     osipy.set_backend(osipy.GPUConfig(force_cpu=True))
-    result_cpu = osipy.fit_model("extended_tofts", concentration, aif, time)
+    result_cpu = osipy.dce_fit_model("extended_tofts", concentration, aif, time)
 
     osipy.set_backend(osipy.GPUConfig(force_cpu=False))
-    result_gpu = osipy.fit_model("extended_tofts", concentration, aif, time)
+    result_gpu = osipy.dce_fit_model("extended_tofts", concentration, aif, time)
 
     ktrans_cpu = osipy.to_numpy(result_cpu.parameter_maps['Ktrans'].values)
     ktrans_gpu = osipy.to_numpy(result_gpu.parameter_maps['Ktrans'].values)

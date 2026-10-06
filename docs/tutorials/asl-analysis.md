@@ -166,7 +166,7 @@ The three main labeling types are pulsed ASL (PASL), continuous ASL (CASL), and 
     ```python
     # Quantify CBF
     # quantify_cbf returns an ASLQuantificationResult object
-    cbf_result = osipy.quantify_cbf(
+    cbf_result = osipy.asl_quantify_cbf(
         delta_m=delta_m,
         m0=m0_corrected,
         params=quant_params,
@@ -391,7 +391,7 @@ Save results in BIDS format:
     brain_mask = m0_corrected > np.percentile(m0_corrected[m0_corrected > 0], 10)
 
     # 5. Quantify CBF
-    cbf_result = osipy.quantify_cbf(delta_m, m0_corrected, quant_params, mask=brain_mask)
+    cbf_result = osipy.asl_quantify_cbf(delta_m, m0_corrected, quant_params, mask=brain_mask)
     cbf_map = cbf_result.cbf_map.values
 
     # 6. Export (export_bids expects dict[str, ParameterMap])
