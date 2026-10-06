@@ -132,7 +132,7 @@ Bi-exponential diffusion fitting: segmented, full, and Bayesian strategies for D
     aif = osipy.ParkerAIF()(time_array)
 
     # Fit Extended Tofts model
-    result = osipy.fit_model(
+    result = osipy.dce_fit_model(
         "extended_tofts",
         concentration=dataset.data,
         aif=aif,

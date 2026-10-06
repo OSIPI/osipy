@@ -193,7 +193,7 @@ The time conversion happens automatically:
 
     ```python
     # Public API uses seconds
-    result = osipy.fit_model("extended_tofts", concentration, aif, time_in_seconds)
+    result = osipy.dce_fit_model("extended_tofts", concentration, aif, time_in_seconds)
 
     # Internally, models use minutes for Ktrans units
     time_minutes = time_seconds / 60
@@ -274,7 +274,7 @@ In practice, the AIF may arrive at different times in different tissue regions. 
 !!! example "Fit with automatic delay estimation"
 
     ```python
-    result = osipy.fit_model(
+    result = osipy.dce_fit_model(
         "extended_tofts", concentration, aif, time,
         fit_delay=True  # Estimate arterial delay per voxel
     )

@@ -14,7 +14,7 @@ Export analysis results in Brain Imaging Data Structure (BIDS) derivatives forma
     import osipy
 
     # After fitting
-    result = osipy.fit_model("extended_tofts", concentration, aif, time)
+    result = osipy.dce_fit_model("extended_tofts", concentration, aif, time)
 
     # Export to BIDS
     # export_bids signature: (parameter_maps, output_dir, subject_id, session_id, metadata)
@@ -182,7 +182,7 @@ Export analysis results in Brain Imaging Data Structure (BIDS) derivatives forma
     for subj in subjects:
         # Load and process
         data = osipy.load_nifti(f"sub-{subj}/perf/dce.nii.gz")
-        result = osipy.fit_model("extended_tofts", data.data, aif, time)
+        result = osipy.dce_fit_model("extended_tofts", data.data, aif, time)
 
         # Export
         osipy.export_bids(

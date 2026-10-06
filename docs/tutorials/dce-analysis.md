@@ -201,7 +201,7 @@ See [How to Use a Custom AIF](../how-to/use-custom-aif.md) for detailed instruct
 
 ```python
 # Fit Extended Tofts model
-result = osipy.fit_model(
+result = osipy.dce_fit_model(
     "extended_tofts",
     concentration=concentration,
     aif=aif,
@@ -231,7 +231,7 @@ See [Understanding Pharmacokinetic Models](../explanation/pharmacokinetic-models
 
 ```python
 # Compare with Standard Tofts
-result_standard = osipy.fit_model(
+result_standard = osipy.dce_fit_model(
     "tofts",
     concentration=concentration,
     aif=aif,
@@ -466,7 +466,7 @@ aif_model = osipy.ParkerAIF()
 aif = aif_model(perf.time_points)
 
 # 5. Extended Tofts fit.
-fit_result = osipy.fit_model(
+fit_result = osipy.dce_fit_model(
     model_name="extended_tofts",
     concentration=concentration,
     aif=aif,
