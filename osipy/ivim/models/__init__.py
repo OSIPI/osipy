@@ -5,7 +5,8 @@ implementing the bi-exponential and simplified IVIM models for
 separating diffusion and perfusion contributions.
 
 Models are registered via ``@register_ivim_model`` and can be
-retrieved by name with ``get_ivim_model()``.
+retrieved by name with ``get_ivim_model()``. Use ``list_models()``
+to see all registered model names.
 
 References
 ----------
@@ -21,6 +22,7 @@ from osipy.ivim.models.biexponential import (
 )
 from osipy.ivim.models.registry import (
     get_ivim_model,
+    list_models,
     register_ivim_model,
 )
 
@@ -35,5 +37,6 @@ __all__ = [
     "IVIMParams",
     "IVIMSimplifiedModel",
     "get_ivim_model",
+    "list_models",
     "register_ivim_model",
 ]
