@@ -36,6 +36,7 @@ from osipy.ivim.models import (
     IVIMParams,
     IVIMSimplifiedModel,
     get_ivim_model,
+    list_models,
     register_ivim_model,
 )
 
@@ -54,6 +55,7 @@ __all__ = [
     # Registry
     "get_ivim_model",
     "list_ivim_fitters",
+    "list_models",
     # IVIM fitter registry
     "register_ivim_fitter",
     "register_ivim_model",
