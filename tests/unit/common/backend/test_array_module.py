@@ -20,6 +20,7 @@ from osipy.common.backend.config import (
     get_backend,
     set_backend,
 )
+from osipy.common.exceptions import GPUTransferError
 
 
 class TestGetArrayModule:
@@ -119,6 +120,41 @@ class TestToGpu:
         data = np.array([1.0, 2.0, 3.0])
         result = to_gpu(data)
         np.testing.assert_array_almost_equal(to_numpy(result), data)
+
+    def test_transfer_failure_raises_instead_of_falling_back(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """GH-175: a failed GPU transfer must not be swallowed silently.
+
+        With a GPU detected and force_cpu unset, a transfer failure must
+        raise GPUTransferError rather than silently returning a NumPy
+        array, since callers rely on use_gpu staying accurate for
+        chunk-sizing and threading decisions.
+        """
+        import osipy.common.backend.array_module as array_module
+
+        fake_cp = type(
+            "FakeCupy",
+            (),
+            {
+                "asarray": staticmethod(
+                    lambda arr: (_ for _ in ()).throw(
+                        RuntimeError("CUDA out of memory")
+                    )
+                ),
+                "ndarray": np.ndarray,
+            },
+        )()
+        monkeypatch.setattr(array_module, "_get_cupy", lambda: fake_cp)
+
+        original_config = get_backend()
+        try:
+            set_backend(GPUConfig(force_cpu=False))
+            data = np.array([1.0, 2.0, 3.0])
+            with pytest.raises(GPUTransferError, match="GPU transfer failed"):
+                to_gpu(data)
+        finally:
+            set_backend(original_config)
 
 
 class TestGpuIntegration:

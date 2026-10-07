@@ -37,7 +37,7 @@ from osipy.common.backend.config import (
     get_gpu_memory_info,
     is_gpu_available,
 )
-from osipy.common.exceptions import DataValidationError
+from osipy.common.exceptions import DataValidationError, GPUTransferError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -238,8 +238,33 @@ class BatchProcessor:
 
                 batches_processed += 1
 
+            except GPUTransferError as e:
+                # to_gpu() raises this instead of silently falling back
+                # to CPU (see array_module.to_gpu). BatchProcessor
+                # deliberately wants to keep degrading gracefully to CPU
+                # when GPU memory fills mid-run, so handle it here.
+                if not self.auto_fallback:
+                    raise
+
+                warnings.warn(
+                    f"GPU transfer failed at batch {batches_processed}: {e}. "
+                    "Falling back to CPU processing.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                fallback_occurred = True
+                use_gpu = False
+
+                # Clear GPU memory
+                self._clear_gpu_memory()
+
+                # Retry on CPU
+                results.append(func(batch))
+                batches_processed += 1
+
             except Exception as e:
-                # Check if this is a GPU memory error
+                # Check if this is a GPU memory error raised by `func`
+                # itself (as opposed to the transfer, handled above).
                 error_str = str(e).lower()
                 is_memory_error = any(
                     phrase in error_str

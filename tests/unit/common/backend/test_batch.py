@@ -8,9 +8,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from osipy.common.backend import batch as batch_module
 from osipy.common.backend.batch import BatchProcessor, BatchResult, batch_apply
 from osipy.common.backend.config import GPUConfig, set_backend
-from osipy.common.exceptions import DataValidationError
+from osipy.common.exceptions import DataValidationError, GPUTransferError
 
 
 class TestBatchResult:
@@ -134,6 +135,52 @@ class TestBatchProcessor:
             assert result.used_gpu is False
         finally:
             set_backend(original_config)
+
+
+class TestGpuTransferFallback:
+    """GH-175/GH-176: BatchProcessor must keep its deliberate CPU fallback
+    when a GPU transfer fails, even though to_gpu() itself now raises
+    instead of silently degrading."""
+
+    def test_falls_back_to_cpu_on_gpu_transfer_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A GPUTransferError from to_gpu() should be caught and the
+        batch retried on CPU when auto_fallback is True (the default)."""
+        monkeypatch.setattr(batch_module, "is_gpu_available", lambda: True)
+
+        def _raise(arr: np.ndarray) -> np.ndarray:
+            raise GPUTransferError("GPU transfer failed (CUDA out of memory)")
+
+        monkeypatch.setattr(batch_module, "to_gpu", _raise)
+
+        processor = BatchProcessor(batch_size=50, use_gpu=True)
+        data = np.arange(100).astype(np.float64)
+
+        with pytest.warns(UserWarning, match="GPU transfer failed"):
+            result = processor.map(data, lambda x: x**2)
+
+        np.testing.assert_array_almost_equal(result.data, data**2)
+        assert result.fallback_occurred is True
+        assert result.used_gpu is False
+
+    def test_reraises_gpu_transfer_error_when_auto_fallback_disabled(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With auto_fallback disabled, the GPUTransferError must propagate
+        instead of being swallowed."""
+        monkeypatch.setattr(batch_module, "is_gpu_available", lambda: True)
+
+        def _raise(arr: np.ndarray) -> np.ndarray:
+            raise GPUTransferError("GPU transfer failed (CUDA out of memory)")
+
+        monkeypatch.setattr(batch_module, "to_gpu", _raise)
+
+        processor = BatchProcessor(batch_size=50, use_gpu=True, auto_fallback=False)
+        data = np.arange(100).astype(np.float64)
+
+        with pytest.raises(GPUTransferError, match="GPU transfer failed"):
+            processor.map(data, lambda x: x**2)
 
 
 class TestBatchApply:
