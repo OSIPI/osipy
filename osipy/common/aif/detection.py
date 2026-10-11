@@ -16,6 +16,7 @@ on dynamic contrast-enhanced MR images. Comput Methods Programs Biomed
 104(3):e148-e157.
 """
 
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -28,6 +29,8 @@ from osipy.common.exceptions import AIFError
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -249,6 +252,14 @@ def detect_aif(
 
     if best_cluster is None:
         # Fall back to top individual voxels
+        logger.warning(
+            "No connected cluster of >=%d voxels found among %d candidate "
+            "cluster(s); falling back to the top %d individual voxels. "
+            "The detected AIF may be lower quality.",
+            params.cluster_size,
+            n_clusters,
+            params.cluster_size,
+        )
         selected_indices = candidate_indices[: params.cluster_size]
         final_mask = np.zeros(spatial_shape, dtype=bool)
         coords = np.unravel_index(selected_indices, spatial_shape)

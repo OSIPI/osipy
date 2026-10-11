@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import tempfile
 import time
 import warnings
@@ -21,6 +22,8 @@ import numpy as np
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -405,7 +408,14 @@ class IntermediateCache:
                 # Dict format
                 return {k[5:]: v for k, v in loaded.items() if k.startswith("data_")}
 
-        except Exception:
+        except Exception as exc:
+            # The file exists but could not be read (corrupt or unreadable);
+            # treat as a miss so the caller recomputes.
+            logger.warning(
+                "Failed to read cache entry '%s' (%s); treating as a cache miss.",
+                cache_file,
+                exc,
+            )
             return None
 
     def _get_cache_path(self, key: str) -> Path:
