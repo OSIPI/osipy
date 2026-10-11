@@ -142,14 +142,22 @@ class BoundDSCModel(BaseBoundModel):
         ta = full_params[all_names.index("Ta"), :]
 
         # Build R(t) = exp(-t/MTT) shifted by Ta
+        n_t = len(self._time)
         t = self._time[:, xp.newaxis]  # (n_t, 1)
         dt_arr = t - ta[xp.newaxis, :]  # (n_t, n_voxels)
         mtt_safe = xp.maximum(mtt[xp.newaxis, :], 1e-10)
         R = xp.where(dt_arr >= 0, xp.exp(-dt_arr / mtt_safe), 0.0)
 
-        # C(t) = CBF * A @ R (convolution via pre-computed matrix)
-        # A is (n_t, n_t), R is (n_t, n_voxels)
-        A = self._U @ (self._S[:, xp.newaxis] * (self._Vh @ R))
+        # C(t) = CBF * A @ R (convolution via pre-computed matrix).
+        # For the circulant matrix (2*n_t x 2*n_t), R must be zero-padded
+        # before applying the operator.
+        L = self._U.shape[0]
+        if n_t != L:
+            R_padded = xp.zeros((L, R.shape[1]), dtype=R.dtype)
+            R_padded[:n_t] = R
+        else:
+            R_padded = R
+        A = (self._U @ (self._S[:, xp.newaxis] * (self._Vh @ R_padded)))[:n_t]
         return cbf[xp.newaxis, :] * A
 
     def get_initial_guess_batch(

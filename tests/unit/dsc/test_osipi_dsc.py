@@ -17,6 +17,7 @@ import pytest
 
 from osipy.common.backend.array_module import get_array_module
 from osipy.dsc.deconvolution import DeconvolutionResult, get_deconvolver
+from osipy.dsc.deconvolution.svd import SVDDeconvolutionParams
 
 
 class TestOSIPIDSCReferenceData:
@@ -31,23 +32,18 @@ class TestOSIPIDSCReferenceData:
 
         self.cases = load_osipi_dsc_dro()
 
+    # Truncation levels calibrated by Wu et al. (2003) for SNR=100, TR=1.5s --
+    # the regime this data sits in. Stated explicitly since optimal values are
+    # acquisition-dependent.
     @pytest.mark.parametrize(
-        "method",
+        ("method", "params"),
         [
-            "oSVD",
-            pytest.param(
-                "cSVD",
-                marks=pytest.mark.xfail(
-                    reason=(
-                        "cSVD with fixed threshold underestimates CBF at "
-                        "high flow (CBF=70, CBV=4); 13/14 cases pass"
-                    ),
-                    strict=False,
-                ),
-            ),
+            ("sSVD", {"threshold": 0.04}),
+            ("cSVD", {"threshold": 0.03}),
+            ("oSVD", {"oscillation_index": 0.085}),
         ],
     )
-    def test_osipi_dsc_parameter_recovery(self, method):
+    def test_osipi_dsc_parameter_recovery(self, method, params):
         """Test CBV and CBF recovery against OSIPI DRO ground truth.
 
         Uses the OSIPI CodeCollection dsc_data.csv with 14 test cases
@@ -61,6 +57,7 @@ class TestOSIPIDSCReferenceData:
             pytest.skip("OSIPI DSC DRO CSV data not found")
 
         deconvolver = get_deconvolver(method)
+        svd_params = SVDDeconvolutionParams(method=method, **params)
 
         n_pass = 0
         n_fail = 0
@@ -86,19 +83,18 @@ class TestOSIPIDSCReferenceData:
             # Reshape to 3D for deconvolver: (1, 1, n_timepoints)
             conc_3d = c_tis.reshape(1, 1, -1)
 
-            result = deconvolver.deconvolve(conc_3d, c_aif, time)
+            result = deconvolver.deconvolve(conc_3d, c_aif, time, params=svd_params)
 
             assert isinstance(result, DeconvolutionResult)
 
-            rec_mtt = float(result.mtt[0, 0])
+            # CBF from the residue peak, as in the reference implementation
+            # that produced this ground truth (OSIPI CodeCollection,
+            # DSC_parameters.py) and Wu et al. (2003) "CBF set to f_max".
+            # Back-calculating it from MTT instead diverges at high flow.
+            residue = xp.asarray(result.residue_function)[0, 0]
 
-            # CBV from area ratio (standard DSC indicator-dilution theory):
-            #   CBV = integral(C_tis) / integral(C_aif) * 100  [mL/100mL]
+            rec_cbf = float(xp.max(residue)) * 60.0 * 100.0
             rec_cbv = xp.trapezoid(c_tis, time) / xp.trapezoid(c_aif, time) * 100.0
-
-            # CBF from central volume theorem: CBF = CBV / MTT * 60
-            #   CBV in mL/100mL, MTT in seconds -> CBF in mL/100mL/min
-            rec_cbf = rec_cbv / rec_mtt * 60.0 if rec_mtt > 0 else 0.0
 
             case_pass = True
 
