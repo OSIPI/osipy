@@ -3,6 +3,9 @@
 Tests for fit_model and DCEFitResult.
 """
 
+import logging
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pytest
 
@@ -11,6 +14,7 @@ from osipy.common.exceptions import FittingError
 from osipy.common.parameter_map import ParameterMap
 from osipy.dce.fitting import (
     DCEFitResult,
+    _compute_r_squared_vectorized,
     fit_model,
 )
 from osipy.dce.models import ToftsModel, ToftsParams
@@ -286,3 +290,44 @@ class TestDelayFitting:
                 f"Delay should be near 0 for non-delayed data, "
                 f"got {recovered_delay:.2f}"
             )
+
+
+class TestComputeRSquaredVectorized:
+    """Tests for _compute_r_squared_vectorized."""
+
+    def test_logs_warning_on_predict_failure(self) -> None:
+        """A failing predict_array_batch logs a warning instead of silently returning zeros."""
+        ct_4d = np.ones((2, 2, 1, 10), dtype=np.float64)
+        quality_mask = np.ones((2, 2, 1), dtype=bool)
+
+        bound_model = MagicMock()
+        bound_model.parameters = ["ktrans", "ve"]
+        bound_model.predict_array_batch.side_effect = ValueError("shape mismatch")
+
+        param_maps = {
+            "ktrans": ParameterMap(
+                name="ktrans",
+                symbol="Ktrans",
+                units="1/min",
+                values=np.full((2, 2, 1), 0.2),
+                affine=np.eye(4),
+            ),
+            "ve": ParameterMap(
+                name="ve",
+                symbol="ve",
+                units="mL/100mL",
+                values=np.full((2, 2, 1), 0.3),
+                affine=np.eye(4),
+            ),
+        }
+
+        with patch("osipy.dce.fitting.logger") as mock_logger:
+            result = _compute_r_squared_vectorized(
+                ct_4d, bound_model, param_maps, quality_mask, np
+            )
+
+        mock_logger.warning.assert_called_once()
+        call_args = mock_logger.warning.call_args[0]
+        assert "R²" in call_args[0]
+        assert isinstance(call_args[-1], ValueError)
+        assert np.all(result == 0.0)
