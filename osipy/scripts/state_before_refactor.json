@@ -1,0 +1,82 @@
+{
+  "osipy_version": "0.1.1",
+  "captured_at": "2026-03-09T18:35:25",
+  "synthetic_shape": [
+    4,
+    4,
+    2
+  ],
+  "modalities": {
+    "DCE": {
+      "class": "DCEPipelineResult",
+      "parameter_maps_keys": [
+        "Ktrans",
+        "ve",
+        "r_squared"
+      ],
+      "quality_mask_shape": [
+        4,
+        4,
+        2
+      ],
+      "model": "Standard Tofts",
+      "access_path_params": "result.fit_result.parameter_maps[name]",
+      "access_path_mask": "result.fit_result.quality_mask",
+      "mask_guaranteed": true
+    },
+    "DSC": {
+      "class": "DSCPipelineResult",
+      "parameter_maps_keys": [
+        "cbv",
+        "cbf",
+        "mtt",
+        "ttp"
+      ],
+      "quality_mask_shape": [
+        4,
+        4,
+        2
+      ],
+      "access_path_params": "result.perfusion_maps.<name>  (individual attrs)",
+      "access_path_mask": "result.perfusion_maps.quality_mask",
+      "mask_guaranteed": false
+    },
+    "ASL": {
+      "class": "ASLPipelineResult",
+      "parameter_maps_keys": [
+        "cbf_map"
+      ],
+      "quality_mask_shape": [
+        4,
+        4,
+        2
+      ],
+      "access_path_params": "result.cbf_result.cbf_map",
+      "access_path_mask": "result.cbf_result.quality_mask",
+      "mask_guaranteed": true
+    },
+    "IVIM": {
+      "class": "IVIMPipelineResult",
+      "parameter_maps_keys": [
+        "d_map",
+        "d_star_map",
+        "f_map"
+      ],
+      "quality_mask_shape": [
+        4,
+        4,
+        2
+      ],
+      "access_path_params": "result.fit_result.<d_map|d_star_map|f_map>",
+      "access_path_mask": "result.fit_result.quality_mask",
+      "mask_guaranteed": true
+    }
+  },
+  "runner": {
+    "class": "PipelineResult",
+    "has_parameter_maps_dict": true,
+    "has_quality_mask": true,
+    "has_provenance": false,
+    "note": "run_analysis() wraps each pipeline, but lacks provenance."
+  }
+}
