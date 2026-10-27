@@ -208,3 +208,58 @@ class TestIVIMFitParams:
         )
         assert params.method == FittingMethod.FULL
         assert params.b_threshold == 150.0
+
+
+class TestSegmentedWLS:
+    """Tests for the TF2.4 segmented iterative-WLS fitter."""
+
+    def test_recovers_noiseless_parameters(self) -> None:
+        b_values = np.array([0, 10, 20, 50, 100, 200, 400, 800])
+        signal_1d = generate_ivim_signal(
+            b_values, s0=1000, d=1.0e-3, d_star=10e-3, f=0.1
+        )
+        signal = np.broadcast_to(signal_1d, (3, 3, len(b_values))).copy()
+
+        result = fit_ivim(signal, b_values, method=FittingMethod.SEGMENTED_WLS)
+
+        assert np.allclose(result.d_map.values, 1.0e-3, rtol=0.05)
+        # the segmented method underestimates f slightly (residual perfusion at b >= 200)
+        assert np.allclose(result.f_map.values, 0.1, atol=0.03)
+        assert np.allclose(result.d_star_map.values, 10e-3, rtol=0.4)
+
+    def test_matches_tf24_reference(self) -> None:
+        """Vectorized result matches the scalar TF2.4 reference algorithm."""
+        pytest.importorskip("statsmodels")
+        pytest.importorskip("scipy")
+        import importlib.util
+        import pathlib
+
+        ref_path = pathlib.Path(
+            "/home/dsmits/OSIPY/TF2.4_IVIM-MRI_CodeCollection/src/original/"
+            "fitting/TF_reference/segmented_IVIMfit.py"
+        )
+        if not ref_path.exists():
+            pytest.skip("TF2.4 reference code not available")
+        spec = importlib.util.spec_from_file_location("tf24_ref", ref_path)
+        ref = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ref)
+
+        rng = np.random.default_rng(0)
+        b_values = np.array([0, 10, 20, 50, 100, 200, 400, 800], dtype=float)
+        clean = generate_ivim_signal(b_values, s0=1000, d=1.2e-3, d_star=6e-3, f=0.12)
+        signal = clean + rng.normal(0, 5, size=(5, 1, len(b_values)))
+
+        result = fit_ivim(
+            signal[:, :, :],
+            b_values,
+            method=FittingMethod.SEGMENTED_WLS,
+            params=IVIMFitParams(
+                bounds={"D": (0.0001, 0.004), "D*": (0.001, 0.01), "f": (0.0, 0.7)}
+            ),
+        )
+        for i in range(5):
+            # the reference assumes signal normalised to S(b=0) = 1
+            d, f, dp = ref.segmented_IVIM_fit(b_values, signal[i, 0] / signal[i, 0, 0])
+            assert result.d_map.values[i, 0, 0] == pytest.approx(d, rel=1e-6)
+            assert result.f_map.values[i, 0, 0] == pytest.approx(f, abs=1e-6)
+            assert result.d_star_map.values[i, 0, 0] == pytest.approx(dp, rel=1e-3)
