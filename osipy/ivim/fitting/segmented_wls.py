@@ -62,11 +62,8 @@ def fit_segmented_IVIM_wrapper(
 
     for i, (x, y, z) in enumerate(voxel_indices):
         voxel_signal = signal[x, y, z, :]
-        try:
-            D, f, Dp = segmented_IVIM_fit(b_values, voxel_signal)
-        except Exception:  # noqa: BLE001 - leave failed voxels at zero
-            logger.debug("Segmented WLS fit failed for voxel %s", (x, y, z))
-            continue
+        D, f, Dp = segmented_IVIM_fit(b_values, voxel_signal)
+
         S0 = voxel_signal[b_values == 0].item()
         fitted[names.index("S0"), i] = S0
         fitted[names.index("D"), i] = D
@@ -96,49 +93,47 @@ def fit_segmented_IVIM_wrapper(
     )
 
 
-def fit_segmented_D(signal, b_values, b_threshold, b_cutoff=200, bounds=([0.0001, 0.0, 0.001], [0.004, 0.7, 0.01])):
+def segmented_IVIM_fit(bvalues: np.ndarray, dw_data: np.ndarray, b_cutoff=200,
+                       bounds=([0.0001, 0.0, 0.001], [0.004, 0.7, 0.01])) -> tuple[float, float, float]:
+    """Fit a bi-exponential IVIM model on a single voxel using a segmented approach.
+
+    The diffusion coefficient ``D`` is first estimated from measurements at
+    or above ``b_cutoff`` using iterative weighted least squares on the
+    logarithm of the signal. The perfusion fraction ``f`` is then estimated
+    from the mono-exponential fit's intercept and the measured signal at
+    ``b=0``. Finally, ``D*`` is fitted with ``D`` and ``f`` held fixed.
+
+    Parameters
+    ----------
+    bvalues : numpy.ndarray
+        B-values corresponding to the measurements.
+    dw_data : array-like
+        Diffusion-weighted signal measurements at a single voxel corresponding
+        to ``bvalues``. Contains exactly one ``b=0`` measurement, which is used
+        as S0. Normalizing the data to the b=0 signal beforehand (so S0 == 1)
+        reproduces the reference implementation.
+    b_cutoff : float, optional
+        Threshold separating measurements used to fit ``D`` from those used
+        to fit ``D*``. Defaults to 200.
+    bounds : tuple of array-like, optional
+        Lower and upper bounds for ``D``, ``f``, and ``D*``, respectively.
+        Defaults to ``([0.0001, 0.0, 0.001], [0.004, 0.7, 0.01])``.
+
+    Returns
+    -------
+    D : float
+        Estimated tissue diffusion coefficient.
+    f : float
+        Estimated perfusion fraction.
+    Dp : float
+        Estimated pseudo-diffusion coefficient (``D*``).
     """
-    Fit D using a WLLS on log(signal) for b > b_cutoff
-    """
-    names = ["S0", "D", "D*", "f"]
-
-    _n_b, n_vox = signal.shape
-
-    high = b_values >= b_cutoff
-    b0 = int(np.argmin(b_values))
-
-    guess = np.zeros((len(names), n_vox))
-    for v in range(n_vox):
-        s = signal[:, v]
-        s0 = s[b0]
-        try:
-            log_s = np.log(np.clip(s[high], 1e-6, None))
-            d, intercept = d_fit_iterative_wls(b_values[high], log_s)
-            d = np.clip(d, *SEGMENTED_BOUNDS["D"])
-            f = np.clip((s0 - intercept) / s0, *SEGMENTED_BOUNDS["f"])
-        except Exception:  # noqa: BLE001 - fall back to a sane guess
-            d, f = 1e-3, 0.1
-        guess[names.index("S0"), v] = s0
-        guess[names.index("D"), v] = d
-        guess[names.index("f"), v] = f
-        guess[names.index("D*"), v] = np.clip(d * 10, *SEGMENTED_BOUNDS["D*"])
-
-    return xp.asarray(guess)
-
-
-def segmented_IVIM_fit(bvalues, dw_data, b_cutoff=200, bounds=([0.0001, 0.0, 0.001], [0.004, 0.7, 0.01])):
-    """
-        A segmented fitting implementation for a bi-exponential model.
-        First D is fitted using a mono exponential model on all signal above the bvalue cutoff using an iterative WLLSVertrekpassage, Schiphol
-        Then f is fitted by using the b=0 intercept from the mono expontential fit and substracting this from the measured signal at b=0
-        Then D* is fitted using a bi-exponential model with fixed D and f
-
-        """
     bvalues_D = bvalues[bvalues >= b_cutoff]
     dw_data_D = dw_data[bvalues >= b_cutoff]
-    dw_data_D = np.clip(dw_data_D, 1e-6, None) # ensure we do not get 0 or negative values that cause nans/infs
+    dw_data_D = np.clip(dw_data_D, 1e-6, None)  # ensure we do not get 0 or negative values that cause nans/infs
     log_data_D = np.log(dw_data_D)
 
+    # Step 1: Fit D and b0_intercept using iterative WLS.
     D, b0_intercept = d_fit_iterative_wls(bvalues_D, log_data_D)
 
     D = np.clip(D, bounds[0][0], bounds[1][0])
@@ -146,14 +141,35 @@ def segmented_IVIM_fit(bvalues, dw_data, b_cutoff=200, bounds=([0.0001, 0.0, 0.0
     f = (S0 - b0_intercept) / S0
     f = np.clip(f, bounds[0][1], bounds[1][1])
 
-    Dp = scipy.optimize.least_squares(
-    fun=lambda Dp: ivim_biexp(bvalues, D, f, Dp[0]) - dw_data,
-    x0=np.clip(D * 10, bounds[0][2], bounds[1][2]), # Initial guess for D*
-    bounds=(bounds[0][2], bounds[1][2]))
+    # TODO: Replace scipy least squares by LevenbergMarquardtFitter from osipy.common.fitting, to avoid scipy dependency and to have a more robust fit.
+    model = get_ivim_model("biexponential")
 
-    Dp = Dp.x[0]
+    # Only D* is unfixed. S0 is the measured b=0 signal (the same value used for
+    # f above); it equals 1 when the data is normalized to b=0, as in the
+    # reference. The start value D*=10*D also matches the reference.
+    bound_model = BoundIVIMModel(
+        model,
+        b_values=bvalues,
+        fixed={"S0": S0, "D": D, "f": f},
+        b_threshold=b_cutoff,
+        initial_guess={"D*": float(np.clip(D * 10, bounds[0][2], bounds[1][2]))},
+    )
 
-    return D, f, Dp
+    # TODO: LevenbergMarquardtFitter should be used on the entire image at once, not per voxel.
+    # TODO: Apply specified bounds (it needs to be a dict)
+    fitter = LevenbergMarquardtFitter()
+    param_maps, r2, converged = fitter.fit_batch(bound_model, dw_data[:, np.newaxis],
+                                                 bounds_override={"D*": (bounds[0][2], bounds[1][2])})
+
+    # Dp = scipy.optimize.least_squares(
+    #     fun=lambda Dp: ivim_biexp(bvalues, D, f, Dp[0]) - dw_data,
+    #     x0=np.clip(D * 10, bounds[0][2], bounds[1][2]),  # Initial guess for D*
+    #     bounds=(bounds[0][2], bounds[1][2]))
+    #
+    # Dp = Dp.x[0]
+
+    # Because  we are fitting on one voxel, the param_maps will hold only one value for D*, so we can extract it directly.
+    return D, f, param_maps.item()
 
 
 def d_fit_iterative_wls(bvalues_D, log_signal, max_iter=50):
@@ -188,53 +204,3 @@ def d_fit_iterative_wls(bvalues_D, log_signal, max_iter=50):
     ln_b0_intercept, D = results.params
     b0_intercept = np.exp(ln_b0_intercept)
     return D, b0_intercept
-
-
-# Reference bounds used by the segmented fit, keyed by parameter name.
-SEGMENTED_BOUNDS = {"D": (1e-4, 4e-3), "f": (0.0, 0.7), "D*": (1e-3, 1e-2)}
-
-
-class SegmentedBoundIVIMModel(BoundIVIMModel):
-    """Step 2 of the segmented fit: only D* is free, S0/D/f are frozen.
-
-    S0, D and f are estimated per voxel in ``get_initial_guess_batch`` (the
-    WLS step) and then kept constant by giving them zero Jacobian columns, so
-    the shared LM fitter never moves them. The "step 1" fit therefore runs as
-    the initial guess of the LM fit.
-    """
-
-    _FROZEN = ("S0", "D", "f")
-
-    def get_initial_guess_batch(self, observed_batch, xp):
-        names = self._ivim_model.parameters
-        b = np.asarray(to_numpy(self._b_values))
-        obs = np.asarray(to_numpy(observed_batch), dtype=np.float64)
-        _n_b, n_vox = obs.shape
-
-        high = b >= self._b_threshold
-        b0 = int(np.argmin(b))
-
-        guess = np.zeros((len(names), n_vox))
-        for v in range(n_vox):
-            s = obs[:, v]
-            s0 = s[b0]
-            try:
-                log_s = np.log(np.clip(s[high], 1e-6, None))
-                d, intercept = d_fit_iterative_wls(b[high], log_s)
-                d = np.clip(d, *SEGMENTED_BOUNDS["D"])
-                f = np.clip((s0 - intercept) / s0, *SEGMENTED_BOUNDS["f"])
-            except Exception:  # noqa: BLE001 - fall back to a sane guess
-                d, f = 1e-3, 0.1
-            guess[names.index("S0"), v] = s0
-            guess[names.index("D"), v] = d
-            guess[names.index("f"), v] = f
-            guess[names.index("D*"), v] = np.clip(d * 10, *SEGMENTED_BOUNDS["D*"])
-
-        return xp.asarray(guess)
-
-    def compute_jacobian_batch(self, params_batch, predicted, xp):
-        jac = super().compute_jacobian_batch(params_batch, predicted, xp)
-        # jac: (n_free, n_b, n_vox). Zero the frozen parameters' columns.
-        for name in self._FROZEN:
-            jac[self._free_params.index(name)] = 0.0
-        return jac

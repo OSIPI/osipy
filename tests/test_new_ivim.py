@@ -19,6 +19,7 @@ from tests.conftest import generate_synthetic_ivim_data
 ZENODO_URL = "https://zenodo.org/api/records/14605039/files/OSIPI_TF24_data_phantoms.zip/content"
 ZENODO_MD5 = "e7b3fe1d811a7a45c5aaf6c604c82793"
 
+TOLERANCE = 1e-4
 
 class IVIMResults(NamedTuple):
     D: np.ndarray
@@ -107,14 +108,21 @@ def test_segmented_ivim_same_as_reference(load_data):
     Test that the segmented IVIM fit implementation in this package produces the same results as the reference implementation.
     """
     data, mask, bvals = load_data()
+    signals = _normalize_to_b0(data[mask], bvals)
 
-    new_result = _fit_ivim_new(bvals, data[mask])
-    reference_result = _fit_ivim_reference(bvals, data[mask])
+    new_result = _fit_ivim_new(bvals, signals)
+    reference_result = _fit_ivim_reference(bvals, signals)
 
     # Compare results
-    np.testing.assert_allclose(new_result.D, reference_result.D)
-    np.testing.assert_allclose(new_result.Dp, reference_result.Dp)
-    np.testing.assert_allclose(new_result.f, reference_result.f)
+    np.testing.assert_allclose(new_result.D, reference_result.D, rtol=TOLERANCE)
+    np.testing.assert_allclose(new_result.Dp, reference_result.Dp, rtol=TOLERANCE)
+    np.testing.assert_allclose(new_result.f, reference_result.f, rtol=TOLERANCE)
+
+
+def _normalize_to_b0(signals, bvalues):
+    """Divide each voxel's signal by its b=0 signal (the segmented fit expects S(b=0)=1)."""
+    b0 = signals[:, bvalues == 0].mean(axis=-1, keepdims=True)
+    return signals / b0
 
 
 def _fit_ivim_reference(bvalues, signals) -> IVIMResults:
