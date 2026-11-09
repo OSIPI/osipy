@@ -450,16 +450,10 @@ def _ivim_segmented_wls(
     signal, b_values, mask, params, use_gpu, progress_callback=None
 ) -> dict[str, ParameterMap]:
     """Segmented IVIM fitting with iterative WLS (OSIPI TF2.4 reference)."""
-    from osipy.ivim.fitting.segmented_wls import SegmentedWLSIVIMFitter
+    from osipy.ivim.fitting.segmented_wls import fit_segmented_IVIM_wrapper
 
-    return _fit_ivim_vectorized(
-        signal,
-        b_values,
-        mask,
-        params,
-        use_gpu,
-        progress_callback,
-        fitter=SegmentedWLSIVIMFitter(),
+    return fit_segmented_IVIM_wrapper(
+        signal, b_values, mask, params, use_gpu, progress_callback
     )
 
 

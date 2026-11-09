@@ -41,6 +41,7 @@ dependencies = [
     "pydantic>=2.5.0",
     "pyyaml>=6.0",
     "dcm2niix>=1.0.20260416",
+    "scipy-stubs~=1.18.1",
 ]
 
 [project.optional-dependencies]
@@ -62,6 +63,12 @@ docs = [
     "mkdocs-literate-nav>=0.6.0",
     "mkdocs-jupyter>=0.25.0",
 ]
+# TEMPORARY: OSIPI TF2.4 IVIM reference implementations, used while
+# integrating them into osipy. Remove once the integration is done.
+ivim-reference = [
+    "osipi-ivim @ git+https://github.com/OSIPI/TF2.4_IVIM-MRI_CodeCollection.git",
+]
+
 
 [project.urls]
 Homepage = "https://github.com/OSIPI/osipy"
@@ -73,6 +80,10 @@ osipy = "osipy.cli.main:main"
 
 [tool.hatch.version]
 path = "osipy/_version.py"
+
+# TEMPORARY: required for the git-URL dependency in the ivim-reference extra
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["osipy"]
@@ -220,5 +231,9 @@ line-ending = "auto"
 [dependency-groups]
 dev = [
     "vulture>=2.14",
+]
+ivim-reference = [
+    "scipy>=1.18.1",
+    "statsmodels>=0.15.0",
 ]
 
