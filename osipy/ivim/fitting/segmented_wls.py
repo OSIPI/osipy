@@ -11,6 +11,7 @@ import logging
 import numpy as np
 import scipy
 import statsmodels.api as sm
+from pygments.util import get_int_opt
 
 from osipy.common.backend.array_module import get_array_module, to_numpy
 from osipy.common.fitting import LevenbergMarquardtFitter
@@ -26,7 +27,7 @@ def ivim_biexp(bvalues, D, f, Dp, S0=1):
 
 
 def fit_segmented_IVIM_wrapper(
-    signal, b_values, mask=None, params=None, use_gpu=False, progress_callback=None
+        signal, b_values, mask=None, params=None, use_gpu=False, progress_callback=None
 ):
     """Fit IVIM per voxel with the TF2.4 segmented WLS reference algorithm.
 
@@ -95,6 +96,36 @@ def fit_segmented_IVIM_wrapper(
     )
 
 
+def fit_segmented_D(signal, b_values, b_threshold, b_cutoff=200, bounds=([0.0001, 0.0, 0.001], [0.004, 0.7, 0.01])):
+    """
+    Fit D using a WLLS on log(signal) for b > b_cutoff
+    """
+    names = ["S0", "D", "D*", "f"]
+
+    _n_b, n_vox = signal.shape
+
+    high = b_values >= b_cutoff
+    b0 = int(np.argmin(b_values))
+
+    guess = np.zeros((len(names), n_vox))
+    for v in range(n_vox):
+        s = signal[:, v]
+        s0 = s[b0]
+        try:
+            log_s = np.log(np.clip(s[high], 1e-6, None))
+            d, intercept = d_fit_iterative_wls(b_values[high], log_s)
+            d = np.clip(d, *SEGMENTED_BOUNDS["D"])
+            f = np.clip((s0 - intercept) / s0, *SEGMENTED_BOUNDS["f"])
+        except Exception:  # noqa: BLE001 - fall back to a sane guess
+            d, f = 1e-3, 0.1
+        guess[names.index("S0"), v] = s0
+        guess[names.index("D"), v] = d
+        guess[names.index("f"), v] = f
+        guess[names.index("D*"), v] = np.clip(d * 10, *SEGMENTED_BOUNDS["D*"])
+
+    return xp.asarray(guess)
+
+
 def segmented_IVIM_fit(bvalues, dw_data, b_cutoff=200, bounds=([0.0001, 0.0, 0.001], [0.004, 0.7, 0.01])):
     """
         A segmented fitting implementation for a bi-exponential model.
@@ -103,21 +134,24 @@ def segmented_IVIM_fit(bvalues, dw_data, b_cutoff=200, bounds=([0.0001, 0.0, 0.0
         Then D* is fitted using a bi-exponential model with fixed D and f
 
         """
-    # D and f (WLS) are computed in SegmentedBoundIVIMModel.get_initial_guess_batch
-    # and frozen there; the shared LM fitter only fits D*.
-    bound_model = SegmentedBoundIVIMModel(
-        get_ivim_model("biexponential"), bvalues, b_threshold=b_cutoff
-    )
-    params, _r2, _converged = LevenbergMarquardtFitter().fit_batch(
-        bound_model,
-        np.asarray(dw_data, dtype=np.float64)[:, np.newaxis],  # (n_b, 1 voxel)
-        bounds_override={"D*": (bounds[0][2], bounds[1][2])},
-    )
+    bvalues_D = bvalues[bvalues >= b_cutoff]
+    dw_data_D = dw_data[bvalues >= b_cutoff]
+    dw_data_D = np.clip(dw_data_D, 1e-6, None) # ensure we do not get 0 or negative values that cause nans/infs
+    log_data_D = np.log(dw_data_D)
 
-    names = bound_model.parameters  # ["S0", "D", "D*", "f"]
-    D = params[names.index("D"), 0]
-    f = params[names.index("f"), 0]
-    Dp = params[names.index("D*"), 0]
+    D, b0_intercept = d_fit_iterative_wls(bvalues_D, log_data_D)
+
+    D = np.clip(D, bounds[0][0], bounds[1][0])
+    S0 = dw_data[bvalues == 0].item()
+    f = (S0 - b0_intercept) / S0
+    f = np.clip(f, bounds[0][1], bounds[1][1])
+
+    Dp = scipy.optimize.least_squares(
+    fun=lambda Dp: ivim_biexp(bvalues, D, f, Dp[0]) - dw_data,
+    x0=np.clip(D * 10, bounds[0][2], bounds[1][2]), # Initial guess for D*
+    bounds=(bounds[0][2], bounds[1][2]))
+
+    Dp = Dp.x[0]
 
     return D, f, Dp
 
@@ -136,7 +170,6 @@ def d_fit_iterative_wls(bvalues_D, log_signal, max_iter=50):
     max_iter: the maximum number of iterations for WLS
 
     """
-
     bvals = sm.add_constant(-bvalues_D)
     # First do a LLS to initialize the weights
     beta_lls = np.linalg.lstsq(bvals, log_signal, rcond=None)[0]
@@ -171,7 +204,6 @@ class SegmentedBoundIVIMModel(BoundIVIMModel):
     """
 
     _FROZEN = ("S0", "D", "f")
-
 
     def get_initial_guess_batch(self, observed_batch, xp):
         names = self._ivim_model.parameters
