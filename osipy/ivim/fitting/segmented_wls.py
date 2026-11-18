@@ -141,7 +141,6 @@ def segmented_IVIM_fit(bvalues: np.ndarray, dw_data: np.ndarray, b_cutoff=200,
     f = (S0 - b0_intercept) / S0
     f = np.clip(f, bounds[0][1], bounds[1][1])
 
-    # TODO: Replace scipy least squares by LevenbergMarquardtFitter from osipy.common.fitting, to avoid scipy dependency and to have a more robust fit.
     model = get_ivim_model("biexponential")
 
     # Only D* is unfixed. S0 is the measured b=0 signal (the same value used for
