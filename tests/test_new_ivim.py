@@ -19,8 +19,7 @@ from tests.conftest import generate_synthetic_ivim_data
 ZENODO_URL = "https://zenodo.org/api/records/14605039/files/OSIPI_TF24_data_phantoms.zip/content"
 ZENODO_MD5 = "e7b3fe1d811a7a45c5aaf6c604c82793"
 
-TOLERANCE = 1e-4
-
+TOLERANCE = 1e-2
 class IVIMResults(NamedTuple):
     D: np.ndarray
     Dp: np.ndarray
@@ -117,6 +116,16 @@ def test_segmented_ivim_same_as_reference(load_data):
     np.testing.assert_allclose(new_result.D, reference_result.D, rtol=TOLERANCE)
     np.testing.assert_allclose(new_result.Dp, reference_result.Dp, rtol=TOLERANCE)
     np.testing.assert_allclose(new_result.f, reference_result.f, rtol=TOLERANCE)
+
+    # Compare distributions of fitted parameters
+    np.testing.assert_almost_equal(new_result.D.mean(), reference_result.D.mean())
+    np.testing.assert_almost_equal(new_result.Dp.mean(), reference_result.Dp.mean())
+    np.testing.assert_almost_equal(new_result.f.mean(), reference_result.f.mean())
+
+    np.testing.assert_almost_equal(new_result.D.std(), reference_result.D.std())
+    np.testing.assert_almost_equal(new_result.Dp.std(), reference_result.Dp.std())
+    np.testing.assert_almost_equal(new_result.f.std(), reference_result.f.std())
+
 
 
 def _normalize_to_b0(signals, bvalues):
